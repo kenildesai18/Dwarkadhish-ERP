@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Dwarkadhish Enterprise - Inventory, Sales & 2-Partner Ledger</title>
   <link rel="icon" type="image/jpeg" href="logo.jpg">
   
@@ -42,22 +45,22 @@
 </head>
 <body class="min-h-screen flex flex-col antialiased">
 
-  <!-- ==================== ENTERPRISE TOP HEADER ==================== -->
+  <!-- ==================== ENTERPRISE TOP HEADER (MOBILE-READY) ==================== -->
   <header class="app-header sticky top-0 z-40">
-    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+    <div class="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-14 sm:h-16">
         
         <!-- Left: Logo & Store Info -->
-        <div class="flex items-center space-x-3">
-          <div class="w-11 h-11 rounded-full overflow-hidden border-2 border-slate-200/90 shadow-sm flex-shrink-0 bg-white flex items-center justify-center">
+        <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+          <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 border-slate-200/90 shadow-sm flex-shrink-0 bg-white flex items-center justify-center">
             <img src="logo.jpg" alt="Dwarkadhish Enterprise" class="w-full h-full object-cover scale-105 rounded-full">
           </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight" id="headerBizName">
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5 sm:gap-2">
+              <h1 class="text-xs sm:text-base font-bold text-slate-900 tracking-tight truncate max-w-[130px] sm:max-w-none" id="headerBizName">
                 Dwarkadhish Enterprise
               </h1>
-              <span id="cloudSyncStatusBadge" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span id="cloudSyncStatusBadge" class="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                 <span id="cloudSyncDot" class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                 <span id="cloudSyncText">Live ERP</span>
               </span>
@@ -66,18 +69,18 @@
         </div>
 
         <!-- Right: Actions -->
-        <div class="flex items-center space-x-2.5">
-          <button onclick="openModal('settingsModal')" class="btn-outline text-sm py-1.5 px-3.5">
+        <div class="flex items-center space-x-1.5 sm:space-x-2 flex-shrink-0">
+          <button onclick="openModal('settingsModal')" class="btn-outline text-xs sm:text-sm py-1.5 px-2.5 sm:px-3.5" title="Store Settings">
             <i class="fa-solid fa-gear text-slate-500"></i>
             <span class="hidden sm:inline">Settings</span>
           </button>
           
-          <button onclick="backupSystemData()" class="btn-solid-primary text-sm py-1.5 px-3.5">
+          <button onclick="backupSystemData()" class="btn-solid-primary text-xs sm:text-sm py-1.5 px-2.5 sm:px-3.5" title="Download Backup">
             <i class="fa-solid fa-download"></i>
             <span class="hidden sm:inline">Backup</span>
           </button>
 
-          <button onclick="clearAllData()" class="btn-outline text-sm py-1.5 px-3 text-slate-400 hover:text-rose-600" title="Reset Database">
+          <button onclick="clearAllData()" class="btn-outline text-xs sm:text-sm py-1.5 px-2.5 text-slate-400 hover:text-rose-600" title="Reset Database">
             <i class="fa-solid fa-rotate-left"></i>
           </button>
         </div>
@@ -85,22 +88,26 @@
       </div>
     </div>
 
-    <!-- ==================== NAVIGATION TABS BAR ==================== -->
-    <div class="bg-white border-t border-slate-200">
-      <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex space-x-2 overflow-x-auto py-2 scrollbar-none" id="navTabs">
+    <!-- ==================== NAVIGATION TABS BAR (TOUCH SCROLLABLE) ==================== -->
+    <div class="bg-white border-t border-slate-200 shadow-sm">
+      <div class="max-w-[1440px] mx-auto px-2 sm:px-6 lg:px-8">
+        <div class="flex space-x-1.5 overflow-x-auto py-2 scrollbar-none" id="navTabs">
           <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-tab-item active">
             <i class="fa-solid fa-chart-pie text-xs"></i>
             <span>Dashboard</span>
+          </button>
+          <button onclick="switchTab('payouts')" id="tab-payouts" class="nav-tab-item">
+            <i class="fa-solid fa-building-columns text-xs text-indigo-600"></i>
+            <span>Online Payouts (15 IDs)</span>
+          </button>
+          <button onclick="switchTab('sales')" id="tab-sales" class="nav-tab-item">
+            <i class="fa-solid fa-truck-ramp-box text-xs text-purple-600"></i>
+            <span>Wholesale Bills (B2B)</span>
           </button>
           <button onclick="switchTab('products')" id="tab-products" class="nav-tab-item">
             <i class="fa-solid fa-boxes-stacked text-xs"></i>
             <span>Inventory & Stock</span>
             <span id="lowStockBadge" class="hidden ml-1 px-1.5 py-0.2 text-[10px] bg-rose-500 text-white rounded-full font-bold">0</span>
-          </button>
-          <button onclick="switchTab('sales')" id="tab-sales" class="nav-tab-item">
-            <i class="fa-solid fa-bag-shopping text-xs"></i>
-            <span>Sales Register</span>
           </button>
           <button onclick="switchTab('purchases')" id="tab-purchases" class="nav-tab-item">
             <i class="fa-solid fa-cart-shopping text-xs"></i>
@@ -123,99 +130,124 @@
     </div>
   </header>
 
-  <!-- ==================== MAIN CONTENT ==================== -->
-  <main class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+  <!-- ==================== MAIN CONTENT (RESPONSIVE) ==================== -->
+  <main class="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex-grow w-full">
 
     <!-- ==================== 1. DASHBOARD ==================== -->
-    <section id="view-dashboard" class="space-y-6">
+    <section id="view-dashboard" class="space-y-4 sm:space-y-6">
       
-      <!-- Top 4 Clean Metric Cards Grid (Guaranteed p-6) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Key Business Inward & Profit Hero Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         
-        <!-- 1. Live Stock Value -->
-        <div class="pro-card p-6 flex flex-col justify-between">
+        <!-- 1. Total Inward Bank Money Received (આવેલા કુલ રૂપિયા) -->
+        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between bg-gradient-to-br from-emerald-50/50 to-white">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-emerald-800 uppercase tracking-wider">Total Bank Inward</span>
+              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs sm:text-sm icon-box-3d">
+                <i class="fa-solid fa-building-columns"></i>
+              </div>
+            </div>
+            <h3 class="text-2xl sm:text-3xl font-extrabold text-emerald-700 mt-1.5 font-mono tracking-tight" id="dashTotalInward">₹0</h3>
+          </div>
+          <p class="text-xs text-slate-500 mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+            <span>Online 15 IDs: <b id="dashOnlineInward" class="text-slate-800 font-mono">₹0</b></span>
+            <span>Wholesale: <b id="dashWholesaleInward" class="text-slate-800 font-mono">₹0</b></span>
+          </p>
+        </div>
+
+        <!-- 2. Realized Net Profit (કુલ ચોખ્ખો નફો વધ્યો) -->
+        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between bg-gradient-to-br from-indigo-50/50 to-white">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-indigo-800 uppercase tracking-wider">Net Realized Profit</span>
+              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-indigo-100 text-indigo-800 flex items-center justify-center text-xs sm:text-sm icon-box-3d">
+                <i class="fa-solid fa-sack-dollar"></i>
+              </div>
+            </div>
+            <h3 class="text-2xl sm:text-3xl font-extrabold text-indigo-700 mt-1.5 font-mono tracking-tight" id="dashNetProfit">₹0</h3>
+          </div>
+          <p class="text-xs text-slate-500 mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 font-semibold">
+            <span>Kenil (50%): <b id="dashP1NetProfit" class="text-indigo-900 font-mono">₹0</b></span>
+            <span>Alpesh (50%): <b id="dashP2NetProfit" class="text-purple-900 font-mono">₹0</b></span>
+          </p>
+        </div>
+
+        <!-- 3. Live Stock Valuation -->
+        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between">
               <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Stock Value</span>
-              <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-sm icon-box-3d">
+              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-xs sm:text-sm icon-box-3d">
                 <i class="fa-solid fa-warehouse"></i>
               </div>
             </div>
-            <h3 class="text-3xl font-extrabold text-slate-900 mt-2 font-mono tracking-tight" id="dashStockValue">₹0</h3>
+            <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1.5 font-mono tracking-tight" id="dashStockValue">₹0</h3>
           </div>
-          <p class="text-xs text-slate-500 mt-4 flex items-center gap-2 border-t border-slate-100 pt-3">
-            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+          <p class="text-xs text-slate-500 mt-3 flex items-center gap-2 border-t border-slate-100 pt-2.5">
+            <span class="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0"></span>
             <span id="dashTotalItems" class="font-bold text-slate-800 font-mono">0</span> active SKUs in godown
           </p>
         </div>
 
-        <!-- 2. Total Business Expenses -->
-        <div class="pro-card p-6 flex flex-col justify-between">
+        <!-- 4. Total Business Expenses -->
+        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between">
               <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Expenses</span>
-              <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-sm icon-box-3d">
+              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-xs sm:text-sm icon-box-3d">
                 <i class="fa-solid fa-receipt"></i>
               </div>
             </div>
-            <h3 class="text-3xl font-extrabold text-slate-900 mt-2 font-mono tracking-tight" id="dashTotalExpenses">₹0</h3>
+            <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1.5 font-mono tracking-tight" id="dashTotalExpenses">₹0</h3>
           </div>
-          <p class="text-xs text-slate-500 mt-4 flex items-center gap-2 border-t border-slate-100 pt-3">
-            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+          <p class="text-xs text-slate-500 mt-3 flex items-center gap-2 border-t border-slate-100 pt-2.5">
+            <span class="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0"></span>
             This Month: <span id="dashMonthExpenses" class="font-bold text-slate-800 font-mono">₹0</span>
-          </p>
-        </div>
-
-        <!-- 3. Wholesale Receivables (Customer Due) -->
-        <div class="pro-card p-6 flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-emerald-800 uppercase tracking-wider">Receivables (Due)</span>
-              <button onclick="switchTab('sales')" class="text-xs text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1">
-                View <i class="fa-solid fa-arrow-right text-[10px]"></i>
-              </button>
-            </div>
-            <h3 class="text-3xl font-extrabold text-emerald-700 mt-2 font-mono tracking-tight" id="dashTotalReceivables">₹0</h3>
-          </div>
-          <p class="text-xs text-slate-500 mt-4 border-t border-slate-100 pt-3 truncate" id="dashReceivablesCount">
-            0 parties with pending balance
-          </p>
-        </div>
-
-        <!-- 4. Supplier Payables (Vendor Due) -->
-        <div class="pro-card p-6 flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-rose-800 uppercase tracking-wider">Payables (Due)</span>
-              <button onclick="switchTab('purchases')" class="text-xs text-rose-700 hover:text-rose-800 font-bold flex items-center gap-1">
-                View <i class="fa-solid fa-arrow-right text-[10px]"></i>
-              </button>
-            </div>
-            <h3 class="text-3xl font-extrabold text-rose-700 mt-2 font-mono tracking-tight" id="dashTotalPayables">₹0</h3>
-          </div>
-          <p class="text-xs text-slate-500 mt-4 border-t border-slate-100 pt-3 truncate" id="dashPayablesCount">
-            0 bills pending payment
           </p>
         </div>
 
       </div>
 
+      <!-- Quick 15-ID E-Commerce Summary Banner -->
+      <div class="pro-card p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-bold">15 Multi-Accounts Engine</span>
+            <span class="text-xs text-slate-300">Meesho (5 IDs) • Amazon (5 IDs) • Flipkart (5 IDs)</span>
+          </div>
+          <h3 class="text-base sm:text-lg font-bold text-white">Daily Bank Settlement Tracker</h3>
+          <p class="text-xs text-slate-300">
+            તમારા 15 એકાઉન્ટમાંથી રોજે રોજ બેંકમાં આવતી પેમેન્ટ એન્ટ્રી અહીં નાખો.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <button onclick="openModal('payoutModal')" class="btn-solid-emerald text-xs sm:text-sm py-2 px-4 whitespace-nowrap w-full sm:w-auto text-center">
+            <i class="fa-solid fa-plus"></i> Add Bank Payout
+          </button>
+          <button onclick="switchTab('payouts')" class="btn-outline bg-slate-800 text-white border-slate-700 hover:bg-slate-700 text-xs sm:text-sm py-2 px-3.5 whitespace-nowrap">
+            View 15 Accounts
+          </button>
+        </div>
+      </div>
+
       <!-- Middle 2-Column Section: 2-Partner Split Ledger + Stock Alerts -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
         
         <!-- Left (2 Cols): 2-Partner Split Ledger -->
         <div class="lg:col-span-2 pro-card overflow-hidden">
-          <div class="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-white">
+          <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 flex items-center justify-between bg-white">
             <div>
-              <h3 class="text-base font-bold text-slate-900">2-Partner Investment & Settlement Ledger</h3>
-              <p class="text-xs text-slate-500 mt-0.5">Real-time 50/50 capital & expense allocation engine</p>
+              <h3 class="text-sm sm:text-base font-bold text-slate-900">2-Partner Settlement Ledger</h3>
+              <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Real-time 50/50 capital & expense allocation engine</p>
             </div>
-            <button onclick="switchTab('partners')" class="btn-outline text-xs py-1.5 px-3">
-              Full Ledger <i class="fa-solid fa-chevron-right text-[9px] ml-1"></i>
+            <button onclick="switchTab('partners')" class="btn-outline text-xs py-1 px-2.5 sm:px-3">
+              Ledger <i class="fa-solid fa-chevron-right text-[9px] ml-1"></i>
             </button>
           </div>
 
-          <div class="p-6 space-y-5">
+          <div class="p-4 sm:p-6 space-y-4">
             
             <!-- Visual Contribution Bar -->
             <div class="space-y-1.5">
@@ -230,33 +262,33 @@
             </div>
 
             <!-- Partner Boxes -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-              <div class="p-4.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-1">
+              <div class="p-3.5 sm:p-4.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
                 <div class="flex items-center justify-between">
-                  <span class="font-bold text-sm text-slate-900" id="dashP1Name">Partner 1 (You)</span>
-                  <span class="text-xs px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-bold border border-indigo-200" id="dashP1Ratio">50%</span>
+                  <span class="font-bold text-xs sm:text-sm text-slate-900" id="dashP1Name">Partner 1 (You)</span>
+                  <span class="text-[11px] px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-bold border border-indigo-200" id="dashP1Ratio">50%</span>
                 </div>
-                <p class="text-xs text-slate-500 mt-1">Total Out-of-Pocket Paid / Invested:</p>
-                <h4 class="text-2xl font-extrabold text-slate-900 font-mono mt-0.5" id="dashP1TotalPaid">₹0</h4>
+                <p class="text-[11px] text-slate-500 mt-0.5">Total Out-of-Pocket Paid:</p>
+                <h4 class="text-xl sm:text-2xl font-extrabold text-slate-900 font-mono mt-0.5" id="dashP1TotalPaid">₹0</h4>
               </div>
 
-              <div class="p-4.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
+              <div class="p-3.5 sm:p-4.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
                 <div class="flex items-center justify-between">
-                  <span class="font-bold text-sm text-slate-900" id="dashP2Name">Partner 2</span>
-                  <span class="text-xs px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold border border-purple-200" id="dashP2Ratio">50%</span>
+                  <span class="font-bold text-xs sm:text-sm text-slate-900" id="dashP2Name">Partner 2</span>
+                  <span class="text-[11px] px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold border border-purple-200" id="dashP2Ratio">50%</span>
                 </div>
-                <p class="text-xs text-slate-500 mt-1">Total Out-of-Pocket Paid / Invested:</p>
-                <h4 class="text-2xl font-extrabold text-slate-900 font-mono mt-0.5" id="dashP2TotalPaid">₹0</h4>
+                <p class="text-[11px] text-slate-500 mt-0.5">Total Out-of-Pocket Paid:</p>
+                <h4 class="text-xl sm:text-2xl font-extrabold text-slate-900 font-mono mt-0.5" id="dashP2TotalPaid">₹0</h4>
               </div>
             </div>
 
             <!-- Settlement Banner -->
-            <div class="p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between shadow-sm">
-              <div class="flex items-center gap-3">
-                <i class="fa-solid fa-scale-balanced text-indigo-400 text-sm"></i>
-                <p class="text-xs font-semibold text-slate-100" id="dashSettlementText">Accounts are fully balanced (50/50)</p>
+            <div class="p-3.5 sm:p-4 rounded-xl bg-slate-900 text-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-sm">
+              <div class="flex items-center gap-2.5">
+                <i class="fa-solid fa-scale-balanced text-indigo-400 text-sm flex-shrink-0"></i>
+                <p class="text-xs sm:text-sm font-semibold text-slate-100" id="dashSettlementText">Accounts are fully balanced (50/50)</p>
               </div>
-              <button onclick="openModal('settleModal')" class="btn-solid-emerald text-xs py-1.5 px-3">
+              <button onclick="openModal('settleModal')" class="btn-solid-emerald text-xs py-1.5 px-3.5 w-full sm:w-auto text-center">
                 Settle Now
               </button>
             </div>
@@ -267,20 +299,20 @@
         <!-- Right (1 Col): Stock Alerts -->
         <div class="pro-card flex flex-col justify-between overflow-hidden">
           <div>
-            <div class="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-white">
-              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+              <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
                 <i class="fa-solid fa-triangle-exclamation text-amber-500"></i> Stock Alerts
               </h3>
               <span id="lowStockCount" class="badge-status badge-paid">Optimal</span>
             </div>
             
-            <div id="dashLowStockList" class="p-6 space-y-2.5 max-h-48 overflow-y-auto pr-2">
+            <div id="dashLowStockList" class="p-4 sm:p-5 space-y-2.5 max-h-48 overflow-y-auto pr-2">
               <!-- Dynamically populated -->
             </div>
           </div>
 
-          <div class="p-6 pt-0 border-t border-slate-100 bg-white">
-            <button onclick="openModal('productModal')" class="btn-outline w-full text-sm mt-4">
+          <div class="p-4 sm:p-5 pt-0 border-t border-slate-100 bg-white">
+            <button onclick="openModal('productModal')" class="btn-outline w-full text-xs sm:text-sm mt-3">
               <i class="fa-solid fa-plus"></i> Add Product
             </button>
           </div>
@@ -290,11 +322,11 @@
 
       <!-- Bottom: Recent Business Activities Table -->
       <div class="pro-card overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Recent Business Activities</h3>
-          <span class="text-xs text-slate-400">Live Auto-Sync</span>
+        <div class="px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">Recent Business Activities</h3>
+          <span class="text-[11px] text-slate-400">Live Auto-Sync</span>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto scrollbar-none">
           <table class="pro-table">
             <thead>
               <tr>
@@ -314,15 +346,152 @@
 
     </section>
 
-    <!-- ==================== 2. INVENTORY & STOCK ==================== -->
-    <section id="view-products" class="hidden space-y-5">
+    <!-- ==================== 2. ONLINE BANK PAYOUTS (15 ACCOUNTS) ==================== -->
+    <section id="view-payouts" class="hidden space-y-4 sm:space-y-5">
       
       <!-- Top Action Bar -->
-      <div class="pro-card p-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div class="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+      <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-building-columns text-indigo-600"></i> Online Bank Payouts Register (15 IDs)
+          </h3>
+          <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Track daily bank settlements received across Meesho, Amazon & Flipkart</p>
+        </div>
+
+        <button onclick="openModal('payoutModal')" class="btn-solid-emerald text-xs sm:text-sm py-2 px-4 w-full sm:w-auto">
+          <i class="fa-solid fa-plus"></i> Add Bank Payout
+        </button>
+      </div>
+
+      <!-- 15-ID Platform Breakdown Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+        
+        <!-- Meesho (5 IDs) -->
+        <div class="pro-card p-4 space-y-2 border-l-4 border-l-purple-500">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">M</span>
+              <h4 class="font-bold text-slate-900 text-xs sm:text-sm">Meesho (5 IDs)</h4>
+            </div>
+            <span class="text-xs font-bold text-purple-700 font-mono" id="meeshoTotalPayout">₹0</span>
+          </div>
+          <div class="space-y-1 text-xs text-slate-600 pt-1" id="meeshoAccountsList">
+            <!-- 5 Meesho IDs -->
+          </div>
+        </div>
+
+        <!-- Amazon (5 IDs) -->
+        <div class="pro-card p-4 space-y-2 border-l-4 border-l-amber-500">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">A</span>
+              <h4 class="font-bold text-slate-900 text-xs sm:text-sm">Amazon (5 IDs)</h4>
+            </div>
+            <span class="text-xs font-bold text-amber-700 font-mono" id="amazonTotalPayout">₹0</span>
+          </div>
+          <div class="space-y-1 text-xs text-slate-600 pt-1" id="amazonAccountsList">
+            <!-- 5 Amazon IDs -->
+          </div>
+        </div>
+
+        <!-- Flipkart (5 IDs) -->
+        <div class="pro-card p-4 space-y-2 border-l-4 border-l-blue-500">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">F</span>
+              <h4 class="font-bold text-slate-900 text-xs sm:text-sm">Flipkart (5 IDs)</h4>
+            </div>
+            <span class="text-xs font-bold text-blue-700 font-mono" id="flipkartTotalPayout">₹0</span>
+          </div>
+          <div class="space-y-1 text-xs text-slate-600 pt-1" id="flipkartAccountsList">
+            <!-- 5 Flipkart IDs -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Payouts Table -->
+      <div class="pro-card overflow-hidden">
+        <div class="overflow-x-auto scrollbar-none">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Platform</th>
+                <th>Seller Account / ID</th>
+                <th class="text-right">Bank Amount Credited (₹)</th>
+                <th>Units / Cost (₹)</th>
+                <th>Est. Net Margin (₹)</th>
+                <th>UTR / Notes</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="payoutsTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== 3. WHOLESALE REGISTER & BILLS (B2B) ==================== -->
+    <section id="view-sales" class="hidden space-y-4 sm:space-y-5">
+      
+      <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+          <div class="relative w-full sm:w-60">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+            <input type="text" id="salesSearchInput" oninput="renderSalesTable()" placeholder="Search bill, party, city..." class="input-pro pl-8">
+          </div>
+          <select id="salesFilterPayment" onchange="renderSalesTable()" class="input-pro w-full sm:w-40">
+            <option value="all">All Payment Status</option>
+            <option value="Paid">Fully Paid Only</option>
+            <option value="Partial">Partial Due Only</option>
+            <option value="Pending">Pending Due Only</option>
+          </select>
+        </div>
+
+        <button onclick="openModal('saleModal', 'wholesale')" class="btn-solid-primary text-xs sm:text-sm py-2 px-4 w-full sm:w-auto">
+          <i class="fa-solid fa-plus"></i> New Wholesale Bill
+        </button>
+      </div>
+
+      <!-- Wholesale Bills Table -->
+      <div class="pro-card overflow-hidden">
+        <div class="overflow-x-auto scrollbar-none">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>Bill #</th>
+                <th>Date</th>
+                <th>Customer / Party (City)</th>
+                <th>Items Sold</th>
+                <th class="text-right">Bill Total (₹)</th>
+                <th class="text-right">Paid / Balance (₹)</th>
+                <th class="text-right">Profit Made (₹)</th>
+                <th class="text-center">Status</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="salesTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== 4. INVENTORY & STOCK ==================== -->
+    <section id="view-products" class="hidden space-y-4 sm:space-y-5">
+      
+      <!-- Top Action Bar -->
+      <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
           <div class="relative w-full sm:w-64">
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
-            <input type="text" id="productSearchInput" oninput="renderProductsTable()" placeholder="Search product, SKU, category..." class="input-pro pl-8">
+            <input type="text" id="productSearchInput" oninput="renderProductsTable()" placeholder="Search product, SKU..." class="input-pro pl-8">
           </div>
           <select id="productFilterStock" onchange="renderProductsTable()" class="input-pro w-full sm:w-40">
             <option value="all">All Inventory</option>
@@ -332,10 +501,10 @@
         </div>
 
         <div class="flex items-center gap-2 w-full sm:w-auto">
-          <button onclick="openModal('adjustmentModal')" class="btn-outline text-sm py-2 w-full sm:w-auto">
-            <i class="fa-solid fa-sliders text-amber-500"></i> Adjust Stock (+/-)
+          <button onclick="openModal('adjustmentModal')" class="btn-outline text-xs sm:text-sm py-2 w-1/2 sm:w-auto">
+            <i class="fa-solid fa-sliders text-amber-500"></i> Adjust (+/-)
           </button>
-          <button onclick="openModal('productModal')" class="btn-solid-primary text-sm py-2 w-full sm:w-auto">
+          <button onclick="openModal('productModal')" class="btn-solid-primary text-xs sm:text-sm py-2 w-1/2 sm:w-auto">
             <i class="fa-solid fa-plus"></i> Add Product
           </button>
         </div>
@@ -343,7 +512,7 @@
 
       <!-- Products Table -->
       <div class="pro-card overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto scrollbar-none">
           <table class="pro-table">
             <thead>
               <tr>
@@ -366,80 +535,23 @@
 
     </section>
 
-    <!-- ==================== 3. SALES REGISTER ==================== -->
-    <section id="view-sales" class="hidden space-y-5">
+    <!-- ==================== 5. PURCHASES ==================== -->
+    <section id="view-purchases" class="hidden space-y-4 sm:space-y-5">
       
-      <div class="pro-card p-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div class="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
-          <div class="relative w-full sm:w-60">
-            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
-            <input type="text" id="salesSearchInput" oninput="renderSalesTable()" placeholder="Search invoice, customer..." class="input-pro pl-8">
-          </div>
-          <select id="salesFilterType" onchange="renderSalesTable()" class="input-pro w-full sm:w-36">
-            <option value="all">All Channels</option>
-            <option value="retail_online">Online / Retail</option>
-            <option value="wholesale">Wholesale</option>
-          </select>
-          <select id="salesFilterPayment" onchange="renderSalesTable()" class="input-pro w-full sm:w-36">
-            <option value="all">All Status</option>
-            <option value="Paid">Paid Only</option>
-            <option value="Partial">Partial Only</option>
-            <option value="Pending">Pending / Due Only</option>
-          </select>
-        </div>
-
-        <div class="flex items-center gap-2 w-full sm:w-auto">
-          <button onclick="openModal('saleModal', 'retail_online')" class="btn-solid-emerald text-sm py-2 w-full sm:w-auto">
-            <i class="fa-solid fa-globe"></i> New Online Sale
-          </button>
-          <button onclick="openModal('saleModal', 'wholesale')" class="btn-solid-indigo text-sm py-2 w-full sm:w-auto">
-            <i class="fa-solid fa-truck-ramp-box"></i> New Wholesale Sale
-          </button>
-        </div>
-      </div>
-
-      <!-- Sales Table -->
-      <div class="pro-card overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="pro-table">
-            <thead>
-              <tr>
-                <th>Invoice #</th>
-                <th>Date</th>
-                <th>Channel / Type</th>
-                <th>Customer / Contact</th>
-                <th>Items Sold</th>
-                <th class="text-right">Total & Due (₹)</th>
-                <th class="text-center">Status</th>
-                <th class="text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="salesTableBody">
-              <!-- Dynamically populated -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ==================== 4. PURCHASES ==================== -->
-    <section id="view-purchases" class="hidden space-y-5">
-      
-      <div class="pro-card p-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div>
-          <h3 class="text-base font-bold text-slate-900">Purchase Bills & Supplier Inward</h3>
-          <p class="text-xs text-slate-500 mt-0.5">Track inventory arrivals and partner out-of-pocket payments</p>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900">Purchase Bills & Supplier Inward</h3>
+          <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Track inventory arrivals and partner out-of-pocket payments</p>
         </div>
         
-        <button onclick="openModal('purchaseModal')" class="btn-solid-primary text-sm py-2 w-full sm:w-auto">
+        <button onclick="openModal('purchaseModal')" class="btn-solid-primary text-xs sm:text-sm py-2 w-full sm:w-auto">
           <i class="fa-solid fa-plus"></i> New Purchase Bill
         </button>
       </div>
 
       <!-- Purchases Table -->
       <div class="pro-card overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto scrollbar-none">
           <table class="pro-table">
             <thead>
               <tr>
@@ -460,28 +572,28 @@
 
     </section>
 
-    <!-- ==================== 5. DAILY EXPENSES ==================== -->
-    <section id="view-expenses" class="hidden space-y-5">
+    <!-- ==================== 6. DAILY EXPENSES ==================== -->
+    <section id="view-expenses" class="hidden space-y-4 sm:space-y-5">
       
-      <div class="pro-card p-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div>
-          <h3 class="text-base font-bold text-slate-900">Daily Business Expenses</h3>
-          <p class="text-xs text-slate-500 mt-0.5">Packaging, shipping, refreshments, rent & operational bills</p>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900">Daily Business Expenses</h3>
+          <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Packaging, shipping, refreshments, rent & bills</p>
         </div>
 
-        <button onclick="openModal('expenseModal')" class="btn-solid-rose text-sm py-2 w-full sm:w-auto">
+        <button onclick="openModal('expenseModal')" class="btn-solid-rose text-xs sm:text-sm py-2 w-full sm:w-auto">
           <i class="fa-solid fa-plus"></i> Add Expense
         </button>
       </div>
 
       <!-- Expense Categories -->
-      <div id="expenseCategorySummary" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+      <div id="expenseCategorySummary" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5">
         <!-- Dynamically populated -->
       </div>
 
       <!-- Expenses Table -->
       <div class="pro-card overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto scrollbar-none">
           <table class="pro-table">
             <thead>
               <tr>
@@ -502,23 +614,23 @@
 
     </section>
 
-    <!-- ==================== 6. PARTNER LEDGER ==================== -->
-    <section id="view-partners" class="hidden space-y-5">
+    <!-- ==================== 7. PARTNER LEDGER ==================== -->
+    <section id="view-partners" class="hidden space-y-4 sm:space-y-5">
       
       <!-- Partner Breakdown Cards -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         
         <!-- Partner 1 Card -->
-        <div class="pro-card p-6 space-y-3.5">
-          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="pro-card p-4 sm:p-5.5 space-y-3 sm:space-y-3.5">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5 sm:pb-3">
             <div>
-              <h3 class="font-bold text-slate-900 text-lg" id="cardP1Name">Partner 1 (You)</h3>
+              <h3 class="font-bold text-slate-900 text-base sm:text-lg" id="cardP1Name">Partner 1 (You)</h3>
               <span class="text-xs text-slate-500 font-medium" id="cardP1Ratio">Profit & Expense Share: 50%</span>
             </div>
             <span class="badge-status badge-neutral">Partner 1</span>
           </div>
 
-          <div class="space-y-2.5 text-xs">
+          <div class="space-y-2 text-xs sm:text-sm">
             <div class="flex justify-between py-1 border-b border-slate-50">
               <span class="text-slate-500">Purchases Paid:</span>
               <span class="font-bold text-slate-900 font-mono" id="cardP1Purchases">₹0</span>
@@ -535,24 +647,24 @@
               <span class="text-slate-500">Direct Settlements Adjusted:</span>
               <span class="font-bold text-slate-900 font-mono" id="cardP1Settlements">₹0</span>
             </div>
-            <div class="flex justify-between pt-2.5 text-sm font-bold text-slate-900 border-t border-slate-200">
+            <div class="flex justify-between pt-2.5 text-sm sm:text-base font-bold text-slate-900 border-t border-slate-200">
               <span>Total Net Contribution:</span>
-              <span class="font-mono text-base font-extrabold text-indigo-900" id="cardP1GrandTotal">₹0</span>
+              <span class="font-mono text-base sm:text-lg font-extrabold text-indigo-900" id="cardP1GrandTotal">₹0</span>
             </div>
           </div>
         </div>
 
         <!-- Partner 2 Card -->
-        <div class="pro-card p-6 space-y-3.5">
-          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="pro-card p-4 sm:p-5.5 space-y-3 sm:space-y-3.5">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5 sm:pb-3">
             <div>
-              <h3 class="font-bold text-slate-900 text-lg" id="cardP2Name">Partner 2</h3>
+              <h3 class="font-bold text-slate-900 text-base sm:text-lg" id="cardP2Name">Partner 2</h3>
               <span class="text-xs text-slate-500 font-medium" id="cardP2Ratio">Profit & Expense Share: 50%</span>
             </div>
             <span class="badge-status badge-neutral">Partner 2</span>
           </div>
 
-          <div class="space-y-2.5 text-xs">
+          <div class="space-y-2 text-xs sm:text-sm">
             <div class="flex justify-between py-1 border-b border-slate-50">
               <span class="text-slate-500">Purchases Paid:</span>
               <span class="font-bold text-slate-900 font-mono" id="cardP2Purchases">₹0</span>
@@ -569,9 +681,9 @@
               <span class="text-slate-500">Direct Settlements Adjusted:</span>
               <span class="font-bold text-slate-900 font-mono" id="cardP2Settlements">₹0</span>
             </div>
-            <div class="flex justify-between pt-2.5 text-sm font-bold text-slate-900 border-t border-slate-200">
+            <div class="flex justify-between pt-2.5 text-sm sm:text-base font-bold text-slate-900 border-t border-slate-200">
               <span>Total Net Contribution:</span>
-              <span class="font-mono text-base font-extrabold text-purple-900" id="cardP2GrandTotal">₹0</span>
+              <span class="font-mono text-base sm:text-lg font-extrabold text-purple-900" id="cardP2GrandTotal">₹0</span>
             </div>
           </div>
         </div>
@@ -579,24 +691,24 @@
       </div>
 
       <!-- Final Settlement Verdict Card -->
-      <div class="pro-card p-6 bg-slate-900 text-white space-y-3.5">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="pro-card p-4 sm:p-6 bg-slate-900 text-white space-y-3.5">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5">
           <div>
-            <span class="text-xs text-indigo-400 font-bold uppercase tracking-wider">Automated Settlement</span>
-            <h3 class="text-lg font-bold mt-1 text-white" id="finalSettlementVerdict">
+            <span class="text-xs sm:text-sm text-indigo-400 font-bold uppercase tracking-wider">Automated Settlement</span>
+            <h3 class="text-base sm:text-xl font-bold mt-1 text-white" id="finalSettlementVerdict">
               Accounts are fully balanced (50/50)
             </h3>
-            <p class="text-xs text-slate-300 mt-1 max-w-2xl" id="finalSettlementExplanation">
+            <p class="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl" id="finalSettlementExplanation">
               Both partners have contributed equally according to the agreed ratio.
             </p>
           </div>
 
-          <div class="flex items-center gap-2.5">
-            <button onclick="openModal('capitalModal')" class="btn-outline bg-slate-800 text-white border-slate-700 hover:bg-slate-700 text-sm">
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button onclick="openModal('capitalModal')" class="btn-outline bg-slate-800 text-white border-slate-700 hover:bg-slate-700 text-xs sm:text-sm py-2 w-1/2 sm:w-auto">
               <i class="fa-solid fa-vault"></i> Add Capital
             </button>
-            <button onclick="openModal('settleModal')" class="btn-solid-emerald text-sm">
-              <i class="fa-solid fa-handshake"></i> Record Settlement
+            <button onclick="openModal('settleModal')" class="btn-solid-emerald text-xs sm:text-sm py-2 w-1/2 sm:w-auto">
+              <i class="fa-solid fa-handshake"></i> Record Settle
             </button>
           </div>
         </div>
@@ -604,10 +716,10 @@
 
       <!-- Transactions History Table -->
       <div class="pro-card overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
-          <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Capital & Settlement History</h3>
+        <div class="px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-slate-50">
+          <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">Capital & Settlement History</h3>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto scrollbar-none">
           <table class="pro-table">
             <thead>
               <tr>
@@ -629,68 +741,68 @@
 
     </section>
 
-    <!-- ==================== 7. REPORTS & EXCEL ==================== -->
-    <section id="view-reports" class="hidden space-y-5">
+    <!-- ==================== 8. REPORTS & EXCEL ==================== -->
+    <section id="view-reports" class="hidden space-y-4 sm:space-y-5">
       
       <!-- Master Excel Banner -->
-      <div class="pro-card p-6 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="pro-card p-4 sm:p-6 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5">
         <div>
-          <h3 class="text-base font-bold flex items-center gap-2">
+          <h3 class="text-sm sm:text-base font-bold flex items-center gap-2">
             <i class="fa-solid fa-file-excel text-emerald-400"></i> Master Excel Business Report
           </h3>
           <p class="text-xs text-slate-300 mt-1">
-            Export all 5 sheets (Inventory, Sales, Purchases, Expenses, Partner Ledger) in one consolidated Excel workbook (.xlsx).
+            Export all sheets (Online Payouts, Wholesale Bills, Inventory, Purchases, Expenses, Partner Ledger) in one consolidated Excel workbook (.xlsx).
           </p>
         </div>
-        <button onclick="exportAllToExcel()" class="btn-solid-emerald text-sm py-2 px-4 whitespace-nowrap">
+        <button onclick="exportAllToExcel()" class="btn-solid-emerald text-xs sm:text-sm py-2 px-4 whitespace-nowrap w-full sm:w-auto text-center">
           <i class="fa-solid fa-download"></i> Download Master Excel
         </button>
       </div>
 
       <!-- Individual Export Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         
-        <div class="pro-card p-5 space-y-2.5">
+        <div class="pro-card p-4 space-y-2">
+          <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider">Online Payouts Excel</h4>
+          <p class="text-xs text-slate-500">15 IDs bank settlements</p>
+          <button onclick="exportPayoutsToExcel()" class="btn-outline w-full text-xs sm:text-sm py-1.5">Download Sheet</button>
+        </div>
+
+        <div class="pro-card p-4 space-y-2">
+          <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider">Wholesale Bills Excel</h4>
+          <p class="text-xs text-slate-500">B2B party invoices & profits</p>
+          <button onclick="exportSalesToExcel()" class="btn-outline w-full text-xs sm:text-sm py-1.5">Download Sheet</button>
+        </div>
+
+        <div class="pro-card p-4 space-y-2">
           <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider">Stock Excel</h4>
           <p class="text-xs text-slate-500">Quantities & valuation</p>
-          <button onclick="exportStockToExcel()" class="btn-outline w-full text-sm">Download Sheet</button>
+          <button onclick="exportStockToExcel()" class="btn-outline w-full text-xs sm:text-sm py-1.5">Download Sheet</button>
         </div>
 
-        <div class="pro-card p-5 space-y-2.5">
-          <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider">Sales Excel</h4>
-          <p class="text-xs text-slate-500">Online & wholesale dues</p>
-          <button onclick="exportSalesToExcel()" class="btn-outline w-full text-sm">Download Sheet</button>
-        </div>
-
-        <div class="pro-card p-5 space-y-2.5">
-          <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider">Purchases Excel</h4>
-          <p class="text-xs text-slate-500">Vendor bills & paid by</p>
-          <button onclick="exportPurchasesToExcel()" class="btn-outline w-full text-sm">Download Sheet</button>
-        </div>
-
-        <div class="pro-card p-5 space-y-2.5">
+        <div class="pro-card p-4 space-y-2">
           <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider">Expenses Excel</h4>
           <p class="text-xs text-slate-500">Categorized expenses</p>
-          <button onclick="exportExpensesToExcel()" class="btn-outline w-full text-sm">Download Sheet</button>
+          <button onclick="exportExpensesToExcel()" class="btn-outline w-full text-xs sm:text-sm py-1.5">Download Sheet</button>
         </div>
 
       </div>
 
       <!-- Backup & Restore -->
-      <div class="pro-card p-6 space-y-3">
-        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+      <div class="pro-card p-4 sm:p-6 space-y-3">
+        <h3 class="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
           <i class="fa-solid fa-shield-halved text-slate-600"></i> Offline JSON Database Backup
         </h3>
         <p class="text-xs text-slate-500">
           Save an offline JSON copy of your business database or restore your records anytime.
         </p>
         
-        <div class="flex flex-wrap items-center gap-2.5 pt-1">
-          <button onclick="backupSystemData()" class="btn-solid-primary text-sm">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+          <button onclick="backupSystemData()" class="btn-solid-primary text-xs sm:text-sm py-2">
             <i class="fa-solid fa-download"></i> Download Backup (.json)
           </button>
           
-          <label class="btn-outline text-sm cursor-pointer">
+          <label class="btn-outline text-xs sm:text-sm py-2 cursor-pointer text-center">
             <i class="fa-solid fa-upload"></i> Restore from Backup (.json)
             <input type="file" id="restoreFileInput" accept=".json" onchange="restoreSystemData(event)" class="hidden">
           </label>
@@ -701,38 +813,185 @@
 
   </main>
 
-  <!-- ==================== MODALS ==================== -->
+  <!-- ==================== RESPONSIVE MODALS ==================== -->
 
-  <!-- 1. PRODUCT MODAL -->
-  <div id="productModal" class="modal-overlay hidden">
+  <!-- 1. ONLINE BANK PAYOUT MODAL (15 IDs) -->
+  <div id="payoutModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-lg">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900" id="productModalTitle">Add New Product</h3>
-        <button onclick="closeModal('productModal')" class="text-slate-400 hover:text-slate-600 text-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900" id="payoutModalTitle">Add Online Bank Payout</h3>
+        <button onclick="closeModal('payoutModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <form id="productForm" onsubmit="handleSaveProduct(event)" class="space-y-3.5 mt-4">
+      <form id="payoutForm" onsubmit="handleSavePayout(event)" class="space-y-3 mt-3.5">
+        <input type="hidden" id="payoutEditId" value="">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Payout Date *</label>
+            <input type="date" id="payoutDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Platform *</label>
+            <select id="payoutPlatform" onchange="updatePayoutAccountsDropdown()" required class="input-pro font-bold">
+              <option value="Meesho">Meesho (5 IDs)</option>
+              <option value="Amazon">Amazon (5 IDs)</option>
+              <option value="Flipkart">Flipkart (5 IDs)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Seller Account / ID *</label>
+          <select id="payoutAccountId" required class="input-pro font-semibold">
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Amount Credited in Bank (₹) *</label>
+          <input type="number" id="payoutBankAmount" min="1" step="any" required placeholder="0.00" class="input-pro font-mono font-bold text-emerald-600 text-base">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50 p-2.5 sm:p-3 rounded-lg border border-slate-200">
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Dispatched Orders (Optional)</label>
+            <input type="number" id="payoutUnits" min="0" placeholder="e.g. 20" class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Approx Item Cost (₹) (Optional)</label>
+            <input type="number" id="payoutApproxCost" min="0" step="any" placeholder="0.00" class="input-pro font-mono">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Bank UTR / Reference / Notes</label>
+          <input type="text" id="payoutNotes" placeholder="e.g. Settlement credited into HDFC A/c" class="input-pro">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('payoutModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-emerald text-xs sm:text-sm py-2 px-4">Save Bank Payout</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. WHOLESALE BILL MODAL -->
+  <div id="saleModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900" id="saleModalTitle">New Wholesale Bill (B2B)</h3>
+        <button onclick="closeModal('saleModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="saleForm" onsubmit="handleSaveSale(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="saleEditId" value="">
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Bill Date *</label>
+            <input type="date" id="saleDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Party / Customer Name *</label>
+            <input type="text" id="saleCustomerName" required placeholder="Party / Shop Name" class="input-pro">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">City / Location</label>
+            <input type="text" id="saleCustomerCity" placeholder="e.g. Surat, Rajkot" class="input-pro">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Customer Phone Number</label>
+          <input type="text" id="saleCustomerPhone" placeholder="Mobile / WhatsApp" class="input-pro font-mono">
+        </div>
+
+        <!-- Multi-Item Wholesale List -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-slate-800">Items in Wholesale Bill *</label>
+            <button type="button" onclick="addSaleItemRow()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+              <i class="fa-solid fa-plus"></i> Add Item
+            </button>
+          </div>
+
+          <div id="saleItemsContainer" class="space-y-2 max-h-48 sm:max-h-52 overflow-y-auto pr-1">
+            <!-- Dynamically populated rows -->
+          </div>
+        </div>
+
+        <!-- Total & Payment -->
+        <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-2.5">
+          <div class="flex items-center justify-between text-xs sm:text-sm">
+            <span class="font-bold text-slate-700">Total Bill Amount:</span>
+            <span class="text-xl sm:text-2xl font-bold text-slate-900 font-mono" id="saleTotalDisplay">₹0</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2 border-t border-slate-200">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Status *</label>
+              <select id="salePaymentStatus" onchange="toggleSalePaidAmount()" class="input-pro font-semibold">
+                <option value="Paid">Fully Paid (Paid)</option>
+                <option value="Pending">Unpaid / On Credit (Pending)</option>
+                <option value="Partial">Partial Advance Paid</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Amount Collected (₹)</label>
+              <input type="number" id="salePaidAmount" min="0" step="any" placeholder="0.00" class="input-pro font-bold font-mono text-emerald-600">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Remarks (Optional)</label>
+          <input type="text" id="saleNotes" placeholder="Payment terms or notes..." class="input-pro">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('saleModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-4">Save Bill</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. PRODUCT MODAL -->
+  <div id="productModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900" id="productModalTitle">Add New Product</h3>
+        <button onclick="closeModal('productModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="productForm" onsubmit="handleSaveProduct(event)" class="space-y-3 mt-3.5">
         <input type="hidden" id="productEditId" value="">
 
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Product Name *</label>
-          <input type="text" id="prodName" required placeholder="e.g. Cotton Kurti / Wireless Headphones" class="input-pro">
+          <input type="text" id="prodName" required placeholder="e.g. Cotton Kurti / Silk Saree" class="input-pro">
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">SKU / Item Code</label>
             <input type="text" id="prodSku" placeholder="e.g. SKU-101" class="input-pro font-mono">
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Category</label>
-            <input type="text" id="prodCategory" placeholder="Apparel / Electronics" class="input-pro">
+            <input type="text" id="prodCategory" placeholder="Apparel / Accessories" class="input-pro">
           </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Cost Price (₹) *</label>
             <input type="number" id="prodCostPrice" min="0" step="any" required placeholder="0.00" class="input-pro font-mono font-bold">
@@ -747,7 +1006,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
           <div id="openingStockGroup">
             <label class="block text-xs font-semibold text-slate-700 mb-1">Opening Stock (Qty)</label>
             <input type="number" id="prodOpeningStock" min="0" value="0" placeholder="0" class="input-pro font-mono font-bold">
@@ -758,25 +1017,25 @@
           </div>
         </div>
 
-        <div class="flex justify-end gap-2 pt-3.5 border-t border-slate-100">
-          <button type="button" onclick="closeModal('productModal')" class="btn-outline text-sm">Cancel</button>
-          <button type="submit" class="btn-solid-primary text-sm">Save Product</button>
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('productModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-4">Save Product</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 2. STOCK ADJUSTMENT MODAL -->
+  <!-- 4. STOCK ADJUSTMENT MODAL -->
   <div id="adjustmentModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-md">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900">Stock Adjustment (+/-)</h3>
-        <button onclick="closeModal('adjustmentModal')" class="text-slate-400 hover:text-slate-600 text-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900">Stock Adjustment (+/-)</h3>
+        <button onclick="closeModal('adjustmentModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <form id="adjustmentForm" onsubmit="handleSaveAdjustment(event)" class="space-y-3.5 mt-4">
+      <form id="adjustmentForm" onsubmit="handleSaveAdjustment(event)" class="space-y-3 mt-3.5">
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Select Product *</label>
           <select id="adjProductSelect" required class="input-pro font-semibold">
@@ -784,12 +1043,12 @@
           </select>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-2.5 sm:gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Action *</label>
             <select id="adjType" class="input-pro font-bold">
-              <option value="add">Add (+ Increase)</option>
-              <option value="reduce">Reduce (- Decrease)</option>
+              <option value="add">Add (+)</option>
+              <option value="reduce">Reduce (-)</option>
             </select>
           </div>
           <div>
@@ -814,135 +1073,28 @@
           <input type="text" id="adjNotes" placeholder="Order ID or notes..." class="input-pro">
         </div>
 
-        <div class="flex justify-end gap-2 pt-3.5 border-t border-slate-100">
-          <button type="button" onclick="closeModal('adjustmentModal')" class="btn-outline text-sm">Cancel</button>
-          <button type="submit" class="btn-solid-primary text-sm">Save Adjustment</button>
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('adjustmentModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-4">Save</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 3. SALE MODAL -->
-  <div id="saleModal" class="modal-overlay hidden">
-    <div class="modal-dialog max-w-2xl">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900" id="saleModalTitle">New Sale Entry</h3>
-        <button onclick="closeModal('saleModal')" class="text-slate-400 hover:text-slate-600 text-lg">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-
-      <form id="saleForm" onsubmit="handleSaveSale(event)" class="space-y-4 mt-4">
-        <input type="hidden" id="saleEditId" value="">
-
-        <!-- Sale Type -->
-        <div class="flex items-center gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
-          <label class="flex items-center gap-2 cursor-pointer font-semibold text-xs text-slate-700">
-            <input type="radio" name="saleType" value="retail_online" checked onchange="toggleSaleTypeUI()" class="accent-indigo-600">
-            <span>Online / Retail Sale (Amazon, Meesho, etc.)</span>
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer font-semibold text-xs text-slate-700">
-            <input type="radio" name="saleType" value="wholesale" onchange="toggleSaleTypeUI()" class="accent-indigo-600">
-            <span>Wholesale Sale (Party / B2B)</span>
-          </label>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Date *</label>
-            <input type="date" id="saleDate" required class="input-pro font-mono">
-          </div>
-          <div id="saleChannelGroup">
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Sales Channel *</label>
-            <select id="saleChannel" class="input-pro font-semibold">
-              <option value="Meesho">Meesho</option>
-              <option value="Amazon">Amazon</option>
-              <option value="Flipkart">Flipkart</option>
-              <option value="Shopify / Website">Website / Shopify</option>
-              <option value="Direct Retail">Direct Retail Store</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1" id="saleCustomerLabel">Customer Name / Order ID</label>
-            <input type="text" id="saleCustomerName" placeholder="Name or Order ID" class="input-pro">
-          </div>
-        </div>
-
-        <div id="wholesaleExtraFields" class="hidden grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
-            <input type="text" id="saleCustomerPhone" placeholder="Mobile / WhatsApp" class="input-pro font-mono">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">City / Address</label>
-            <input type="text" id="saleCustomerCity" placeholder="City" class="input-pro">
-          </div>
-        </div>
-
-        <!-- Multi-Item Inward List -->
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <label class="text-xs font-bold text-slate-800">Items to Sell *</label>
-            <button type="button" onclick="addSaleItemRow()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-              <i class="fa-solid fa-plus"></i> Add Item
-            </button>
-          </div>
-
-          <div id="saleItemsContainer" class="space-y-2 max-h-52 overflow-y-auto pr-1">
-            <!-- Dynamically populated rows -->
-          </div>
-        </div>
-
-        <!-- Total & Payment -->
-        <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
-          <div class="flex items-center justify-between text-sm">
-            <span class="font-bold text-slate-700">Total Invoice Amount:</span>
-            <span class="text-2xl font-bold text-slate-900 font-mono" id="saleTotalDisplay">₹0</span>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-slate-200">
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Status *</label>
-              <select id="salePaymentStatus" onchange="toggleSalePaidAmount()" class="input-pro font-semibold">
-                <option value="Paid">Fully Paid (Paid)</option>
-                <option value="Pending">Unpaid / Credit (Pending)</option>
-                <option value="Partial">Partial / Advance Paid</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Amount Received (₹)</label>
-              <input type="number" id="salePaidAmount" min="0" step="any" placeholder="0.00" class="input-pro font-bold font-mono text-emerald-600">
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Remarks (Optional)</label>
-          <input type="text" id="saleNotes" placeholder="Payment terms or order notes..." class="input-pro">
-        </div>
-
-        <div class="flex justify-end gap-2 pt-3.5 border-t border-slate-100">
-          <button type="button" onclick="closeModal('saleModal')" class="btn-outline text-sm">Cancel</button>
-          <button type="submit" class="btn-solid-primary text-sm">Save Sale</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- 4. PURCHASE MODAL -->
+  <!-- 5. PURCHASE MODAL -->
   <div id="purchaseModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-2xl">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900" id="purchaseModalTitle">New Purchase Bill</h3>
-        <button onclick="closeModal('purchaseModal')" class="text-slate-400 hover:text-slate-600 text-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900" id="purchaseModalTitle">New Purchase Bill</h3>
+        <button onclick="closeModal('purchaseModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <form id="purchaseForm" onsubmit="handleSavePurchase(event)" class="space-y-4 mt-4">
+      <form id="purchaseForm" onsubmit="handleSavePurchase(event)" class="space-y-3.5 mt-3.5">
         <input type="hidden" id="purchaseEditId" value="">
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Bill Date *</label>
             <input type="date" id="purchaseDate" required class="input-pro font-mono">
@@ -966,18 +1118,18 @@
             </button>
           </div>
 
-          <div id="purchaseItemsContainer" class="space-y-2 max-h-52 overflow-y-auto pr-1">
+          <div id="purchaseItemsContainer" class="space-y-2 max-h-48 sm:max-h-52 overflow-y-auto pr-1">
             <!-- Dynamically populated rows -->
           </div>
         </div>
 
-        <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
-          <div class="flex items-center justify-between text-sm">
+        <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-2.5">
+          <div class="flex items-center justify-between text-xs sm:text-sm">
             <span class="font-bold text-slate-700">Total Bill Amount:</span>
-            <span class="text-2xl font-bold text-slate-900 font-mono" id="purchaseTotalDisplay">₹0</span>
+            <span class="text-xl sm:text-2xl font-bold text-slate-900 font-mono" id="purchaseTotalDisplay">₹0</span>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-slate-200">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2 border-t border-slate-200">
             <div>
               <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Status *</label>
               <select id="purchasePaymentStatus" onchange="togglePurchasePaymentUI()" class="input-pro font-semibold">
@@ -994,18 +1146,18 @@
         </div>
 
         <!-- Paid By Partner -->
-        <div id="purchasePaidBySection" class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-1.5">
+        <div id="purchasePaidBySection" class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
           <label class="block text-xs font-bold text-slate-800">Who Paid This Bill? (Partner Ledger) *</label>
           <div class="grid grid-cols-3 gap-2">
-            <label class="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700">
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700 text-center">
               <input type="radio" name="purchasePaidBy" value="partner1" checked class="hidden">
-              <span id="purchaseP1RadioLabel">Partner 1</span>
+              <span id="purchaseP1RadioLabel" class="truncate">Partner 1</span>
             </label>
-            <label class="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700">
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700 text-center">
               <input type="radio" name="purchasePaidBy" value="partner2" class="hidden">
-              <span id="purchaseP2RadioLabel">Partner 2</span>
+              <span id="purchaseP2RadioLabel" class="truncate">Partner 2</span>
             </label>
-            <label class="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700">
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700 text-center">
               <input type="radio" name="purchasePaidBy" value="business_account" class="hidden">
               <span>Business</span>
             </label>
@@ -1014,31 +1166,31 @@
 
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Remarks (Optional)</label>
-          <input type="text" id="purchaseNotes" placeholder="Vendor contact or payment notes..." class="input-pro">
+          <input type="text" id="purchaseNotes" placeholder="Vendor contact or notes..." class="input-pro">
         </div>
 
-        <div class="flex justify-end gap-2 pt-3.5 border-t border-slate-100">
-          <button type="button" onclick="closeModal('purchaseModal')" class="btn-outline text-sm">Cancel</button>
-          <button type="submit" class="btn-solid-primary text-sm">Save Purchase Bill</button>
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('purchaseModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-4">Save Bill</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 5. EXPENSE MODAL -->
+  <!-- 6. EXPENSE MODAL -->
   <div id="expenseModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-md">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900" id="expenseModalTitle">Add Daily Expense</h3>
-        <button onclick="closeModal('expenseModal')" class="text-slate-400 hover:text-slate-600 text-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900" id="expenseModalTitle">Add Daily Expense</h3>
+        <button onclick="closeModal('expenseModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <form id="expenseForm" onsubmit="handleSaveExpense(event)" class="space-y-3.5 mt-4">
+      <form id="expenseForm" onsubmit="handleSaveExpense(event)" class="space-y-3 mt-3.5">
         <input type="hidden" id="expenseEditId" value="">
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Date *</label>
             <input type="date" id="expenseDate" required class="input-pro font-mono">
@@ -1065,18 +1217,18 @@
         </div>
 
         <!-- Paid By -->
-        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
+        <div class="bg-slate-50 p-2.5 sm:p-3 rounded-lg border border-slate-200 space-y-1.5">
           <label class="block text-xs font-bold text-slate-800">Who Paid This Expense? *</label>
           <div class="grid grid-cols-3 gap-2">
-            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700">
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700 text-center">
               <input type="radio" name="expensePaidBy" value="partner1" checked class="hidden">
-              <span id="expenseP1RadioLabel">Partner 1</span>
+              <span id="expenseP1RadioLabel" class="truncate">Partner 1</span>
             </label>
-            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700">
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700 text-center">
               <input type="radio" name="expensePaidBy" value="partner2" class="hidden">
-              <span id="expenseP2RadioLabel">Partner 2</span>
+              <span id="expenseP2RadioLabel" class="truncate">Partner 2</span>
             </label>
-            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700">
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700 text-center">
               <input type="radio" name="expensePaidBy" value="business_account" class="hidden">
               <span>Business</span>
             </label>
@@ -1088,25 +1240,25 @@
           <input type="text" id="expenseDescription" placeholder="e.g. Courier to Surat..." class="input-pro">
         </div>
 
-        <div class="flex justify-end gap-2 pt-3.5 border-t border-slate-100">
-          <button type="button" onclick="closeModal('expenseModal')" class="btn-outline text-sm">Cancel</button>
-          <button type="submit" class="btn-solid-primary text-sm">Save Expense</button>
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('expenseModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-4">Save Expense</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 6. SETTLEMENT MODAL -->
+  <!-- 7. SETTLEMENT MODAL -->
   <div id="settleModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-md">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900" id="settleModalTitle">Record Partner Settlement</h3>
-        <button onclick="closeModal('settleModal')" class="text-slate-400 hover:text-slate-600 text-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900" id="settleModalTitle">Record Partner Settlement</h3>
+        <button onclick="closeModal('settleModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <form id="settleForm" onsubmit="handleSaveSettlement(event)" class="space-y-3.5 mt-4">
+      <form id="settleForm" onsubmit="handleSaveSettlement(event)" class="space-y-3 mt-3.5">
         <input type="hidden" id="settleEditId" value="">
 
         <div>
@@ -1114,7 +1266,7 @@
           <input type="date" id="settleDate" required class="input-pro font-mono">
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Payer (Who Paid) *</label>
             <select id="settlePayer" required class="input-pro font-semibold">
@@ -1139,25 +1291,25 @@
           <input type="text" id="settleNotes" placeholder="e.g. Bank transfer, GPay..." class="input-pro">
         </div>
 
-        <div class="flex justify-end gap-2 pt-3.5 border-t border-slate-100">
-          <button type="button" onclick="closeModal('settleModal')" class="btn-outline text-sm">Cancel</button>
-          <button type="submit" class="btn-solid-emerald text-sm">Save Settlement</button>
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('settleModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-emerald text-xs sm:text-sm py-2 px-4">Save Settlement</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 7. CAPITAL MODAL -->
+  <!-- 8. CAPITAL MODAL -->
   <div id="capitalModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-md">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900" id="capitalModalTitle">Add Capital Investment</h3>
-        <button onclick="closeModal('capitalModal')" class="text-slate-400 hover:text-slate-600 text-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900" id="capitalModalTitle">Add Capital Investment</h3>
+        <button onclick="closeModal('capitalModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <form id="capitalForm" onsubmit="handleSaveCapital(event)" class="space-y-3.5 mt-4">
+      <form id="capitalForm" onsubmit="handleSaveCapital(event)" class="space-y-3 mt-3.5">
         <input type="hidden" id="capitalEditId" value="">
 
         <div>
@@ -1179,34 +1331,34 @@
 
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Remarks</label>
-          <input type="text" id="capitalNotes" placeholder="e.g. Initial capital, Meesho payout..." class="input-pro">
+          <input type="text" id="capitalNotes" placeholder="e.g. Initial capital..." class="input-pro">
         </div>
 
-        <div class="flex justify-end gap-2 pt-3.5 border-t border-slate-100">
-          <button type="button" onclick="closeModal('capitalModal')" class="btn-outline text-sm">Cancel</button>
-          <button type="submit" class="btn-solid-primary text-sm">Save Capital</button>
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('capitalModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-4">Save Capital</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 8. SETTINGS MODAL -->
+  <!-- 9. SETTINGS MODAL -->
   <div id="settingsModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-md">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900">Store & Partner Settings</h3>
-        <button onclick="closeModal('settingsModal')" class="text-slate-400 hover:text-slate-600 text-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900">Store & 15-ID Settings</h3>
+        <button onclick="closeModal('settingsModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <form id="settingsForm" onsubmit="handleSaveSettings(event)" class="space-y-4 mt-4">
+      <form id="settingsForm" onsubmit="handleSaveSettings(event)" class="space-y-3 mt-3.5">
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Store / Business Name</label>
           <input type="text" id="settingBizName" placeholder="My Commerce Store" class="input-pro">
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Partner 1 Name *</label>
             <input type="text" id="settingP1Name" required placeholder="Partner 1" class="input-pro">
@@ -1235,160 +1387,50 @@
           <div class="flex items-center justify-between">
             <div>
               <label class="block text-xs font-bold text-slate-800">
-                <i class="fa-solid fa-cloud text-indigo-600"></i> Google Cloud Database Sync (Permanent Safe)
+                <i class="fa-solid fa-cloud text-indigo-600"></i> Google Firebase Cloud Sync (Optional)
               </label>
-              <p class="text-[11px] text-slate-500">Auto-sync across both partners' phones and never lose data</p>
+              <p class="text-[11px] text-slate-500">Auto-sync across both partners' phones</p>
             </div>
-            <span id="settingCloudStatus" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">Offline</span>
+            <span id="settingCloudStatus" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">Active</span>
           </div>
 
           <div>
-            <textarea id="settingFirebaseConfig" rows="3" placeholder='Paste your Firebase config JSON here, e.g. {"apiKey": "...", "projectId": "..."}' class="input-pro font-mono text-[11px]"></textarea>
+            <textarea id="settingFirebaseConfig" rows="3" placeholder='Paste your Firebase config JSON here (optional)' class="input-pro font-mono text-[11px]"></textarea>
           </div>
         </div>
 
-        <div class="flex justify-end gap-2 pt-3.5 border-t border-slate-100">
-          <button type="button" onclick="closeModal('settingsModal')" class="btn-outline text-sm">Cancel</button>
-          <button type="submit" class="btn-solid-primary text-sm">Save Settings & Sync</button>
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('settingsModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-4">Save Settings</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 9. PRINT / INVOICE MODAL -->
+  <!-- 10. PRINT / INVOICE MODAL -->
   <div id="invoiceModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-lg">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100 no-print">
-        <h3 class="text-base font-bold text-slate-900">Tax Invoice & Receipt</h3>
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 no-print">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900">Tax Invoice & Receipt</h3>
         <div class="flex items-center gap-2">
           <button onclick="window.print()" class="btn-solid-primary text-xs py-1.5 px-3">
             <i class="fa-solid fa-print"></i> Print / PDF
           </button>
-          <button onclick="closeModal('invoiceModal')" class="text-slate-400 hover:text-slate-600 text-lg">
+          <button onclick="closeModal('invoiceModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
       </div>
 
-      <div id="invoicePrintContent" class="p-4 bg-white text-slate-900 space-y-4">
+      <div id="invoicePrintContent" class="p-2 sm:p-4 bg-white text-slate-900 space-y-4">
         <!-- Rendered dynamically -->
       </div>
     </div>
   </div>
 
-  <!-- 10. VENDOR PAY MODAL -->
-  <div id="vendorPayModal" class="modal-overlay hidden">
-    <div class="modal-dialog max-w-md">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900">Pay Supplier Balance</h3>
-        <button onclick="closeModal('vendorPayModal')" class="text-slate-400 hover:text-slate-600 text-lg">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-
-      <form id="vendorPayForm" onsubmit="handleSaveVendorPay(event)" class="space-y-3.5 mt-4">
-        <input type="hidden" id="vendorPayPurchId" value="">
-
-        <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs space-y-1.5">
-          <p><span class="text-slate-500">Supplier:</span> <b id="vpVendorName" class="text-slate-900 text-sm">-</b></p>
-          <p><span class="text-slate-500">Bill No:</span> <b id="vpBillNo" class="font-mono text-slate-900">-</b></p>
-          <div class="flex justify-between border-t border-slate-200 pt-2 mt-1 text-xs">
-            <span class="text-slate-600 font-semibold">Pending Due:</span>
-            <span class="font-bold text-rose-600 font-mono text-sm" id="vpPendingAmount">₹0</span>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Date *</label>
-            <input type="date" id="vpDate" required class="input-pro font-mono">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Amount (₹) *</label>
-            <input type="number" id="vpAmount" min="1" step="any" required placeholder="0.00" class="input-pro font-mono font-bold text-slate-900 text-base">
-          </div>
-        </div>
-
-        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
-          <label class="block text-xs font-bold text-slate-800">Who Paid? (Partner Ledger) *</label>
-          <div class="grid grid-cols-3 gap-2">
-            <label class="flex items-center justify-center gap-1 py-1.5 px-1.5 text-center rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700">
-              <input type="radio" name="vpPaidBy" value="partner1" checked class="hidden">
-              <span id="vpP1RadioLabel">Partner 1</span>
-            </label>
-            <label class="flex items-center justify-center gap-1 py-1.5 px-1.5 text-center rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700">
-              <input type="radio" name="vpPaidBy" value="partner2" class="hidden">
-              <span id="vpP2RadioLabel">Partner 2</span>
-            </label>
-            <label class="flex items-center justify-center gap-1 py-1.5 px-1.5 text-center rounded-md text-xs font-medium cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-700">
-              <input type="radio" name="vpPaidBy" value="business_account" class="hidden">
-              <span>Business</span>
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Remarks</label>
-          <input type="text" id="vpNotes" placeholder="Payment mode..." class="input-pro">
-        </div>
-
-        <div class="flex justify-end gap-2 pt-3.5 border-t border-slate-100">
-          <button type="button" onclick="closeModal('vendorPayModal')" class="btn-outline text-sm">Cancel</button>
-          <button type="submit" class="btn-solid-primary text-sm">Save Payment</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- 11. CUSTOMER COLLECT MODAL -->
-  <div id="customerCollectModal" class="modal-overlay hidden">
-    <div class="modal-dialog max-w-md">
-      <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900">Collect Customer Balance</h3>
-        <button onclick="closeModal('customerCollectModal')" class="text-slate-400 hover:text-slate-600 text-lg">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-
-      <form id="customerCollectForm" onsubmit="handleSaveCustomerCollect(event)" class="space-y-3.5 mt-4">
-        <input type="hidden" id="ccSaleId" value="">
-
-        <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs space-y-1.5">
-          <p><span class="text-slate-500">Customer:</span> <b id="ccCustomerName" class="text-slate-900 text-sm">-</b></p>
-          <p><span class="text-slate-500">Invoice:</span> <b id="ccInvoiceNo" class="font-mono text-slate-900">-</b></p>
-          <div class="flex justify-between border-t border-slate-200 pt-2 mt-1 text-xs">
-            <span class="text-slate-600 font-semibold">Pending Due:</span>
-            <span class="font-bold text-emerald-600 font-mono text-sm" id="ccPendingAmount">₹0</span>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Date *</label>
-            <input type="date" id="ccDate" required class="input-pro font-mono">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Amount Received (₹) *</label>
-            <input type="number" id="ccAmount" min="1" step="any" required placeholder="0.00" class="input-pro font-mono font-bold text-emerald-600 text-base">
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Remarks</label>
-          <input type="text" id="ccNotes" placeholder="e.g. GPay, Cash..." class="input-pro">
-        </div>
-
-        <div class="flex justify-end gap-2 pt-3.5 border-t border-slate-100">
-          <button type="button" onclick="closeModal('customerCollectModal')" class="btn-outline text-sm">Cancel</button>
-          <button type="submit" class="btn-solid-emerald text-sm">Collect Payment</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- Toast Notification -->
-  <div id="toastNotification" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-200 pointer-events-none">
-    <div class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border border-slate-700">
+  <div id="toastNotification" class="fixed bottom-4 sm:bottom-5 right-4 sm:right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-200 pointer-events-none">
+    <div class="bg-slate-900 text-white px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border border-slate-700">
       <i id="toastIcon" class="fa-solid fa-check-circle text-emerald-400 text-sm"></i>
       <span id="toastMessage">Saved successfully</span>
     </div>

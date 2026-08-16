@@ -3,7 +3,7 @@
  * Comprehensive Inventory, Multi-Channel Sales, Purchases, Daily Expenses & 2-Partner Ledger
  */
 
-// Global State (Pre-seeded with Complete Business Database)
+// Global State (Clean Pristine Database & 15-ID E-Commerce Accounts)
 const INITIAL_STORE_DATABASE = {
   settings: {
     bizName: "Dwarkadhish Enterprise",
@@ -11,77 +11,32 @@ const INITIAL_STORE_DATABASE = {
     partner2Name: "Alpesh",
     partner1Ratio: 50,
     partner2Ratio: 50,
-    firebaseConfig: ""
+    firebaseConfig: "",
+    accountNames: {
+      "meesho_1": "Meesho - ID 1",
+      "meesho_2": "Meesho - ID 2",
+      "meesho_3": "Meesho - ID 3",
+      "meesho_4": "Meesho - ID 4",
+      "meesho_5": "Meesho - ID 5",
+      "amazon_1": "Amazon - ID 1",
+      "amazon_2": "Amazon - ID 2",
+      "amazon_3": "Amazon - ID 3",
+      "amazon_4": "Amazon - ID 4",
+      "amazon_5": "Amazon - ID 5",
+      "flipkart_1": "Flipkart - ID 1",
+      "flipkart_2": "Flipkart - ID 2",
+      "flipkart_3": "Flipkart - ID 3",
+      "flipkart_4": "Flipkart - ID 4",
+      "flipkart_5": "Flipkart - ID 5"
+    }
   },
-  products: [
-    { id: "p1", sku: "DE-101", name: "Premium Cotton Printed Kurti", category: "Apparel", costPrice: 320, retailPrice: 599, wholesalePrice: 420, currentStock: 18, minStock: 5 },
-    { id: "p2", sku: "DE-102", name: "Rayon Anarkali Kurta Set", category: "Apparel", costPrice: 480, retailPrice: 899, wholesalePrice: 620, currentStock: 12, minStock: 4 },
-    { id: "p3", sku: "DE-103", name: "Georgette Designer Dupatta", category: "Accessories", costPrice: 150, retailPrice: 349, wholesalePrice: 220, currentStock: 15, minStock: 5 },
-    { id: "p4", sku: "DE-104", name: "Heavy Embroidered Silk Gown", category: "Apparel", costPrice: 750, retailPrice: 1499, wholesalePrice: 980, currentStock: 2, minStock: 2 },
-    { id: "p5", sku: "DE-105", name: "Linen Casual Shirt", category: "Apparel", costPrice: 290, retailPrice: 649, wholesalePrice: 390, currentStock: 1, minStock: 3 },
-    { id: "p6", sku: "DE-106", name: "Chanderi Saree Sample", category: "Traditional", costPrice: 281.5, retailPrice: 699, wholesalePrice: 450, currentStock: 1, minStock: 2 },
-    { id: "p7", sku: "DE-107", name: "Digital Print Night Suit", category: "Nightwear", costPrice: 210, retailPrice: 499, wholesalePrice: 290, currentStock: 0, minStock: 5 },
-    { id: "p8", sku: "DE-108", name: "Stretchable Denim Jeans", category: "Bottomwear", costPrice: 380, retailPrice: 799, wholesalePrice: 510, currentStock: 0, minStock: 3 }
-  ],
-  sales: [
-    {
-      id: "sale_1",
-      invoiceNo: "INV-1001",
-      date: "2026-08-16",
-      type: "retail_online",
-      channel: "Meesho",
-      customerName: "Pooja Sharma",
-      customerPhone: "9876543210",
-      customerCity: "Surat",
-      items: [{ productId: "p1", productName: "Premium Cotton Printed Kurti", qty: 2, price: 599, total: 1198 }],
-      totalAmount: 1198,
-      paidAmount: 1198,
-      paymentStatus: "Paid",
-      notes: "Meesho Online Order"
-    },
-    {
-      id: "sale_2",
-      invoiceNo: "INV-1002",
-      date: "2026-08-16",
-      type: "retail_online",
-      channel: "Amazon",
-      customerName: "Rahul Patel",
-      customerPhone: "9988776655",
-      customerCity: "Ahmedabad",
-      items: [{ productId: "p2", productName: "Rayon Anarkali Kurta Set", qty: 1, price: 899, total: 899 }],
-      totalAmount: 899,
-      paidAmount: 899,
-      paymentStatus: "Paid",
-      notes: "Amazon Prime Order"
-    }
-  ],
-  purchases: [
-    {
-      id: "pur_1",
-      billNo: "PB-901",
-      date: "2026-08-15",
-      vendor: "Surat Textile Hub",
-      paidBy: "partner1",
-      items: [{ productId: "p1", productName: "Premium Cotton Printed Kurti", qty: 20, costPrice: 320, total: 6400 }],
-      totalAmount: 6400,
-      paidAmount: 6400,
-      paymentStatus: "Paid",
-      notes: "Stock Inward"
-    }
-  ],
-  expenses: [
-    { id: "exp_1", date: "2026-08-16", category: "Packaging Materials", amount: 490, paidBy: "partner1", description: "Cricket box" },
-    { id: "exp_2", date: "2026-08-16", category: "Tea, Snacks & Refreshments", amount: 200, paidBy: "partner2", description: "nasto" },
-    { id: "exp_3", date: "2026-08-16", category: "Packaging Materials", amount: 300, paidBy: "partner1", description: "Amazon Box" },
-    { id: "exp_4", date: "2026-08-01", category: "Shop / Godown Rent", amount: 10000, paidBy: "partner1", description: "Monthly Godown Rent" },
-    { id: "exp_5", date: "2026-08-05", category: "Courier & Shipping", amount: 4527, paidBy: "partner2", description: "Delhivery & SpeedPost Courier" },
-    { id: "exp_6", date: "2026-08-10", category: "Electricity & Internet", amount: 2000, paidBy: "partner2", description: "Office Electricity & Wi-Fi" }
-  ],
+  products: [],
+  onlinePayouts: [],
+  sales: [],
+  purchases: [],
+  expenses: [],
   adjustments: [],
-  partnerTransactions: [
-    { id: "tx_1", date: "2026-08-15", type: "capital", payer: "partner1", receiver: "business", amount: 47048.5, notes: "Initial Inventory & Capital Investment" },
-    { id: "tx_2", date: "2026-08-15", type: "capital", payer: "partner2", receiver: "business", amount: 23473, notes: "Initial Partner Capital" }
-  ],
+  partnerTransactions: [],
   _syncTime: Date.now()
 };
 
@@ -197,8 +152,8 @@ function loadState() {
     const data = localStorage.getItem(STORAGE_KEY);
     if (data) {
       const parsed = JSON.parse(data);
-      if (parsed && (parsed.products && parsed.products.length || parsed.expenses && parsed.expenses.length)) {
-        state = { ...state, ...parsed };
+      if (parsed) {
+        state = { ...JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE)), ...parsed };
       } else {
         state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -356,7 +311,14 @@ function openModal(modalId, isEditOrParam = null) {
     return;
   }
 
-  if (modalId === 'saleModal') {
+  if (modalId === 'payoutModal') {
+    const form = document.getElementById("payoutForm");
+    if (form) form.reset();
+    document.getElementById("payoutEditId").value = "";
+    document.getElementById("payoutDate").value = new Date().toISOString().split('T')[0];
+    document.getElementById("payoutModalTitle").textContent = "Add Online Bank Payout";
+    updatePayoutAccountsDropdown();
+  } else if (modalId === 'saleModal') {
     initSaleModal(isEditOrParam);
   } else if (modalId === 'purchaseModal') {
     initPurchaseModal();
@@ -394,7 +356,7 @@ function closeModal(modalId) {
   if (modal) modal.classList.add("hidden");
 }
 
-// ==================== DASHBOARD ====================
+// ==================== DASHBOARD & PROFIT ENGINE ====================
 function renderDashboard() {
   const today = new Date().toISOString().split('T')[0];
   const curMonth = today.substring(0, 7);
@@ -420,7 +382,19 @@ function renderDashboard() {
   if (dStockVal) dStockVal.textContent = formatCurrency(totalStockVal);
   if (dItemsCount) dItemsCount.textContent = totalItemsCount;
 
-  // 2. Sales & Wholesale Receivables
+  // 2. Online Bank Payouts Inward
+  let totalOnlineInward = 0;
+  let onlineGrossProfit = 0;
+  (state.onlinePayouts || []).forEach(op => {
+    const bank = Number(op.bankAmount) || 0;
+    const cost = Number(op.approxCost) || 0;
+    totalOnlineInward += bank;
+    onlineGrossProfit += Math.max(0, bank - cost);
+  });
+
+  // 3. Wholesale Inward & Profit
+  let totalWholesaleInward = 0;
+  let wholesaleGrossProfit = 0;
   let totalReceivables = 0;
   let pendingReceivablesCount = 0;
 
@@ -429,36 +403,24 @@ function renderDashboard() {
     const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? amt : 0);
     const pending = Math.max(0, amt - paid);
 
+    totalWholesaleInward += paid;
     if (pending > 0) {
       totalReceivables += pending;
       pendingReceivablesCount++;
     }
-  });
 
-  const dTotRec = document.getElementById("dashTotalReceivables");
-  const dRecCnt = document.getElementById("dashReceivablesCount");
-  if (dTotRec) dTotRec.textContent = formatCurrency(totalReceivables);
-  if (dRecCnt) dRecCnt.textContent = `${pendingReceivablesCount} parties with pending balance`;
-
-  // 3. Purchases & Supplier Payables
-  let totalPayables = 0;
-  let pendingPayablesCount = 0;
-
-  state.purchases.forEach(p => {
-    const amt = Number(p.totalAmount) || 0;
-    const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Pending' ? 0 : amt);
-    const pending = Math.max(0, amt - paid);
-
-    if (pending > 0) {
-      totalPayables += pending;
-      pendingPayablesCount++;
+    if (s.items && s.items.length) {
+      s.items.forEach(it => {
+        const prod = state.products.find(p => p.id === it.productId);
+        const costPrice = prod ? (Number(prod.costPrice) || 0) : (Number(it.costPrice) || 0);
+        const sellingPrice = Number(it.price) || 0;
+        const qty = Number(it.qty) || 0;
+        wholesaleGrossProfit += (sellingPrice - costPrice) * qty;
+      });
+    } else {
+      wholesaleGrossProfit += amt * 0.25;
     }
   });
-
-  const dTotPay = document.getElementById("dashTotalPayables");
-  const dPayCnt = document.getElementById("dashPayablesCount");
-  if (dTotPay) dTotPay.textContent = formatCurrency(totalPayables);
-  if (dPayCnt) dPayCnt.textContent = `${pendingPayablesCount} bills pending payment`;
 
   // 4. Expenses
   let totalExpenses = 0;
@@ -474,7 +436,32 @@ function renderDashboard() {
   if (dTotalExp) dTotalExp.textContent = formatCurrency(totalExpenses);
   if (dMonthExp) dMonthExp.textContent = formatCurrency(monthExpenses);
 
-  // 5. Low Stock Alerts
+  // 5. Total Inward Bank Received (આવેલા કુલ રૂપિયા)
+  const grandInward = totalOnlineInward + totalWholesaleInward;
+  const dTotInward = document.getElementById("dashTotalInward");
+  const dOnlInward = document.getElementById("dashOnlineInward");
+  const dWhsInward = document.getElementById("dashWholesaleInward");
+
+  if (dTotInward) dTotInward.textContent = formatCurrency(grandInward);
+  if (dOnlInward) dOnlInward.textContent = formatCurrency(totalOnlineInward);
+  if (dWhsInward) dWhsInward.textContent = formatCurrency(totalWholesaleInward);
+
+  // 6. Net Realized Profit (કુલ ચોખ્ખો નફો વધ્યો)
+  const grandGrossProfit = onlineGrossProfit + wholesaleGrossProfit;
+  const netRealizedProfit = grandGrossProfit - totalExpenses;
+  const p1Ratio = (state.settings.partner1Ratio || 50) / 100;
+  const p1NetProfit = Math.round(netRealizedProfit * p1Ratio);
+  const p2NetProfit = netRealizedProfit - p1NetProfit;
+
+  const dNetProfit = document.getElementById("dashNetProfit");
+  const dP1Net = document.getElementById("dashP1NetProfit");
+  const dP2Net = document.getElementById("dashP2NetProfit");
+
+  if (dNetProfit) dNetProfit.textContent = formatCurrency(netRealizedProfit);
+  if (dP1Net) dP1Net.textContent = formatCurrency(p1NetProfit);
+  if (dP2Net) dP2Net.textContent = formatCurrency(p2NetProfit);
+
+  // 7. Low Stock Alerts
   const lowStockBadge = document.getElementById("lowStockBadge");
   const lowStockCount = document.getElementById("lowStockCount");
   const dashLowStockList = document.getElementById("dashLowStockList");
@@ -513,10 +500,10 @@ function renderDashboard() {
     }
   }
 
-  // 6. 2-Partner Calculation
+  // 8. 2-Partner Calculation
   calculatePartnerBalances();
 
-  // 7. Recent Activity Table
+  // 9. Recent Activity Table
   renderRecentActivity();
 }
 
@@ -1300,31 +1287,42 @@ function renderSalesTable() {
   if (!tbody) return;
 
   const search = (document.getElementById("salesSearchInput")?.value || "").toLowerCase();
-  const filterType = document.getElementById("salesFilterType")?.value || "all";
   const filterPayment = document.getElementById("salesFilterPayment")?.value || "all";
 
   const filtered = state.sales.filter(s => {
     const matchSearch = (s.invoiceNo && s.invoiceNo.toLowerCase().includes(search)) ||
                         (s.customerName && s.customerName.toLowerCase().includes(search)) ||
+                        (s.customerCity && s.customerCity.toLowerCase().includes(search)) ||
                         (s.customerPhone && s.customerPhone.includes(search));
     if (!matchSearch) return false;
 
-    if (filterType !== 'all' && s.type !== filterType) return false;
     if (filterPayment !== 'all' && s.paymentStatus !== filterPayment) return false;
     return true;
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="py-5 text-center text-slate-400">No sales recorded.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="py-5 text-center text-slate-400">No wholesale bills found. Click "New Wholesale Bill" above.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = filtered.map(s => {
-    const isWholesale = s.type === 'wholesale';
-    const itemsSummary = (s.items || []).map(it => `${it.productName} (${it.qty})`).join(", ");
+    const itemsSummary = (s.items || []).map(it => `${it.productName} (${it.qty} pcs @ ₹${it.price})`).join(", ");
     const total = Number(s.totalAmount) || 0;
     const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
     const pending = Math.max(0, total - paid);
+
+    let billProfit = 0;
+    if (s.items && s.items.length) {
+      s.items.forEach(it => {
+        const prod = state.products.find(p => p.id === it.productId);
+        const cost = prod ? (Number(prod.costPrice) || 0) : (Number(it.costPrice) || 0);
+        const price = Number(it.price) || 0;
+        const qty = Number(it.qty) || 0;
+        billProfit += (price - cost) * qty;
+      });
+    } else {
+      billProfit = total * 0.25;
+    }
 
     let statusBadge = "badge-paid";
     let statusText = "Paid";
@@ -1339,20 +1337,20 @@ function renderSalesTable() {
     return `
       <tr>
         <td class="font-mono font-bold text-slate-900">${s.invoiceNo}</td>
-        <td class="text-slate-500 font-mono">${formatDate(s.date)}</td>
-        <td>
-          <span class="badge-status ${isWholesale ? 'badge-partial' : 'badge-paid'}">
-            ${isWholesale ? 'Wholesale' : s.channel}
-          </span>
-        </td>
+        <td class="text-slate-500 font-mono text-xs">${formatDate(s.date)}</td>
         <td class="font-semibold text-slate-800">
           ${escapeHtml(s.customerName)}
+          ${s.customerCity ? `<span class="inline-block ml-1 text-[11px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-medium">${escapeHtml(s.customerCity)}</span>` : ''}
           ${s.customerPhone ? `<span class="block text-[10px] text-slate-400 font-mono">${escapeHtml(s.customerPhone)}</span>` : ''}
         </td>
-        <td class="text-slate-600 max-w-xs truncate" title="${escapeHtml(itemsSummary)}">${escapeHtml(itemsSummary)}</td>
+        <td class="text-slate-600 max-w-xs truncate text-xs" title="${escapeHtml(itemsSummary)}">${escapeHtml(itemsSummary)}</td>
+        <td class="text-right font-bold text-slate-900 font-mono text-sm">${formatCurrency(total)}</td>
         <td class="text-right">
-          <span class="font-bold text-slate-900 block font-mono">${formatCurrency(total)}</span>
-          ${pending > 0 ? `<span class="text-[10px] text-rose-600 font-bold block font-mono">Due: ${formatCurrency(pending)}</span>` : `<span class="text-[10px] text-emerald-600 block">Paid</span>`}
+          <span class="font-bold text-emerald-700 block font-mono text-xs">Recv: ${formatCurrency(paid)}</span>
+          ${pending > 0 ? `<span class="text-[10px] text-rose-600 font-bold block font-mono">Due: ${formatCurrency(pending)}</span>` : ''}
+        </td>
+        <td class="text-right font-mono font-extrabold text-indigo-700 text-sm">
+          +${formatCurrency(billProfit)}
         </td>
         <td class="text-center">
           <span class="badge-status ${statusBadge}">
@@ -1365,7 +1363,7 @@ function renderSalesTable() {
           ` : ''}
         </td>
         <td class="text-center space-x-1">
-          <button onclick="viewInvoiceReceipt('${s.id}')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Print Invoice">
+          <button onclick="viewInvoiceReceipt('${s.id}')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Print Bill Receipt">
             <i class="fa-solid fa-print"></i>
           </button>
           <button onclick="editSale('${s.id}')" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Edit">
@@ -1536,7 +1534,222 @@ function viewInvoiceReceipt(id) {
   openModal('invoiceModal');
 }
 
-// ==================== PURCHASES ====================
+// ==================== ONLINE BANK PAYOUTS (15 ACCOUNTS) ====================
+function updatePayoutAccountsDropdown() {
+  const platform = document.getElementById("payoutPlatform")?.value || "Meesho";
+  const select = document.getElementById("payoutAccountId");
+  if (!select) return;
+
+  const names = state.settings.accountNames || {};
+  let ids = [];
+  if (platform === "Meesho") {
+    ids = ["meesho_1", "meesho_2", "meesho_3", "meesho_4", "meesho_5"];
+  } else if (platform === "Amazon") {
+    ids = ["amazon_1", "amazon_2", "amazon_3", "amazon_4", "amazon_5"];
+  } else if (platform === "Flipkart") {
+    ids = ["flipkart_1", "flipkart_2", "flipkart_3", "flipkart_4", "flipkart_5"];
+  }
+
+  select.innerHTML = ids.map(id => {
+    const label = names[id] || id.replace('_', ' - ID ').toUpperCase();
+    return `<option value="${id}">${escapeHtml(label)}</option>`;
+  }).join('');
+}
+
+function handleSavePayout(e) {
+  e.preventDefault();
+  const editId = document.getElementById("payoutEditId")?.value;
+  const date = document.getElementById("payoutDate").value;
+  const platform = document.getElementById("payoutPlatform").value;
+  const accountId = document.getElementById("payoutAccountId").value;
+  const bankAmount = parseFloat(document.getElementById("payoutBankAmount").value) || 0;
+  const unitsDispatched = parseInt(document.getElementById("payoutUnits").value) || 0;
+  const approxCost = parseFloat(document.getElementById("payoutApproxCost").value) || 0;
+  const notes = document.getElementById("payoutNotes").value.trim();
+
+  if (bankAmount <= 0) {
+    showToast("Please enter a valid payout amount!", true);
+    return;
+  }
+
+  if (!state.onlinePayouts) state.onlinePayouts = [];
+
+  if (editId) {
+    const existing = state.onlinePayouts.find(p => p.id === editId);
+    if (existing) {
+      existing.date = date;
+      existing.platform = platform;
+      existing.accountId = accountId;
+      existing.bankAmount = bankAmount;
+      existing.unitsDispatched = unitsDispatched;
+      existing.approxCost = approxCost;
+      existing.notes = notes;
+      showToast("Bank payout updated!");
+    }
+  } else {
+    state.onlinePayouts.push({
+      id: "op_" + Date.now(),
+      date,
+      platform,
+      accountId,
+      bankAmount,
+      unitsDispatched,
+      approxCost,
+      notes
+    });
+    showToast("Bank payout saved successfully!");
+  }
+
+  saveState();
+  closeModal('payoutModal');
+  refreshAllUI();
+}
+
+function renderOnlinePayouts() {
+  if (!state.onlinePayouts) state.onlinePayouts = [];
+
+  const names = state.settings.accountNames || {};
+  let meeshoTotal = 0, amazonTotal = 0, flipkartTotal = 0;
+  const accountTotals = {};
+
+  for (let i = 1; i <= 5; i++) {
+    accountTotals[`meesho_${i}`] = 0;
+    accountTotals[`amazon_${i}`] = 0;
+    accountTotals[`flipkart_${i}`] = 0;
+  }
+
+  state.onlinePayouts.forEach(op => {
+    const amt = Number(op.bankAmount) || 0;
+    if (op.platform === 'Meesho') meeshoTotal += amt;
+    else if (op.platform === 'Amazon') amazonTotal += amt;
+    else if (op.platform === 'Flipkart') flipkartTotal += amt;
+
+    if (accountTotals[op.accountId] !== undefined) {
+      accountTotals[op.accountId] += amt;
+    }
+  });
+
+  const mTot = document.getElementById("meeshoTotalPayout");
+  const aTot = document.getElementById("amazonTotalPayout");
+  const fTot = document.getElementById("flipkartTotalPayout");
+  if (mTot) mTot.textContent = formatCurrency(meeshoTotal);
+  if (aTot) aTot.textContent = formatCurrency(amazonTotal);
+  if (fTot) fTot.textContent = formatCurrency(flipkartTotal);
+
+  // Render individual IDs list
+  const mList = document.getElementById("meeshoAccountsList");
+  if (mList) {
+    mList.innerHTML = [1,2,3,4,5].map(i => {
+      const id = `meesho_${i}`;
+      const name = names[id] || `Meesho - ID ${i}`;
+      const val = accountTotals[id] || 0;
+      return `<div class="flex justify-between py-0.5 border-b border-slate-100">
+        <span>${escapeHtml(name)}:</span>
+        <b class="font-mono text-slate-800">${formatCurrency(val)}</b>
+      </div>`;
+    }).join('');
+  }
+
+  const aList = document.getElementById("amazonAccountsList");
+  if (aList) {
+    aList.innerHTML = [1,2,3,4,5].map(i => {
+      const id = `amazon_${i}`;
+      const name = names[id] || `Amazon - ID ${i}`;
+      const val = accountTotals[id] || 0;
+      return `<div class="flex justify-between py-0.5 border-b border-slate-100">
+        <span>${escapeHtml(name)}:</span>
+        <b class="font-mono text-slate-800">${formatCurrency(val)}</b>
+      </div>`;
+    }).join('');
+  }
+
+  const fList = document.getElementById("flipkartAccountsList");
+  if (fList) {
+    fList.innerHTML = [1,2,3,4,5].map(i => {
+      const id = `flipkart_${i}`;
+      const name = names[id] || `Flipkart - ID ${i}`;
+      const val = accountTotals[id] || 0;
+      return `<div class="flex justify-between py-0.5 border-b border-slate-100">
+        <span>${escapeHtml(name)}:</span>
+        <b class="font-mono text-slate-800">${formatCurrency(val)}</b>
+      </div>`;
+    }).join('');
+  }
+
+  // Render Table
+  const tbody = document.getElementById("payoutsTableBody");
+  if (!tbody) return;
+
+  if (state.onlinePayouts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="py-5 text-center text-slate-400">No online bank settlements recorded. Click "Add Bank Payout" above.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = state.onlinePayouts.slice().reverse().map(op => {
+    const accName = names[op.accountId] || op.accountId;
+    const bank = Number(op.bankAmount) || 0;
+    const cost = Number(op.approxCost) || 0;
+    const margin = bank - cost;
+
+    let badgeClass = "bg-purple-50 text-purple-700 border-purple-200";
+    if (op.platform === 'Amazon') badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
+    else if (op.platform === 'Flipkart') badgeClass = "bg-blue-50 text-blue-700 border-blue-200";
+
+    return `
+      <tr>
+        <td class="font-mono text-slate-600">${formatDate(op.date)}</td>
+        <td>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${badgeClass}">
+            ${escapeHtml(op.platform)}
+          </span>
+        </td>
+        <td class="font-bold text-slate-800">${escapeHtml(accName)}</td>
+        <td class="text-right font-mono font-extrabold text-emerald-700 text-sm">${formatCurrency(bank)}</td>
+        <td class="text-slate-600 text-xs">${op.unitsDispatched ? `${op.unitsDispatched} units` : '-'} ${cost > 0 ? `(${formatCurrency(cost)})` : ''}</td>
+        <td class="font-mono font-bold ${margin >= 0 ? 'text-indigo-700' : 'text-rose-600'} text-xs">
+          ${formatCurrency(margin)}
+        </td>
+        <td class="text-slate-500 text-xs max-w-xs truncate" title="${escapeHtml(op.notes || '')}">${escapeHtml(op.notes || '-')}</td>
+        <td class="text-center space-x-1">
+          <button onclick="editPayout('${op.id}')" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Edit">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button onclick="deletePayout('${op.id}')" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded" title="Delete">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function editPayout(id) {
+  const op = (state.onlinePayouts || []).find(p => p.id === id);
+  if (!op) return;
+
+  openModal('payoutModal');
+  document.getElementById("payoutEditId").value = op.id;
+  document.getElementById("payoutDate").value = op.date;
+  document.getElementById("payoutPlatform").value = op.platform;
+  updatePayoutAccountsDropdown();
+  document.getElementById("payoutAccountId").value = op.accountId;
+  document.getElementById("payoutBankAmount").value = op.bankAmount;
+  document.getElementById("payoutUnits").value = op.unitsDispatched || "";
+  document.getElementById("payoutApproxCost").value = op.approxCost || "";
+  document.getElementById("payoutNotes").value = op.notes || "";
+  document.getElementById("payoutModalTitle").textContent = "Edit Bank Payout";
+}
+
+function deletePayout(id) {
+  if (confirm("Are you sure you want to delete this bank payout entry?")) {
+    state.onlinePayouts = (state.onlinePayouts || []).filter(p => p.id !== id);
+    saveState();
+    refreshAllUI();
+    showToast("Bank payout entry deleted!");
+  }
+}
+
+// ==================== SALES (WHOLESALE & BILLING) ====================
 function initPurchaseModal() {
   const form = document.getElementById("purchaseForm");
   if (form) form.reset();
@@ -2233,7 +2446,22 @@ function exportAllToExcel() {
 
   const wb = XLSX.utils.book_new();
 
-  // Stock Sheet
+  // 1. Online Bank Payouts Sheet
+  const names = state.settings.accountNames || {};
+  const payoutsData = (state.onlinePayouts || []).map(op => ({
+    "Date": op.date,
+    "Platform": op.platform,
+    "Seller Account": names[op.accountId] || op.accountId,
+    "Bank Payout (₹)": op.bankAmount,
+    "Dispatched Units": op.unitsDispatched || 0,
+    "Approx Item Cost (₹)": op.approxCost || 0,
+    "Net Margin (₹)": (Number(op.bankAmount) || 0) - (Number(op.approxCost) || 0),
+    "Bank UTR / Notes": op.notes || ''
+  }));
+  const wsPayouts = XLSX.utils.json_to_sheet(payoutsData);
+  XLSX.utils.book_append_sheet(wb, wsPayouts, "15 IDs Bank Payouts");
+
+  // 2. Stock Sheet
   const stockData = state.products.map(p => ({
     "SKU": p.sku,
     "Product Name": p.name,
@@ -2247,7 +2475,7 @@ function exportAllToExcel() {
   const wsStock = XLSX.utils.json_to_sheet(stockData);
   XLSX.utils.book_append_sheet(wb, wsStock, "Inventory Stock");
 
-  // Sales Sheet
+  // 3. Wholesale Sales Sheet
   const salesData = [];
   state.sales.forEach(s => {
     const total = Number(s.totalAmount) || 0;
@@ -2256,28 +2484,29 @@ function exportAllToExcel() {
 
     (s.items || []).forEach(it => {
       salesData.push({
-        "Invoice #": s.invoiceNo,
+        "Bill #": s.invoiceNo,
         "Date": s.date,
-        "Type": s.type === 'wholesale' ? 'Wholesale' : 'Online',
-        "Channel": s.channel,
-        "Customer": s.customerName,
+        "Customer / Party": s.customerName,
+        "City": s.customerCity || '',
         "Phone": s.customerPhone || '',
         "Product": it.productName,
         "Qty": it.qty,
-        "Price (₹)": it.price,
+        "Cost Price (₹)": it.costPrice || 0,
+        "Selling Price (₹)": it.price,
         "Item Total (₹)": it.total,
         "Bill Total (₹)": total,
-        "Amount Received (₹)": paid,
+        "Paid Amount (₹)": paid,
         "Pending Due (₹)": pending,
+        "Gross Profit (₹)": (Number(it.price) - (Number(it.costPrice) || 0)) * Number(it.qty),
         "Payment Status": s.paymentStatus,
         "Remarks": s.notes || ''
       });
     });
   });
   const wsSales = XLSX.utils.json_to_sheet(salesData);
-  XLSX.utils.book_append_sheet(wb, wsSales, "Sales Register");
+  XLSX.utils.book_append_sheet(wb, wsSales, "Wholesale Bills");
 
-  // Purchases Sheet
+  // 4. Purchases Sheet
   const purchData = [];
   state.purchases.forEach(p => {
     const total = Number(p.totalAmount) || 0;
@@ -2305,7 +2534,7 @@ function exportAllToExcel() {
   const wsPurch = XLSX.utils.json_to_sheet(purchData);
   XLSX.utils.book_append_sheet(wb, wsPurch, "Purchases");
 
-  // Expenses Sheet
+  // 5. Expenses Sheet
   const expData = state.expenses.map(e => ({
     "Date": e.date,
     "Category": e.category,
@@ -2316,7 +2545,7 @@ function exportAllToExcel() {
   const wsExp = XLSX.utils.json_to_sheet(expData);
   XLSX.utils.book_append_sheet(wb, wsExp, "Daily Expenses");
 
-  // Partner Ledger Sheet
+  // 6. Partner Ledger Sheet
   const partnerData = state.partnerTransactions.map(t => ({
     "Date": t.date,
     "Type": t.type === 'capital' ? 'Capital' : 'Settlement',
@@ -2329,8 +2558,27 @@ function exportAllToExcel() {
   XLSX.utils.book_append_sheet(wb, wsPartner, "Partner Ledger");
 
   const dateStr = new Date().toISOString().split('T')[0];
-  XLSX.writeFile(wb, `CommerceHub_Master_Report_${dateStr}.xlsx`);
+  XLSX.writeFile(wb, `Dwarkadhish_Master_Business_Report_${dateStr}.xlsx`);
   showToast("Master Excel report downloaded!");
+}
+
+function exportPayoutsToExcel() {
+  const names = state.settings.accountNames || {};
+  const data = (state.onlinePayouts || []).map(op => ({
+    "Date": op.date,
+    "Platform": op.platform,
+    "Account ID / Name": names[op.accountId] || op.accountId,
+    "Bank Payout (₹)": op.bankAmount,
+    "Dispatched Orders": op.unitsDispatched || 0,
+    "Approx Item Cost (₹)": op.approxCost || 0,
+    "Net Margin (₹)": (Number(op.bankAmount) || 0) - (Number(op.approxCost) || 0),
+    "Bank UTR / Notes": op.notes || ''
+  }));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(data);
+  XLSX.utils.book_append_sheet(wb, ws, "15 IDs Bank Payouts");
+  XLSX.writeFile(wb, `Online_Bank_Payouts_${Date.now()}.xlsx`);
+  showToast("Online payouts Excel downloaded!");
 }
 
 function exportStockToExcel() {
@@ -2356,12 +2604,11 @@ function exportSalesToExcel() {
     const total = Number(s.totalAmount) || 0;
     const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
     return {
-      "Invoice No": s.invoiceNo,
+      "Bill No": s.invoiceNo,
       "Date": s.date,
-      "Type": s.type,
-      "Channel": s.channel,
-      "Customer": s.customerName,
-      "Total Amount": total,
+      "Party / Customer": s.customerName,
+      "City": s.customerCity || '',
+      "Bill Amount": total,
       "Paid Amount": paid,
       "Pending Balance": Math.max(0, total - paid),
       "Payment Status": s.paymentStatus
@@ -2369,9 +2616,9 @@ function exportSalesToExcel() {
   });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(salesData);
-  XLSX.utils.book_append_sheet(wb, ws, "Sales");
-  XLSX.writeFile(wb, `Sales_Report_${Date.now()}.xlsx`);
-  showToast("Sales report downloaded!");
+  XLSX.utils.book_append_sheet(wb, ws, "Wholesale Bills");
+  XLSX.writeFile(wb, `Wholesale_Bills_Report_${Date.now()}.xlsx`);
+  showToast("Wholesale bills report downloaded!");
 }
 
 function exportPurchasesToExcel() {
@@ -2432,7 +2679,7 @@ function restoreSystemData(e) {
   reader.onload = function(evt) {
     try {
       const restored = JSON.parse(evt.target.result);
-      if (restored && (restored.products || restored.sales)) {
+      if (restored && (restored.products || restored.sales || restored.onlinePayouts)) {
         state = restored;
         saveState();
         updatePartnerLabelsInUI();
@@ -2450,30 +2697,17 @@ function restoreSystemData(e) {
 
 function clearAllData() {
   if (confirm("Warning: Are you sure you want to reset all data? This cannot be undone!")) {
-    state = {
-      settings: {
-        bizName: "CommerceHub Store",
-        partner1Name: "Partner 1 (You)",
-        partner2Name: "Partner 2",
-        partner1Ratio: 50,
-        partner2Ratio: 50
-      },
-      products: [],
-      sales: [],
-      purchases: [],
-      expenses: [],
-      adjustments: [],
-      partnerTransactions: []
-    };
+    state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
     saveState();
     updatePartnerLabelsInUI();
     refreshAllUI();
-    showToast("All data reset successfully!");
+    showToast("All data reset to defaults!");
   }
 }
 
 function refreshAllUI() {
   renderDashboard();
+  renderOnlinePayouts();
   renderProductsTable();
   renderSalesTable();
   renderPurchasesTable();
