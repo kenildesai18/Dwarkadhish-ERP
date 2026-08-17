@@ -1151,13 +1151,21 @@
         <!-- Multi-Item Wholesale List -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <label class="text-xs font-bold text-slate-800">Items in Wholesale Bill *</label>
+            <label class="text-xs font-bold text-slate-800">Items in Wholesale Bill (Custom Rates Allowed) *</label>
             <button type="button" onclick="addSaleItemRow()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
               <i class="fa-solid fa-plus"></i> Add Item
             </button>
           </div>
 
-          <div id="saleItemsContainer" class="space-y-2 max-h-48 sm:max-h-52 overflow-y-auto pr-1">
+          <!-- Column Header Labels -->
+          <div class="hidden sm:grid sm:grid-cols-12 gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1 bg-slate-100 rounded-md">
+            <div class="col-span-5">Product Name</div>
+            <div class="col-span-2 text-center">Qty</div>
+            <div class="col-span-3 text-right">Selling Rate (₹)</div>
+            <div class="col-span-2 text-right">Subtotal</div>
+          </div>
+
+          <div id="saleItemsContainer" class="space-y-2 max-h-48 sm:max-h-56 overflow-y-auto pr-1">
             <!-- Dynamically populated rows -->
           </div>
         </div>
@@ -1165,7 +1173,10 @@
         <!-- Total & Payment -->
         <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-2.5">
           <div class="flex items-center justify-between text-xs sm:text-sm">
-            <span class="font-bold text-slate-700">Total Bill Amount:</span>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-700">Total Bill Amount:</span>
+              <span id="saleProfitDisplay" class="text-[11px] font-bold text-emerald-700 bg-emerald-100/70 border border-emerald-300 px-2 py-0.5 rounded">Profit: +₹0</span>
+            </div>
             <span class="text-xl sm:text-2xl font-bold text-slate-900 font-mono" id="saleTotalDisplay">₹0</span>
           </div>
 
@@ -1490,15 +1501,28 @@
         <!-- Inward Items -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <label class="text-xs font-bold text-slate-800">Purchased Items *</label>
+            <label class="text-xs font-bold text-slate-800">Purchased Items (Custom Cost Rates Allowed) *</label>
             <button type="button" onclick="addPurchaseItemRow()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
               <i class="fa-solid fa-plus"></i> Add Item
             </button>
           </div>
 
-          <div id="purchaseItemsContainer" class="space-y-2 max-h-48 sm:max-h-52 overflow-y-auto pr-1">
+          <!-- Column Header Labels -->
+          <div class="hidden sm:grid sm:grid-cols-12 gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1 bg-slate-100 rounded-md">
+            <div class="col-span-5">Product Name</div>
+            <div class="col-span-2 text-center">Qty</div>
+            <div class="col-span-3 text-right">Purchase Cost (₹)</div>
+            <div class="col-span-2 text-right">Subtotal</div>
+          </div>
+
+          <div id="purchaseItemsContainer" class="space-y-2 max-h-48 sm:max-h-56 overflow-y-auto pr-1">
             <!-- Dynamically populated rows -->
           </div>
+
+          <label class="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 select-none pt-1">
+            <input type="checkbox" id="purchaseUpdateMasterCost" checked class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+            <span>Update catalog Cost Price with these new purchase rates</span>
+          </label>
         </div>
 
         <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-2.5">
@@ -1819,21 +1843,22 @@
           <div class="flex items-center justify-between">
             <div>
               <label class="block text-xs font-bold text-slate-800">
-                <i class="fa-solid fa-cloud text-indigo-600"></i> Google Firebase Cloud Sync (Optional)
+                <i class="fa-solid fa-cloud text-indigo-600"></i> Google Firebase Realtime Cloud Sync
               </label>
-              <p class="text-[11px] text-slate-500">Auto-sync across both partners' phones</p>
+              <p class="text-[11px] text-slate-500">Live multi-device real-time sync across Kenil & Alpesh</p>
             </div>
-            <span id="settingCloudStatus" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">Active</span>
+            <span id="settingCloudStatus" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">Local Mode</span>
           </div>
 
           <div>
-            <textarea id="settingFirebaseConfig" rows="3" placeholder='Paste your Firebase config JSON here (optional)' class="input-pro font-mono text-[11px]"></textarea>
+            <textarea id="settingFirebaseConfig" rows="3" placeholder='Paste your Firebase Realtime Database URL (e.g. https://dwarkadhish-erp-default-rtdb.firebaseio.com) or Firebase Config JSON here' class="input-pro font-mono text-[11px]"></textarea>
+            <p class="text-[10px] text-slate-400 mt-1">Paste your free Firebase Realtime Database URL to sync live across Kenil & Alpesh's phones.</p>
           </div>
         </div>
 
         <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
           <button type="button" onclick="closeModal('settingsModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
-          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-4">Save Settings</button>
+          <button type="submit" onclick="handleSaveSettings(event)" class="btn-solid-primary text-xs sm:text-sm py-2 px-4">Save Settings</button>
         </div>
       </form>
     </div>
@@ -1869,6 +1894,6 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="app.js?v=2026_clean_en_v8"></script>
+  <script src="app.js?v=2026_cloud_sync_v10"></script>
 </body>
 </html>

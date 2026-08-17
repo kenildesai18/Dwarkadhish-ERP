@@ -169,30 +169,71 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("focus", fetchFromInstantCloud);
 });
 
-// ==================== ZERO-SETUP INSTANT CLOUD SYNC ====================
+// ==================== ZERO-SETUP INSTANT CLOUD SYNC & FIREBASE ====================
+function getFirebaseSyncUrl() {
+  const config = state.settings.firebaseConfig || localStorage.getItem("FIREBASE_CONFIG_KEY") || "";
+  if (!config) return null;
+
+  try {
+    const trimmed = config.trim();
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      let cleanUrl = trimmed.replace(/\/$/, "");
+      if (!cleanUrl.endsWith(".json")) {
+        cleanUrl += "/dwarkadhish_state.json";
+      }
+      return cleanUrl;
+    }
+    const parsed = JSON.parse(trimmed);
+    if (parsed.databaseURL) {
+      let dbUrl = parsed.databaseURL.replace(/\/$/, "");
+      return `${dbUrl}/dwarkadhish_state.json`;
+    }
+    if (parsed.projectId) {
+      return `https://${parsed.projectId}-default-rtdb.firebaseio.com/dwarkadhish_state.json`;
+    }
+  } catch (e) {
+    if (config.includes("firebase")) {
+      let cleanUrl = config.trim().replace(/\/$/, "");
+      if (!cleanUrl.startsWith("http")) cleanUrl = "https://" + cleanUrl;
+      if (!cleanUrl.endsWith(".json")) cleanUrl += "/dwarkadhish_state.json";
+      return cleanUrl;
+    }
+  }
+  return null;
+}
+
+function initFirebaseSync() {
+  fetchFromInstantCloud();
+}
+
 async function fetchFromInstantCloud() {
   if (isSyncingFromCloud) return;
-  try {
-    const res = await fetch(CLOUD_FETCH_URL, { cache: "no-store" });
-    if (res.ok) {
-      const raw = await res.text();
-      if (raw && raw !== "null" && raw.trim().startsWith("{")) {
-        const cloudState = JSON.parse(raw);
-        const cloudTime = cloudState._syncTime || 0;
-        const localTime = state._syncTime || 0;
+  const fbUrl = getFirebaseSyncUrl();
 
-        // Only sync if cloud data is strictly newer than local
-        if (cloudTime > localTime) {
-          isSyncingFromCloud = true;
-          state = { ...state, ...cloudState };
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-          updatePartnerLabelsInUI();
-          refreshAllUI();
-          isSyncingFromCloud = false;
+  try {
+    if (fbUrl) {
+      const res = await fetch(fbUrl, { cache: "no-store" });
+      if (res.ok) {
+        const cloudState = await res.json();
+        if (cloudState && typeof cloudState === 'object') {
+          const cloudTime = cloudState._syncTime || 0;
+          const localTime = state._syncTime || 0;
+
+          if (cloudTime > localTime) {
+            isSyncingFromCloud = true;
+            state = { ...state, ...cloudState };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            updatePartnerLabelsInUI();
+            refreshAllUI();
+            isSyncingFromCloud = false;
+          }
         }
+        updateCloudStatusUI(true, "Firebase Cloud Live");
+        return;
       }
-      updateCloudStatusUI(true);
     }
+
+    updateCloudStatusUI(navigator.onLine, navigator.onLine ? "Local Device (Safe)" : "Offline");
   } catch (err) {
     console.log("Cloud sync check (offline/local fallback):", err);
     updateCloudStatusUI(navigator.onLine);
@@ -201,31 +242,41 @@ async function fetchFromInstantCloud() {
 
 async function pushToInstantCloud() {
   if (isSyncingFromCloud) return;
+  const fbUrl = getFirebaseSyncUrl();
+
   try {
     state._syncTime = Date.now();
-    const payload = encodeURIComponent(JSON.stringify(state));
-    await fetch(CLOUD_ENDPOINT_URL + payload, { method: "POST" });
-    updateCloudStatusUI(true);
+    if (fbUrl) {
+      await fetch(fbUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(state)
+      });
+      updateCloudStatusUI(true, "Firebase Cloud Live");
+    }
   } catch (err) {
     console.warn("Cloud push error (saved locally):", err);
   }
 }
 
-function updateCloudStatusUI(isOnline) {
+function updateCloudStatusUI(isOnline, customLabel = null) {
   const badge = document.getElementById("cloudSyncStatusBadge");
   const dot = document.getElementById("cloudSyncDot");
   const text = document.getElementById("cloudSyncText");
   const settingStatus = document.getElementById("settingCloudStatus");
 
+  const fbUrl = getFirebaseSyncUrl();
+  const label = customLabel || (fbUrl ? "Firebase Cloud Live" : (isOnline ? "Local Device (Safe)" : "Offline"));
+
   if (isOnline) {
     if (badge) {
-      badge.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200";
+      badge.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold " + (fbUrl ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-indigo-50 text-indigo-700 border border-indigo-200");
     }
-    if (dot) dot.className = "w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse";
-    if (text) text.textContent = "Cloud Live (100% Safe)";
+    if (dot) dot.className = "w-1.5 h-1.5 rounded-full " + (fbUrl ? "bg-emerald-500 animate-pulse" : "bg-indigo-500");
+    if (text) text.textContent = label;
     if (settingStatus) {
-      settingStatus.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200";
-      settingStatus.textContent = "Cloud Active";
+      settingStatus.className = "text-[10px] font-bold px-2 py-0.5 rounded " + (fbUrl ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-600");
+      settingStatus.textContent = fbUrl ? "Firebase Active" : "Local Mode";
     }
   } else {
     if (badge) {
@@ -458,6 +509,8 @@ function openModal(modalId, isEditOrParam = null) {
     document.getElementById("drawingModalTitle").innerHTML = `<i class="fa-solid fa-money-bill-transfer text-amber-600"></i> Record Partner Drawing`;
   } else if (modalId === 'onlineDispatchModal') {
     initOnlineDispatchModal();
+  } else if (modalId === 'settingsModal') {
+    updatePartnerLabelsInUI();
   } else if (modalId === 'settleModal') {
     const form = document.getElementById("settleForm");
     if (form) form.reset();
@@ -1435,32 +1488,7 @@ function editSale(id) {
   container.innerHTML = "";
 
   (sale.items || []).forEach(it => {
-    const rowIndex = Date.now() + "_" + Math.random().toString(36).substr(2, 4);
-    const row = document.createElement("div");
-    row.className = "flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 sale-item-row";
-    row.id = `sale_row_${rowIndex}`;
-
-    row.innerHTML = `
-      <div class="flex-grow">
-        <select onchange="onSaleProductSelect('${rowIndex}')" id="sale_prod_${rowIndex}" required class="input-pro py-1 text-xs font-semibold">
-          <option value="">-- Select Product --</option>
-          ${state.products.map(p => `<option value="${p.id}" ${p.id === it.productId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
-        </select>
-      </div>
-      <div class="w-full sm:w-20">
-        <input type="number" id="sale_qty_${rowIndex}" min="1" value="${it.qty}" oninput="calculateSaleTotal()" placeholder="Qty" required class="input-pro py-1 text-xs text-center font-bold font-mono">
-      </div>
-      <div class="w-full sm:w-28">
-        <input type="number" id="sale_price_${rowIndex}" min="0" step="any" value="${it.price}" oninput="calculateSaleTotal()" placeholder="Price ₹" required class="input-pro py-1 text-xs text-right font-bold text-emerald-600 font-mono">
-      </div>
-      <div class="w-full sm:w-24 text-right font-bold text-slate-800 text-xs px-1 flex items-center justify-between sm:justify-end gap-2">
-        <span id="sale_subtotal_${rowIndex}" class="font-mono">₹${it.total}</span>
-        <button type="button" onclick="removeSaleItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 p-1" title="Remove">
-          <i class="fa-solid fa-trash-can"></i>
-        </button>
-      </div>
-    `;
-    container.appendChild(row);
+    addSaleItemRow(it.productId, it.qty, it.price);
   });
 
   calculateSaleTotal();
@@ -1486,31 +1514,46 @@ function toggleSaleTypeUI() {
   updateSaleItemPricesBasedOnType(saleType);
 }
 
-function addSaleItemRow() {
+function addSaleItemRow(prodId = "", qty = 1, customPrice = null) {
   const container = document.getElementById("saleItemsContainer");
   if (!container) return;
 
   const rowIndex = Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+  const saleType = document.querySelector('input[name="saleType"]:checked')?.value || 'wholesale';
+
+  let initialPrice = 0;
+  if (customPrice !== null && customPrice !== undefined) {
+    initialPrice = customPrice;
+  } else if (prodId) {
+    const prod = state.products.find(p => p.id === prodId);
+    if (prod) {
+      initialPrice = (saleType === 'wholesale' ? prod.wholesalePrice : prod.retailPrice) || 0;
+    }
+  }
 
   const row = document.createElement("div");
-  row.className = "flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 sale-item-row";
+  row.className = "flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 sale-item-row hover:border-indigo-300 transition-colors";
   row.id = `sale_row_${rowIndex}`;
 
   row.innerHTML = `
-    <div class="flex-grow">
-      <select onchange="onSaleProductSelect('${rowIndex}')" id="sale_prod_${rowIndex}" required class="input-pro py-1 text-xs font-semibold">
+    <div class="flex-grow sm:w-5/12">
+      <select onchange="onSaleProductSelect('${rowIndex}')" id="sale_prod_${rowIndex}" required class="input-pro py-1.5 text-xs font-semibold">
         <option value="">-- Select Product --</option>
-        ${state.products.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
+        ${state.products.map(p => `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
       </select>
     </div>
-    <div class="w-full sm:w-20">
-      <input type="number" id="sale_qty_${rowIndex}" min="1" value="1" oninput="calculateSaleTotal()" placeholder="Qty" required class="input-pro py-1 text-xs text-center font-bold font-mono">
+    <div class="w-full sm:w-2/12">
+      <div class="relative">
+        <input type="number" id="sale_qty_${rowIndex}" min="1" value="${qty}" oninput="calculateSaleTotal()" placeholder="Qty" required class="input-pro py-1.5 text-xs text-center font-bold font-mono">
+      </div>
     </div>
-    <div class="w-full sm:w-28">
-      <input type="number" id="sale_price_${rowIndex}" min="0" step="any" oninput="calculateSaleTotal()" placeholder="Price ₹" required class="input-pro py-1 text-xs text-right font-bold text-emerald-600 font-mono">
+    <div class="w-full sm:w-3/12">
+      <div class="relative">
+        <input type="number" id="sale_price_${rowIndex}" min="0" step="any" value="${initialPrice > 0 ? initialPrice : ''}" oninput="calculateSaleTotal()" placeholder="Rate ₹" required class="input-pro py-1.5 text-xs text-right font-bold text-emerald-600 font-mono" title="You can freely enter any custom selling price for this customer">
+      </div>
     </div>
-    <div class="w-full sm:w-24 text-right font-bold text-slate-800 text-xs px-1 flex items-center justify-between sm:justify-end gap-2">
-      <span id="sale_subtotal_${rowIndex}" class="font-mono">₹0</span>
+    <div class="w-full sm:w-2/12 text-right font-bold text-slate-900 text-xs px-1 flex items-center justify-between sm:justify-end gap-2">
+      <span id="sale_subtotal_${rowIndex}" class="font-mono text-sm">₹0</span>
       <button type="button" onclick="removeSaleItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 p-1" title="Remove">
         <i class="fa-solid fa-trash-can"></i>
       </button>
@@ -1518,6 +1561,7 @@ function addSaleItemRow() {
   `;
 
   container.appendChild(row);
+  calculateSaleTotal();
 }
 
 function removeSaleItemRow(rowIndex) {
@@ -1529,12 +1573,12 @@ function removeSaleItemRow(rowIndex) {
 function onSaleProductSelect(rowIndex) {
   const prodId = document.getElementById(`sale_prod_${rowIndex}`).value;
   const prod = state.products.find(p => p.id === prodId);
-  const saleType = document.querySelector('input[name="saleType"]:checked')?.value || 'retail_online';
+  const saleType = document.querySelector('input[name="saleType"]:checked')?.value || 'wholesale';
 
   if (prod) {
     const priceInput = document.getElementById(`sale_price_${rowIndex}`);
     if (priceInput) {
-      priceInput.value = saleType === 'wholesale' ? prod.wholesalePrice : prod.retailPrice;
+      priceInput.value = (saleType === 'wholesale' ? (prod.wholesalePrice || prod.retailPrice) : prod.retailPrice) || 0;
     }
   }
   calculateSaleTotal();
@@ -1549,7 +1593,7 @@ function updateSaleItemPricesBasedOnType(saleType) {
     if (prod) {
       const priceInput = document.getElementById(`sale_price_${id}`);
       if (priceInput && !document.getElementById("saleEditId").value) {
-        priceInput.value = saleType === 'wholesale' ? prod.wholesalePrice : prod.retailPrice;
+        priceInput.value = (saleType === 'wholesale' ? (prod.wholesalePrice || prod.retailPrice) : prod.retailPrice) || 0;
       }
     }
   });
@@ -1559,13 +1603,20 @@ function updateSaleItemPricesBasedOnType(saleType) {
 function calculateSaleTotal() {
   const rows = document.querySelectorAll(".sale-item-row");
   let grandTotal = 0;
+  let totalEstimatedCost = 0;
 
   rows.forEach(row => {
     const id = row.id.replace("sale_row_", "");
+    const prodId = document.getElementById(`sale_prod_${id}`)?.value;
     const qty = parseFloat(document.getElementById(`sale_qty_${id}`)?.value) || 0;
     const price = parseFloat(document.getElementById(`sale_price_${id}`)?.value) || 0;
     const subtotal = qty * price;
     grandTotal += subtotal;
+
+    const prod = state.products.find(p => p.id === prodId);
+    if (prod) {
+      totalEstimatedCost += (qty * (Number(prod.costPrice) || 0));
+    }
 
     const subEl = document.getElementById(`sale_subtotal_${id}`);
     if (subEl) subEl.textContent = formatCurrency(subtotal);
@@ -1573,6 +1624,12 @@ function calculateSaleTotal() {
 
   const dTotal = document.getElementById("saleTotalDisplay");
   if (dTotal) dTotal.textContent = formatCurrency(grandTotal);
+
+  const profitEl = document.getElementById("saleProfitDisplay");
+  if (profitEl) {
+    const profit = grandTotal - totalEstimatedCost;
+    profitEl.textContent = `Est. Profit: +${formatCurrency(profit)}`;
+  }
 
   const status = document.getElementById("salePaymentStatus")?.value;
   const paidInput = document.getElementById("salePaidAmount");
@@ -2445,63 +2502,50 @@ function editPurchase(id) {
   container.innerHTML = "";
 
   (purch.items || []).forEach(it => {
-    const rowIndex = Date.now() + "_" + Math.random().toString(36).substr(2, 4);
-    const row = document.createElement("div");
-    row.className = "flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 purchase-item-row";
-    row.id = `purch_row_${rowIndex}`;
-
-    row.innerHTML = `
-      <div class="flex-grow">
-        <select onchange="onPurchaseProductSelect('${rowIndex}')" id="purch_prod_${rowIndex}" required class="input-pro py-1 text-xs font-semibold">
-          <option value="">-- Select Item --</option>
-          ${state.products.map(p => `<option value="${p.id}" ${p.id === it.productId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
-        </select>
-      </div>
-      <div class="w-full sm:w-20">
-        <input type="number" id="purch_qty_${rowIndex}" min="1" value="${it.qty}" oninput="calculatePurchaseTotal()" placeholder="Qty" required class="input-pro py-1 text-xs text-center font-bold font-mono">
-      </div>
-      <div class="w-full sm:w-28">
-        <input type="number" id="purch_cost_${rowIndex}" min="0" step="any" value="${it.costPrice}" oninput="calculatePurchaseTotal()" placeholder="Cost ₹" required class="input-pro py-1 text-xs text-right font-bold text-slate-800 font-mono">
-      </div>
-      <div class="w-full sm:w-24 text-right font-bold text-slate-800 text-xs px-1 flex items-center justify-between sm:justify-end gap-2">
-        <span id="purch_subtotal_${rowIndex}" class="font-mono">₹${it.total}</span>
-        <button type="button" onclick="removePurchaseItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 p-1" title="Remove">
-          <i class="fa-solid fa-trash-can"></i>
-        </button>
-      </div>
-    `;
-    container.appendChild(row);
+    addPurchaseItemRow(it.productId, it.qty, it.costPrice);
   });
 
   calculatePurchaseTotal();
   openModal('purchaseModal', 'edit');
 }
 
-function addPurchaseItemRow() {
+function addPurchaseItemRow(prodId = "", qty = 10, customCost = null) {
   const container = document.getElementById("purchaseItemsContainer");
   if (!container) return;
 
   const rowIndex = Date.now() + "_" + Math.random().toString(36).substr(2, 4);
 
+  let initialCost = 0;
+  if (customCost !== null && customCost !== undefined) {
+    initialCost = customCost;
+  } else if (prodId) {
+    const prod = state.products.find(p => p.id === prodId);
+    if (prod) initialCost = prod.costPrice || 0;
+  }
+
   const row = document.createElement("div");
-  row.className = "flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 purchase-item-row";
+  row.className = "flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 purchase-item-row hover:border-indigo-300 transition-colors";
   row.id = `purch_row_${rowIndex}`;
 
   row.innerHTML = `
-    <div class="flex-grow">
-      <select onchange="onPurchaseProductSelect('${rowIndex}')" id="purch_prod_${rowIndex}" required class="input-pro py-1 text-xs font-semibold">
+    <div class="flex-grow sm:w-5/12">
+      <select onchange="onPurchaseProductSelect('${rowIndex}')" id="purch_prod_${rowIndex}" required class="input-pro py-1.5 text-xs font-semibold">
         <option value="">-- Select Item --</option>
-        ${state.products.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
+        ${state.products.map(p => `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
       </select>
     </div>
-    <div class="w-full sm:w-20">
-      <input type="number" id="purch_qty_${rowIndex}" min="1" value="10" oninput="calculatePurchaseTotal()" placeholder="Qty" required class="input-pro py-1 text-xs text-center font-bold font-mono">
+    <div class="w-full sm:w-2/12">
+      <div class="relative">
+        <input type="number" id="purch_qty_${rowIndex}" min="1" value="${qty}" oninput="calculatePurchaseTotal()" placeholder="Qty" required class="input-pro py-1.5 text-xs text-center font-bold font-mono">
+      </div>
     </div>
-    <div class="w-full sm:w-28">
-      <input type="number" id="purch_cost_${rowIndex}" min="0" step="any" oninput="calculatePurchaseTotal()" placeholder="Cost ₹" required class="input-pro py-1 text-xs text-right font-bold text-slate-800 font-mono">
+    <div class="w-full sm:w-3/12">
+      <div class="relative">
+        <input type="number" id="purch_cost_${rowIndex}" min="0" step="any" value="${initialCost > 0 ? initialCost : ''}" oninput="calculatePurchaseTotal()" placeholder="Cost ₹" required class="input-pro py-1.5 text-xs text-right font-bold text-slate-800 font-mono" title="You can freely enter any custom purchase cost for this batch">
+      </div>
     </div>
-    <div class="w-full sm:w-24 text-right font-bold text-slate-800 text-xs px-1 flex items-center justify-between sm:justify-end gap-2">
-      <span id="purch_subtotal_${rowIndex}" class="font-mono">₹0</span>
+    <div class="w-full sm:w-2/12 text-right font-bold text-slate-900 text-xs px-1 flex items-center justify-between sm:justify-end gap-2">
+      <span id="purch_subtotal_${rowIndex}" class="font-mono text-sm">₹0</span>
       <button type="button" onclick="removePurchaseItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 p-1" title="Remove">
         <i class="fa-solid fa-trash-can"></i>
       </button>
@@ -2509,6 +2553,7 @@ function addPurchaseItemRow() {
   `;
 
   container.appendChild(row);
+  calculatePurchaseTotal();
 }
 
 function removePurchaseItemRow(rowIndex) {
@@ -2576,6 +2621,7 @@ function handleSavePurchase(e) {
 
   const items = [];
   let grandTotal = 0;
+  const shouldUpdateMasterCost = document.getElementById("purchaseUpdateMasterCost") ? document.getElementById("purchaseUpdateMasterCost").checked : true;
 
   rows.forEach(row => {
     const id = row.id.replace("purch_row_", "");
@@ -2600,7 +2646,9 @@ function handleSavePurchase(e) {
     });
 
     prod.currentStock = (Number(prod.currentStock) || 0) + qty;
-    if (costPrice > 0) prod.costPrice = costPrice;
+    if (shouldUpdateMasterCost && costPrice > 0) {
+      prod.costPrice = costPrice;
+    }
   });
 
   if (items.length === 0) {
@@ -3099,17 +3147,27 @@ function handleSaveCapital(e) {
 }
 
 function handleSaveSettings(e) {
-  e.preventDefault();
-  state.settings.bizName = document.getElementById("settingBizName").value.trim() || "Dwarkadhish Enterprise";
-  state.settings.partner1Name = document.getElementById("settingP1Name").value.trim() || "Partner 1 (You)";
-  state.settings.partner2Name = document.getElementById("settingP2Name").value.trim() || "Partner 2";
-  state.settings.partner1Ratio = parseInt(document.getElementById("settingP1Ratio").value) || 50;
-  state.settings.partner2Ratio = parseInt(document.getElementById("settingP2Ratio").value) || 50;
+  if (e && e.preventDefault) e.preventDefault();
 
-  const fbConfig = document.getElementById("settingFirebaseConfig").value.trim();
+  const elBiz = document.getElementById("settingBizName");
+  const elP1 = document.getElementById("settingP1Name");
+  const elP2 = document.getElementById("settingP2Name");
+  const elR1 = document.getElementById("settingP1Ratio");
+  const elR2 = document.getElementById("settingP2Ratio");
+  const elFb = document.getElementById("settingFirebaseConfig");
+
+  state.settings.bizName = (elBiz && elBiz.value.trim()) || state.settings.bizName || "Dwarkadhish Enterprise";
+  state.settings.partner1Name = (elP1 && elP1.value.trim()) || state.settings.partner1Name || "Kenil (You)";
+  state.settings.partner2Name = (elP2 && elP2.value.trim()) || state.settings.partner2Name || "Alpesh";
+  state.settings.partner1Ratio = elR1 ? (parseInt(elR1.value) || 50) : 50;
+  state.settings.partner2Ratio = elR2 ? (parseInt(elR2.value) || 50) : 50;
+
+  const fbConfig = elFb ? elFb.value.trim() : "";
   state.settings.firebaseConfig = fbConfig;
   if (fbConfig) {
     localStorage.setItem("FIREBASE_CONFIG_KEY", fbConfig);
+  } else {
+    localStorage.removeItem("FIREBASE_CONFIG_KEY");
   }
 
   saveState();
