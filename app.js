@@ -37,9 +37,110 @@ let firebaseDb = null;
 let isSyncingFromCloud = false;
 let cloudSyncTimer = null;
 
+// ==================== AUTHENTICATION & LOGIN GATE ====================
+const AUTH_STORAGE_KEY = "DWARKADHISH_AUTH_LOGGED_IN";
+const SYSTEM_AUTH_USER = "alken";
+const SYSTEM_AUTH_PASS = "Dwarkadhish#2003#";
+
+function checkAuthStatus() {
+  const isAuth = localStorage.getItem(AUTH_STORAGE_KEY) === "true" || sessionStorage.getItem(AUTH_STORAGE_KEY) === "true";
+  const loginScreen = document.getElementById("loginScreen");
+  const appContainer = document.getElementById("appContainer");
+
+  if (isAuth) {
+    if (loginScreen) loginScreen.classList.add("hidden");
+    if (appContainer) appContainer.classList.remove("hidden");
+    return true;
+  } else {
+    if (loginScreen) loginScreen.classList.remove("hidden");
+    if (appContainer) appContainer.classList.add("hidden");
+    return false;
+  }
+}
+
+function handleUserLogin(e) {
+  e.preventDefault();
+  const usernameInput = document.getElementById("loginUsername");
+  const passwordInput = document.getElementById("loginPassword");
+  const rememberCheckbox = document.getElementById("loginRememberMe");
+  const errorAlert = document.getElementById("loginErrorAlert");
+  const errorText = document.getElementById("loginErrorText");
+  const loginCard = document.getElementById("loginCard");
+
+  const username = (usernameInput?.value || "").trim().toLowerCase();
+  const password = passwordInput?.value || "";
+
+  if (username === SYSTEM_AUTH_USER && password === SYSTEM_AUTH_PASS) {
+    if (rememberCheckbox && rememberCheckbox.checked) {
+      localStorage.setItem(AUTH_STORAGE_KEY, "true");
+    } else {
+      sessionStorage.setItem(AUTH_STORAGE_KEY, "true");
+    }
+
+    if (errorAlert) errorAlert.classList.add("hidden");
+    const loginScreen = document.getElementById("loginScreen");
+    const appContainer = document.getElementById("appContainer");
+    if (loginScreen) loginScreen.classList.add("hidden");
+    if (appContainer) appContainer.classList.remove("hidden");
+
+    showToast("Welcome, Alken! Login successful.");
+    refreshAllUI();
+  } else {
+    if (errorAlert) {
+      errorAlert.classList.remove("hidden");
+      if (errorText) errorText.textContent = "Invalid username or password. Please try again.";
+    }
+    if (loginCard) {
+      loginCard.classList.add("animate-pulse");
+      setTimeout(() => loginCard.classList.remove("animate-pulse"), 600);
+    }
+    showToast("Invalid Username or Password!", true);
+  }
+}
+
+function handleUserLogout() {
+  if (confirm("Are you sure you want to log out from Dwarkadhish Enterprise ERP?")) {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
+
+    const loginScreen = document.getElementById("loginScreen");
+    const appContainer = document.getElementById("appContainer");
+    if (loginScreen) loginScreen.classList.remove("hidden");
+    if (appContainer) appContainer.classList.add("hidden");
+
+    const form = document.getElementById("loginForm");
+    if (form) form.reset();
+
+    showToast("Logged out successfully.");
+  }
+}
+
+function autoFillDemoCredentials() {
+  const usernameInput = document.getElementById("loginUsername");
+  const passwordInput = document.getElementById("loginPassword");
+  if (usernameInput) usernameInput.value = SYSTEM_AUTH_USER;
+  if (passwordInput) passwordInput.value = SYSTEM_AUTH_PASS;
+  showToast("Credentials loaded: alken");
+}
+
+function togglePasswordVisibility() {
+  const passInput = document.getElementById("loginPassword");
+  const eyeIcon = document.getElementById("passwordEyeIcon");
+  if (!passInput) return;
+
+  if (passInput.type === "password") {
+    passInput.type = "text";
+    if (eyeIcon) eyeIcon.className = "fa-solid fa-eye-slash text-xs";
+  } else {
+    passInput.type = "password";
+    if (eyeIcon) eyeIcon.className = "fa-solid fa-eye text-xs";
+  }
+}
+
 // ==================== INITIALIZATION ====================
 document.addEventListener("DOMContentLoaded", () => {
   loadState();
+  checkAuthStatus();
   
   // Clean all inline styles that might have been cached
   document.querySelectorAll(".pro-card, div, section, main").forEach(el => {
@@ -48,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   const today = new Date().toISOString().split('T')[0];
-  const dateInputs = ["saleDate", "purchaseDate", "expenseDate", "settleDate", "capitalDate", "vpDate", "ccDate"];
+  const dateInputs = ["saleDate", "purchaseDate", "expenseDate", "settleDate", "capitalDate", "vpDate", "ccDate", "dispatchDate"];
   dateInputs.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = today;
@@ -354,7 +455,7 @@ function openModal(modalId, isEditOrParam = null) {
     if (form) form.reset();
     document.getElementById("drawingEditId").value = "";
     document.getElementById("drawingDate").value = new Date().toISOString().split('T')[0];
-    document.getElementById("drawingModalTitle").innerHTML = `<i class="fa-solid fa-money-bill-transfer text-amber-600"></i> Record Partner Drawing (પાર્ટનર ઉપાડ)`;
+    document.getElementById("drawingModalTitle").innerHTML = `<i class="fa-solid fa-money-bill-transfer text-amber-600"></i> Record Partner Drawing`;
   } else if (modalId === 'onlineDispatchModal') {
     initOnlineDispatchModal();
   } else if (modalId === 'settleModal') {
@@ -451,7 +552,7 @@ function renderDashboard() {
   if (dTotalExp) dTotalExp.textContent = formatCurrency(totalExpenses);
   if (dMonthExp) dMonthExp.textContent = formatCurrency(monthExpenses);
 
-  // 5. Total Inward Bank Received (આવેલા કુલ રૂપિયા)
+  // 5. Total Inward Bank Received
   const grandInward = totalOnlineInward + totalWholesaleInward;
   const dTotInward = document.getElementById("dashTotalInward");
   const dOnlInward = document.getElementById("dashOnlineInward");
@@ -461,7 +562,7 @@ function renderDashboard() {
   if (dOnlInward) dOnlInward.textContent = formatCurrency(totalOnlineInward);
   if (dWhsInward) dWhsInward.textContent = formatCurrency(totalWholesaleInward);
 
-  // 6. Net Realized Profit (કુલ ચોખ્ખો નફો વધ્યો)
+  // 6. Net Realized Profit
   const grandGrossProfit = onlineGrossProfit + wholesaleGrossProfit;
   const netRealizedProfit = grandGrossProfit - totalExpenses;
   const p1Ratio = (state.settings.partner1Ratio || 50) / 100;
@@ -636,9 +737,7 @@ function calculatePartnerBalances() {
       if (s.receivedBy === 'partner1') p1WholesaleRecv += amt;
       else if (s.receivedBy === 'partner2') p2WholesaleRecv += amt;
     }
-  });
-
-  // 5. Personal Drawings (ઉપાડ)
+  });  // 5. Personal Drawings
   let p1Drawings = 0;
   let p2Drawings = 0;
   state.partnerTransactions.filter(t => t.type === 'drawing').forEach(d => {
@@ -773,7 +872,7 @@ function renderPartnerTransactionsTable() {
       badgeLabel = "Capital Added";
     } else if (tx.type === 'drawing') {
       badgeClass = "bg-amber-100 text-amber-800 border border-amber-300 font-bold";
-      badgeLabel = "Drawing (ઉપાડ)";
+      badgeLabel = "Partner Drawing";
       receiverName = "Self / Personal Use";
     }
 
@@ -1016,7 +1115,7 @@ function initOnlineDispatchModal() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById("dispatchDate").value = today;
   document.getElementById("dispatchEditId").value = "";
-  document.getElementById("dispatchModalTitle").innerHTML = `<i class="fa-solid fa-truck-fast text-indigo-600"></i> Daily Online Dispatch (ઓનલાઇન માલ રવાનગી)`;
+  document.getElementById("dispatchModalTitle").innerHTML = `<i class="fa-solid fa-truck-fast text-indigo-600"></i> Daily Online Dispatch`;
   document.getElementById("dispatchItemsContainer").innerHTML = "";
 
   updateDispatchAccountsDropdown();
@@ -2144,9 +2243,9 @@ function renderOnlinePayouts() {
             <i class="fa-solid fa-building-columns"></i>
           </div>
           <div class="space-y-1">
-            <h4 class="font-bold text-slate-800 text-sm">કોઈ એકાઉન્ટ ઉમેરેલ નથી (No Accounts Added)</h4>
+            <h4 class="font-bold text-slate-800 text-sm">No Seller Accounts Added</h4>
             <p class="text-xs text-slate-500 max-w-md mx-auto">
-              તમે તમારી જાતે જ જેટલા પણ એકાઉન્ટ્સ ચલાવતા હોવ (Amazon, Meesho કે Flipkart), તે અહીં ઉમેરી શકો છો.
+              Add your seller accounts across Amazon, Meesho, Flipkart, and other platforms to track payouts.
             </p>
           </div>
           <button onclick="openModal('sellerAccountsModal')" class="btn-solid-primary text-xs py-2 px-4 mx-auto">
@@ -2853,7 +2952,7 @@ function editPartnerTx(id) {
     document.getElementById("drawingAmount").value = tx.amount;
     document.getElementById("drawingSource").value = tx.source || "Business Bank Account";
     document.getElementById("drawingNotes").value = tx.notes || "";
-    document.getElementById("drawingModalTitle").innerHTML = `<i class="fa-solid fa-money-bill-transfer text-amber-600"></i> Edit Partner Drawing (ઉપાડ)`;
+    document.getElementById("drawingModalTitle").innerHTML = `<i class="fa-solid fa-money-bill-transfer text-amber-600"></i> Edit Partner Drawing`;
     openModal('drawingModal', 'edit');
   } else {
     document.getElementById("settleEditId").value = tx.id;
@@ -2904,7 +3003,7 @@ function handleSaveDrawing(e) {
       amount,
       notes
     });
-    showToast(`Recorded ₹${amount} personal drawing (ઉપાડ) for ${pName}!`);
+    showToast(`Recorded ₹${amount} personal drawing for ${pName}!`);
   }
 
   saveState();
@@ -3162,7 +3261,7 @@ function exportAllToExcel() {
     if (t.type === 'capital') {
       typeLabel = "Capital Invested";
     } else if (t.type === 'drawing') {
-      typeLabel = "Personal Drawing (ઉપાડ)";
+      typeLabel = "Personal Drawing";
       receiver = "Self (Personal Use)";
     }
 
