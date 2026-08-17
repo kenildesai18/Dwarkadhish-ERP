@@ -41,7 +41,22 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <!-- Custom Professional Stylesheet -->
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2026_smooth">
+  <style>
+    /* Clean Modern Flat Layout with Subtle Smooth Hover */
+    html, body, div, section, main, header {
+      perspective: none !important;
+      transform-style: flat !important;
+    }
+    .pro-card {
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease !important;
+    }
+    .pro-card:hover {
+      transform: translateY(-3px) !important;
+      border-color: #cbd5e1 !important;
+      box-shadow: 0 10px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03) !important;
+    }
+  </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased">
 
@@ -98,7 +113,7 @@
           </button>
           <button onclick="switchTab('payouts')" id="tab-payouts" class="nav-tab-item">
             <i class="fa-solid fa-building-columns text-xs text-indigo-600"></i>
-            <span>Online Payouts (15 IDs)</span>
+            <span>Online Payouts</span>
           </button>
           <button onclick="switchTab('sales')" id="tab-sales" class="nav-tab-item">
             <i class="fa-solid fa-truck-ramp-box text-xs text-purple-600"></i>
@@ -123,85 +138,85 @@
           </button>
           <button onclick="switchTab('reports')" id="tab-reports" class="nav-tab-item">
             <i class="fa-solid fa-file-excel text-xs"></i>
-            <span>Reports & Excel</span>
+            <span>Reports</span>
           </button>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- ==================== MAIN CONTENT (RESPONSIVE) ==================== -->
-  <main class="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex-grow w-full">
+  <!-- ==================== MAIN APPLICATION CONTAINER ==================== -->
+  <main class="flex-grow max-w-[1440px] w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
 
-    <!-- ==================== 1. DASHBOARD ==================== -->
+    <!-- ==================== 1. DASHBOARD OVERVIEW ==================== -->
     <section id="view-dashboard" class="space-y-4 sm:space-y-6">
       
-      <!-- Key Business Inward & Profit Hero Cards -->
+      <!-- Top 4 Modern Metrics Cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         
-        <!-- 1. Total Inward Bank Money Received (આવેલા કુલ રૂપિયા) -->
-        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between bg-gradient-to-br from-emerald-50/50 to-white">
-          <div>
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-emerald-800 uppercase tracking-wider">Total Bank Inward</span>
-              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs sm:text-sm icon-box-3d">
-                <i class="fa-solid fa-building-columns"></i>
-              </div>
+        <!-- Total Bank Inward (Online + Wholesale) -->
+        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between space-y-2 border-l-4 border-l-emerald-500">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Bank Inward</span>
+            <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center icon-box-3d">
+              <i class="fa-solid fa-building-columns text-sm"></i>
             </div>
-            <h3 class="text-2xl sm:text-3xl font-extrabold text-emerald-700 mt-1.5 font-mono tracking-tight" id="dashTotalInward">₹0</h3>
           </div>
-          <p class="text-xs text-slate-500 mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-            <span>Online 15 IDs: <b id="dashOnlineInward" class="text-slate-800 font-mono">₹0</b></span>
-            <span>Wholesale: <b id="dashWholesaleInward" class="text-slate-800 font-mono">₹0</b></span>
-          </p>
+          <div>
+            <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono tracking-tight" id="dashTotalInward">₹0</h3>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono pt-1 border-t border-slate-100">
+            <span>Online: <b class="text-slate-700" id="dashOnlineInward">₹0</b></span>
+            <span>Wholesale: <b class="text-slate-700" id="dashWholesaleInward">₹0</b></span>
+          </div>
         </div>
 
-        <!-- 2. Realized Net Profit (કુલ ચોખ્ખો નફો વધ્યો) -->
-        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between bg-gradient-to-br from-indigo-50/50 to-white">
-          <div>
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-indigo-800 uppercase tracking-wider">Net Realized Profit</span>
-              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-indigo-100 text-indigo-800 flex items-center justify-center text-xs sm:text-sm icon-box-3d">
-                <i class="fa-solid fa-sack-dollar"></i>
-              </div>
+        <!-- Net Realized Profit (With 50/50 Split) -->
+        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between space-y-2 border-l-4 border-l-indigo-600 bg-indigo-50/20">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-indigo-900 uppercase tracking-wider">Net Realized Profit</span>
+            <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center icon-box-3d">
+              <i class="fa-solid fa-sack-dollar text-sm"></i>
             </div>
-            <h3 class="text-2xl sm:text-3xl font-extrabold text-indigo-700 mt-1.5 font-mono tracking-tight" id="dashNetProfit">₹0</h3>
           </div>
-          <p class="text-xs text-slate-500 mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 font-semibold">
-            <span>Kenil (50%): <b id="dashP1NetProfit" class="text-indigo-900 font-mono">₹0</b></span>
-            <span>Alpesh (50%): <b id="dashP2NetProfit" class="text-purple-900 font-mono">₹0</b></span>
-          </p>
+          <div>
+            <h3 class="text-2xl sm:text-3xl font-extrabold text-indigo-900 font-mono tracking-tight" id="dashNetProfit">₹0</h3>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-slate-600 font-mono pt-1 border-t border-indigo-100/60">
+            <span>Kenil (50%): <b class="text-indigo-800" id="dashP1NetProfit">₹0</b></span>
+            <span>Alpesh (50%): <b class="text-purple-800" id="dashP2NetProfit">₹0</b></span>
+          </div>
         </div>
 
-        <!-- 3. Live Stock Valuation -->
-        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Stock Value</span>
-              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-xs sm:text-sm icon-box-3d">
-                <i class="fa-solid fa-warehouse"></i>
-              </div>
+        <!-- Total Stock Valuation -->
+        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between space-y-2 border-l-4 border-l-blue-500">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Stock Value</span>
+            <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center icon-box-3d">
+              <i class="fa-solid fa-boxes-stacked text-sm"></i>
             </div>
-            <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1.5 font-mono tracking-tight" id="dashStockValue">₹0</h3>
           </div>
-          <p class="text-xs text-slate-500 mt-3 flex items-center gap-2 border-t border-slate-100 pt-2.5">
-            <span class="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0"></span>
+          <div>
+            <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono tracking-tight" id="dashStockValue">₹0</h3>
+          </div>
+          <p class="text-[11px] text-slate-500 flex items-center gap-1.5 pt-1 border-t border-slate-100">
+            <span class="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></span>
             <span id="dashTotalItems" class="font-bold text-slate-800 font-mono">0</span> active SKUs in godown
           </p>
         </div>
 
-        <!-- 4. Total Business Expenses -->
-        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Expenses</span>
-              <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-xs sm:text-sm icon-box-3d">
-                <i class="fa-solid fa-receipt"></i>
-              </div>
+        <!-- Total Expenses -->
+        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between space-y-2 border-l-4 border-l-rose-500">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Expenses</span>
+            <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center icon-box-3d">
+              <i class="fa-solid fa-receipt text-sm"></i>
             </div>
-            <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1.5 font-mono tracking-tight" id="dashTotalExpenses">₹0</h3>
           </div>
-          <p class="text-xs text-slate-500 mt-3 flex items-center gap-2 border-t border-slate-100 pt-2.5">
+          <div>
+            <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono tracking-tight" id="dashTotalExpenses">₹0</h3>
+          </div>
+          <p class="text-[11px] text-slate-500 flex items-center gap-1.5 pt-1 border-t border-slate-100">
             <span class="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0"></span>
             This Month: <span id="dashMonthExpenses" class="font-bold text-slate-800 font-mono">₹0</span>
           </p>
@@ -209,16 +224,16 @@
 
       </div>
 
-      <!-- Quick 15-ID E-Commerce Summary Banner -->
+      <!-- Quick Multi-Accounts E-Commerce Summary Banner -->
       <div class="pro-card p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
         <div class="space-y-1">
           <div class="flex items-center gap-2">
-            <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-bold">15 Multi-Accounts Engine</span>
-            <span class="text-xs text-slate-300">Meesho (5 IDs) • Amazon (5 IDs) • Flipkart (5 IDs)</span>
+            <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-bold">Multi-Accounts Engine</span>
+            <span class="text-xs text-slate-300">Amazon • Meesho • Flipkart • Custom Platforms</span>
           </div>
           <h3 class="text-base sm:text-lg font-bold text-white">Daily Bank Settlement Tracker</h3>
           <p class="text-xs text-slate-300">
-            તમારા 15 એકાઉન્ટમાંથી રોજે રોજ બેંકમાં આવતી પેમેન્ટ એન્ટ્રી અહીં નાખો.
+            તમારા એકાઉન્ટ્સમાંથી રોજે રોજ બેંકમાં આવતી પેમેન્ટ એન્ટ્રી અહીં નાખો.
           </p>
         </div>
 
@@ -227,7 +242,7 @@
             <i class="fa-solid fa-plus"></i> Add Bank Payout
           </button>
           <button onclick="switchTab('payouts')" class="btn-outline bg-slate-800 text-white border-slate-700 hover:bg-slate-700 text-xs sm:text-sm py-2 px-3.5 whitespace-nowrap">
-            View 15 Accounts
+            View Accounts
           </button>
         </div>
       </div>
@@ -346,68 +361,34 @@
 
     </section>
 
-    <!-- ==================== 2. ONLINE BANK PAYOUTS (15 ACCOUNTS) ==================== -->
+    <!-- ==================== 2. ONLINE BANK PAYOUTS ==================== -->
     <section id="view-payouts" class="hidden space-y-4 sm:space-y-5">
       
       <!-- Top Action Bar -->
       <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div>
           <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-            <i class="fa-solid fa-building-columns text-indigo-600"></i> Online Bank Payouts Register (15 IDs)
+            <i class="fa-solid fa-building-columns text-indigo-600"></i> Online Bank Payouts Register
           </h3>
-          <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Track daily bank settlements received across Meesho, Amazon & Flipkart</p>
+          <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Track daily bank settlements received across all your seller accounts</p>
         </div>
 
-        <button onclick="openModal('payoutModal')" class="btn-solid-emerald text-xs sm:text-sm py-2 px-4 w-full sm:w-auto">
-          <i class="fa-solid fa-plus"></i> Add Bank Payout
-        </button>
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button onclick="openModal('onlineDispatchModal')" class="btn-solid-primary text-xs sm:text-sm py-2 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-truck-fast"></i> Daily Dispatch Out
+          </button>
+          <button onclick="openModal('sellerAccountsModal')" class="btn-outline text-xs sm:text-sm py-2 px-3">
+            <i class="fa-solid fa-gear text-slate-500"></i> Accounts
+          </button>
+          <button onclick="openModal('payoutModal')" class="btn-solid-emerald text-xs sm:text-sm py-2 px-3.5">
+            <i class="fa-solid fa-plus"></i> Add Bank Payout
+          </button>
+        </div>
       </div>
 
-      <!-- 15-ID Platform Breakdown Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-        
-        <!-- Meesho (5 IDs) -->
-        <div class="pro-card p-4 space-y-2 border-l-4 border-l-purple-500">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">M</span>
-              <h4 class="font-bold text-slate-900 text-xs sm:text-sm">Meesho (5 IDs)</h4>
-            </div>
-            <span class="text-xs font-bold text-purple-700 font-mono" id="meeshoTotalPayout">₹0</span>
-          </div>
-          <div class="space-y-1 text-xs text-slate-600 pt-1" id="meeshoAccountsList">
-            <!-- 5 Meesho IDs -->
-          </div>
-        </div>
-
-        <!-- Amazon (5 IDs) -->
-        <div class="pro-card p-4 space-y-2 border-l-4 border-l-amber-500">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">A</span>
-              <h4 class="font-bold text-slate-900 text-xs sm:text-sm">Amazon (5 IDs)</h4>
-            </div>
-            <span class="text-xs font-bold text-amber-700 font-mono" id="amazonTotalPayout">₹0</span>
-          </div>
-          <div class="space-y-1 text-xs text-slate-600 pt-1" id="amazonAccountsList">
-            <!-- 5 Amazon IDs -->
-          </div>
-        </div>
-
-        <!-- Flipkart (5 IDs) -->
-        <div class="pro-card p-4 space-y-2 border-l-4 border-l-blue-500">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">F</span>
-              <h4 class="font-bold text-slate-900 text-xs sm:text-sm">Flipkart (5 IDs)</h4>
-            </div>
-            <span class="text-xs font-bold text-blue-700 font-mono" id="flipkartTotalPayout">₹0</span>
-          </div>
-          <div class="space-y-1 text-xs text-slate-600 pt-1" id="flipkartAccountsList">
-            <!-- 5 Flipkart IDs -->
-          </div>
-        </div>
-
+      <!-- Platform Breakdown Cards Container (Dynamic) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4" id="platformAccountsCardsContainer">
+        <!-- Dynamically rendered for all platforms (Meesho, Amazon, Flipkart, Custom) -->
       </div>
 
       <!-- Payouts Table -->
@@ -500,18 +481,25 @@
           </select>
         </div>
 
-        <div class="flex items-center gap-2 w-full sm:w-auto">
-          <button onclick="openModal('adjustmentModal')" class="btn-outline text-xs sm:text-sm py-2 w-1/2 sm:w-auto">
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button onclick="openModal('onlineDispatchModal')" class="btn-solid-primary text-xs sm:text-sm py-2 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-truck-fast"></i> Daily Online Dispatch
+          </button>
+          <button onclick="openModal('adjustmentModal')" class="btn-outline text-xs sm:text-sm py-2 px-3">
             <i class="fa-solid fa-sliders text-amber-500"></i> Adjust (+/-)
           </button>
-          <button onclick="openModal('productModal')" class="btn-solid-primary text-xs sm:text-sm py-2 w-1/2 sm:w-auto">
-            <i class="fa-solid fa-plus"></i> Add Product
+          <button onclick="openModal('productModal')" class="btn-outline text-xs sm:text-sm py-2 px-3">
+            <i class="fa-solid fa-plus text-slate-600"></i> Add Product
           </button>
         </div>
       </div>
 
       <!-- Products Table -->
       <div class="pro-card overflow-hidden">
+        <div class="px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">Inventory Stock Balance</h3>
+          <span class="text-[11px] text-slate-400 font-medium">Real-Time Sync</span>
+        </div>
         <div class="overflow-x-auto scrollbar-none">
           <table class="pro-table">
             <thead>
@@ -527,6 +515,40 @@
               </tr>
             </thead>
             <tbody id="productsTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Daily Online Dispatches History Table -->
+      <div class="pro-card overflow-hidden">
+        <div class="px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-truck-ramp-box text-indigo-600"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">Daily Online Dispatches Log (રોજિંદી ઓનલાઇન રવાનગી)</h3>
+              <p class="text-[11px] text-slate-500">Log of items shipped to Meesho, Amazon, Flipkart with automatic stock deduction</p>
+            </div>
+          </div>
+          <button onclick="openModal('onlineDispatchModal')" class="btn-solid-indigo text-xs py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-md flex items-center justify-center gap-1">
+            <i class="fa-solid fa-plus"></i> New Dispatch Out
+          </button>
+        </div>
+        <div class="overflow-x-auto scrollbar-none">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Platform</th>
+                <th>Seller Account</th>
+                <th>Products Dispatched</th>
+                <th class="text-right">Units Out</th>
+                <th>Notes / Courier</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="dispatchesTableBody">
               <!-- Dynamically populated -->
             </tbody>
           </table>
@@ -643,6 +665,14 @@
               <span class="text-slate-500">Capital Invested:</span>
               <span class="font-bold text-slate-900 font-mono" id="cardP1Capital">₹0</span>
             </div>
+            <div class="flex justify-between py-1 border-b border-slate-50 text-emerald-700 bg-emerald-50/60 px-1 rounded">
+              <span class="font-semibold">Wholesale Money In A/c:</span>
+              <span class="font-bold font-mono" id="cardP1WholesaleRecv">₹0</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-50 text-amber-700 bg-amber-50/60 px-1 rounded">
+              <span class="font-semibold">Personal Drawings (ઉપાડ):</span>
+              <span class="font-bold font-mono" id="cardP1Drawings">₹0</span>
+            </div>
             <div class="flex justify-between py-1 border-b border-slate-50">
               <span class="text-slate-500">Direct Settlements Adjusted:</span>
               <span class="font-bold text-slate-900 font-mono" id="cardP1Settlements">₹0</span>
@@ -677,6 +707,14 @@
               <span class="text-slate-500">Capital Invested:</span>
               <span class="font-bold text-slate-900 font-mono" id="cardP2Capital">₹0</span>
             </div>
+            <div class="flex justify-between py-1 border-b border-slate-50 text-emerald-700 bg-emerald-50/60 px-1 rounded">
+              <span class="font-semibold">Wholesale Money In A/c:</span>
+              <span class="font-bold font-mono" id="cardP2WholesaleRecv">₹0</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-50 text-amber-700 bg-amber-50/60 px-1 rounded">
+              <span class="font-semibold">Personal Drawings (ઉપાડ):</span>
+              <span class="font-bold font-mono" id="cardP2Drawings">₹0</span>
+            </div>
             <div class="flex justify-between py-1 border-b border-slate-50">
               <span class="text-slate-500">Direct Settlements Adjusted:</span>
               <span class="font-bold text-slate-900 font-mono" id="cardP2Settlements">₹0</span>
@@ -703,11 +741,14 @@
             </p>
           </div>
 
-          <div class="flex items-center gap-2 w-full sm:w-auto">
-            <button onclick="openModal('capitalModal')" class="btn-outline bg-slate-800 text-white border-slate-700 hover:bg-slate-700 text-xs sm:text-sm py-2 w-1/2 sm:w-auto">
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button onclick="openModal('drawingModal')" class="btn-outline bg-amber-950/40 text-amber-300 border-amber-500/40 hover:bg-amber-900/50 text-xs sm:text-sm py-2 px-3">
+              <i class="fa-solid fa-money-bill-transfer"></i> Record Drawing (ઉપાડ)
+            </button>
+            <button onclick="openModal('capitalModal')" class="btn-outline bg-slate-800 text-white border-slate-700 hover:bg-slate-700 text-xs sm:text-sm py-2 px-3">
               <i class="fa-solid fa-vault"></i> Add Capital
             </button>
-            <button onclick="openModal('settleModal')" class="btn-solid-emerald text-xs sm:text-sm py-2 w-1/2 sm:w-auto">
+            <button onclick="openModal('settleModal')" class="btn-solid-emerald text-xs sm:text-sm py-2 px-3.5">
               <i class="fa-solid fa-handshake"></i> Record Settle
             </button>
           </div>
@@ -815,7 +856,7 @@
 
   <!-- ==================== RESPONSIVE MODALS ==================== -->
 
-  <!-- 1. ONLINE BANK PAYOUT MODAL (15 IDs) -->
+  <!-- 1. ONLINE BANK PAYOUT MODAL -->
   <div id="payoutModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-lg">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -836,15 +877,20 @@
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Platform *</label>
             <select id="payoutPlatform" onchange="updatePayoutAccountsDropdown()" required class="input-pro font-bold">
-              <option value="Meesho">Meesho (5 IDs)</option>
-              <option value="Amazon">Amazon (5 IDs)</option>
-              <option value="Flipkart">Flipkart (5 IDs)</option>
+              <option value="Meesho">Meesho</option>
+              <option value="Amazon">Amazon</option>
+              <option value="Flipkart">Flipkart</option>
             </select>
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Seller Account / ID *</label>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-slate-700">Seller Account / ID *</label>
+            <button type="button" onclick="quickAddNewSellerAccount()" class="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
+              <i class="fa-solid fa-plus"></i> New Account
+            </button>
+          </div>
           <select id="payoutAccountId" required class="input-pro font-semibold">
             <!-- Dynamically populated -->
           </select>
@@ -876,6 +922,58 @@
           <button type="submit" class="btn-solid-emerald text-xs sm:text-sm py-2 px-4">Save Bank Payout</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- 1.1 MANAGE SELLER ACCOUNTS MODAL -->
+  <div id="sellerAccountsModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-gear text-indigo-600"></i> Manage E-Commerce Seller Accounts
+        </h3>
+        <button onclick="closeModal('sellerAccountsModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 mt-3.5">
+        
+        <!-- Add Account Box -->
+        <form id="newSellerAccountForm" onsubmit="handleAddNewSellerAccount(event)" class="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5">
+          <h4 class="text-xs font-bold text-slate-800">Add New Seller Account</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Platform *</label>
+              <select id="newAccountPlatform" required class="input-pro py-1 text-xs font-bold">
+                <option value="Amazon">Amazon</option>
+                <option value="Meesho">Meesho</option>
+                <option value="Flipkart">Flipkart</option>
+                <option value="Other">Other / Custom</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Account Name / ID *</label>
+              <input type="text" id="newAccountName" required placeholder="e.g. Amazon - ID 6" class="input-pro py-1 text-xs">
+            </div>
+          </div>
+          <button type="submit" class="btn-solid-primary text-xs py-1.5 px-3 w-full">
+            <i class="fa-solid fa-plus"></i> Add Seller Account
+          </button>
+        </form>
+
+        <!-- Current Accounts List -->
+        <div>
+          <h4 class="text-xs font-bold text-slate-800 mb-2">Registered Accounts</h4>
+          <div id="sellerAccountsListContainer" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <div class="flex justify-end pt-2 border-t border-slate-100">
+          <button type="button" onclick="closeModal('sellerAccountsModal')" class="btn-solid-primary text-xs py-1.5 px-4">Done</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -933,7 +1031,7 @@
             <span class="text-xl sm:text-2xl font-bold text-slate-900 font-mono" id="saleTotalDisplay">₹0</span>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2 border-t border-slate-200">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-2 border-t border-slate-200">
             <div>
               <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Status *</label>
               <select id="salePaymentStatus" onchange="toggleSalePaidAmount()" class="input-pro font-semibold">
@@ -946,6 +1044,14 @@
               <label class="block text-xs font-semibold text-slate-700 mb-1">Amount Collected (₹)</label>
               <input type="number" id="salePaidAmount" min="0" step="any" placeholder="0.00" class="input-pro font-bold font-mono text-emerald-600">
             </div>
+            <div id="saleReceivedByGroup">
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Received In *</label>
+              <select id="saleReceivedBy" class="input-pro font-semibold text-indigo-700">
+                <option value="partner1">Kenil's Account (Partner 1)</option>
+                <option value="partner2">Alpesh's Account (Partner 2)</option>
+                <option value="business">Business Bank / Cash A/c</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -957,6 +1063,140 @@
         <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
           <button type="button" onclick="closeModal('saleModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
           <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-4">Save Bill</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2.1 WHOLESALE CUSTOMER PAYMENT COLLECTION MODAL -->
+  <div id="customerCollectModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-md">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-hand-holding-dollar text-emerald-600"></i> Collect Wholesale Payment
+        </h3>
+        <button onclick="closeModal('customerCollectModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="customerCollectForm" onsubmit="handleSaveCustomerCollect(event)" class="space-y-3 mt-3.5">
+        <input type="hidden" id="ccSaleId" value="">
+
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
+          <div class="flex justify-between text-slate-600">
+            <span>Customer:</span>
+            <b class="text-slate-900" id="ccCustomerName">-</b>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span>Invoice #:</span>
+            <b class="font-mono text-slate-900" id="ccInvoiceNo">-</b>
+          </div>
+          <div class="flex justify-between text-rose-600 font-bold border-t border-slate-200 pt-1">
+            <span>Total Pending Due:</span>
+            <span class="font-mono text-sm" id="ccPendingAmount">₹0</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Receipt Date *</label>
+            <input type="date" id="ccDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Amount Received (₹) *</label>
+            <input type="number" id="ccAmount" min="1" step="any" required placeholder="0.00" class="input-pro font-mono font-bold text-emerald-600">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Received In (Partner / Bank) *</label>
+          <select id="ccReceivedBy" required class="input-pro font-semibold text-indigo-700">
+            <option value="partner1">Kenil's Account (Partner 1)</option>
+            <option value="partner2">Alpesh's Account (Partner 2)</option>
+            <option value="business">Business Bank / Cash A/c</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Reference / Note</label>
+          <input type="text" id="ccNotes" placeholder="e.g. Received via GPay / Cheque..." class="input-pro">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('customerCollectModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-emerald text-xs sm:text-sm py-2 px-4">Record Receipt</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2.2 DAILY ONLINE DISPATCH MODAL -->
+  <div id="onlineDispatchModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="dispatchModalTitle">
+          <i class="fa-solid fa-truck-fast text-indigo-600"></i> Daily Online Dispatch (ઓનલાઇન માલ રવાનગી)
+        </h3>
+        <button onclick="closeModal('onlineDispatchModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="dispatchForm" onsubmit="handleSaveOnlineDispatch(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="dispatchEditId" value="">
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Dispatch Date *</label>
+            <input type="date" id="dispatchDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Platform *</label>
+            <select id="dispatchPlatform" onchange="updateDispatchAccountsDropdown()" class="input-pro font-bold text-indigo-700">
+              <option value="Meesho">Meesho</option>
+              <option value="Amazon">Amazon</option>
+              <option value="Flipkart">Flipkart</option>
+              <option value="Other">Other / Custom</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Seller Account *</label>
+            <select id="dispatchAccount" class="input-pro font-semibold">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Items Dispatched List -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-slate-800">Products Dispatched Today (આજે ગયેલ માલ) *</label>
+            <button type="button" onclick="addDispatchItemRow()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+              <i class="fa-solid fa-plus"></i> Add Product
+            </button>
+          </div>
+
+          <div id="dispatchItemsContainer" class="space-y-2 max-h-48 sm:max-h-56 overflow-y-auto pr-1">
+            <!-- Dynamically populated rows -->
+          </div>
+
+          <div class="p-2.5 bg-indigo-50/70 border border-indigo-100 rounded-lg flex items-center justify-between text-xs">
+            <span class="font-medium text-indigo-900">Total Units Dispatched (કુલ રવાના કરેલ નંગ):</span>
+            <b class="text-base font-mono font-extrabold text-indigo-900" id="dispatchTotalUnitsDisplay">0 pcs</b>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Courier / Batch / Notes (Optional)</label>
+          <input type="text" id="dispatchNotes" placeholder="e.g. ATS Courier, Shadowfax, Morning Batch..." class="input-pro">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('onlineDispatchModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg">
+            <i class="fa-solid fa-check"></i> Record & Deduct Stock
+          </button>
         </div>
       </form>
     </div>
@@ -1342,6 +1582,60 @@
     </div>
   </div>
 
+  <!-- 8.1 PARTNER DRAWINGS / UPAD MODAL -->
+  <div id="drawingModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-md">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="drawingModalTitle">
+          <i class="fa-solid fa-money-bill-transfer text-amber-600"></i> Record Partner Drawing (પાર્ટનર ઉપાડ)
+        </h3>
+        <button onclick="closeModal('drawingModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="drawingForm" onsubmit="handleSaveDrawing(event)" class="space-y-3 mt-3.5">
+        <input type="hidden" id="drawingEditId" value="">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Drawing Date *</label>
+          <input type="date" id="drawingDate" required class="input-pro font-mono">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Partner (Who Took Money / ઉપાડ કરનાર) *</label>
+          <select id="drawingPartner" required class="input-pro font-semibold text-indigo-700">
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Withdrawn Amount (₹) *</label>
+          <input type="number" id="drawingAmount" min="1" step="any" required placeholder="0.00" class="input-pro font-mono font-bold text-amber-600 text-base">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Taken From (Source) *</label>
+          <select id="drawingSource" required class="input-pro font-medium">
+            <option value="Business Bank Account">Business Bank Account / Online Transfer</option>
+            <option value="Cash Counter">Cash / Godown Cash Counter</option>
+            <option value="Wholesale Customer Direct">Direct from Customer / Wholesale Party</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Reason / Purpose</label>
+          <input type="text" id="drawingNotes" placeholder="e.g. Home expenses, personal use..." class="input-pro">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('drawingModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-amber text-xs sm:text-sm py-2 px-4 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg">Save Drawing (ઉપાડ)</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- 9. SETTINGS MODAL -->
   <div id="settingsModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-md">
@@ -1437,6 +1731,6 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="app.js"></script>
+  <script src="app.js?v=2026_online_dispatch_v6"></script>
 </body>
 </html>

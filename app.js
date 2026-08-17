@@ -3,7 +3,7 @@
  * Comprehensive Inventory, Multi-Channel Sales, Purchases, Daily Expenses & 2-Partner Ledger
  */
 
-// Global State (Clean Pristine Database & 15-ID E-Commerce Accounts)
+// Global State (Clean Pristine Database & Custom User Accounts)
 const INITIAL_STORE_DATABASE = {
   settings: {
     bizName: "Dwarkadhish Enterprise",
@@ -12,26 +12,12 @@ const INITIAL_STORE_DATABASE = {
     partner1Ratio: 50,
     partner2Ratio: 50,
     firebaseConfig: "",
-    accountNames: {
-      "meesho_1": "Meesho - ID 1",
-      "meesho_2": "Meesho - ID 2",
-      "meesho_3": "Meesho - ID 3",
-      "meesho_4": "Meesho - ID 4",
-      "meesho_5": "Meesho - ID 5",
-      "amazon_1": "Amazon - ID 1",
-      "amazon_2": "Amazon - ID 2",
-      "amazon_3": "Amazon - ID 3",
-      "amazon_4": "Amazon - ID 4",
-      "amazon_5": "Amazon - ID 5",
-      "flipkart_1": "Flipkart - ID 1",
-      "flipkart_2": "Flipkart - ID 2",
-      "flipkart_3": "Flipkart - ID 3",
-      "flipkart_4": "Flipkart - ID 4",
-      "flipkart_5": "Flipkart - ID 5"
-    }
+    sellerAccounts: [],
+    accountNames: {}
   },
   products: [],
   onlinePayouts: [],
+  onlineDispatches: [],
   sales: [],
   purchases: [],
   expenses: [],
@@ -42,8 +28,8 @@ const INITIAL_STORE_DATABASE = {
 
 let state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
 
-const STORAGE_KEY = "VYAPAR_STOCK_MANAGER_DB_CLEAN_V1";
-const CLOUD_SYNC_KEY = "dwarkadhish_enterprise_db_master_v1";
+const STORAGE_KEY = "DWARKADHISH_ENTERPRISE_V2_CLEAN";
+const CLOUD_SYNC_KEY = "dwarkadhish_enterprise_v2_clean";
 const CLOUD_ENDPOINT_URL = `https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/2d9f8e7a/${CLOUD_SYNC_KEY}/`;
 const CLOUD_FETCH_URL = `https://keyvalue.immanuel.co/api/KeyVal/GetValue/2d9f8e7a/${CLOUD_SYNC_KEY}`;
 
@@ -55,6 +41,12 @@ let cloudSyncTimer = null;
 document.addEventListener("DOMContentLoaded", () => {
   loadState();
   
+  // Clean all inline styles that might have been cached
+  document.querySelectorAll(".pro-card, div, section, main").forEach(el => {
+    el.style.transform = "none";
+    el.style.perspective = "none";
+  });
+
   const today = new Date().toISOString().split('T')[0];
   const dateInputs = ["saleDate", "purchaseDate", "expenseDate", "settleDate", "capitalDate", "vpDate", "ccDate"];
   dateInputs.forEach(id => {
@@ -88,8 +80,8 @@ async function fetchFromInstantCloud() {
         const cloudTime = cloudState._syncTime || 0;
         const localTime = state._syncTime || 0;
 
-        // If cloud data is newer or has entries when local is empty
-        if (cloudTime > localTime || (!state.sales.length && cloudState.sales && cloudState.sales.length)) {
+        // Only sync if cloud data is strictly newer than local
+        if (cloudTime > localTime) {
           isSyncingFromCloud = true;
           state = { ...state, ...cloudState };
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -158,6 +150,7 @@ function loadState() {
         state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
+      if (!state.onlineDispatches) state.onlineDispatches = [];
     } else {
       state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -253,10 +246,22 @@ function updatePartnerLabelsInUI() {
   const settlePayer = document.getElementById("settlePayer");
   const settleReceiver = document.getElementById("settleReceiver");
   const capitalPartner = document.getElementById("capitalPartner");
+  const drawingPartner = document.getElementById("drawingPartner");
 
   if (settlePayer) settlePayer.innerHTML = `<option value="partner1">${p1}</option><option value="partner2">${p2}</option>`;
   if (settleReceiver) settleReceiver.innerHTML = `<option value="partner2">${p2}</option><option value="partner1">${p1}</option>`;
   if (capitalPartner) capitalPartner.innerHTML = `<option value="partner1">${p1}</option><option value="partner2">${p2}</option>`;
+  if (drawingPartner) drawingPartner.innerHTML = `<option value="partner1">${p1} (Partner 1 / You)</option><option value="partner2">${p2} (Partner 2)</option>`;
+
+  const saleRecv = document.getElementById("saleReceivedBy");
+  const ccRecv = document.getElementById("ccReceivedBy");
+  const partnerOptions = `
+    <option value="partner1">${escapeHtml(p1)}'s Account (Partner 1)</option>
+    <option value="partner2">${escapeHtml(p2)}'s Account (Partner 2)</option>
+    <option value="business">Business Account / Cash</option>
+  `;
+  if (saleRecv) saleRecv.innerHTML = partnerOptions;
+  if (ccRecv) ccRecv.innerHTML = partnerOptions;
 
   const setBiz = document.getElementById("settingBizName");
   const setP1 = document.getElementById("settingP1Name");
@@ -318,6 +323,8 @@ function openModal(modalId, isEditOrParam = null) {
     document.getElementById("payoutDate").value = new Date().toISOString().split('T')[0];
     document.getElementById("payoutModalTitle").textContent = "Add Online Bank Payout";
     updatePayoutAccountsDropdown();
+  } else if (modalId === 'sellerAccountsModal') {
+    renderSellerAccountsManager();
   } else if (modalId === 'saleModal') {
     initSaleModal(isEditOrParam);
   } else if (modalId === 'purchaseModal') {
@@ -342,6 +349,14 @@ function openModal(modalId, isEditOrParam = null) {
     document.getElementById("capitalEditId").value = "";
     document.getElementById("capitalDate").value = new Date().toISOString().split('T')[0];
     document.getElementById("capitalModalTitle").textContent = "Add Capital Investment";
+  } else if (modalId === 'drawingModal') {
+    const form = document.getElementById("drawingForm");
+    if (form) form.reset();
+    document.getElementById("drawingEditId").value = "";
+    document.getElementById("drawingDate").value = new Date().toISOString().split('T')[0];
+    document.getElementById("drawingModalTitle").innerHTML = `<i class="fa-solid fa-money-bill-transfer text-amber-600"></i> Record Partner Drawing (પાર્ટનર ઉપાડ)`;
+  } else if (modalId === 'onlineDispatchModal') {
+    initOnlineDispatchModal();
   } else if (modalId === 'settleModal') {
     const form = document.getElementById("settleForm");
     if (form) form.reset();
@@ -606,7 +621,33 @@ function calculatePartnerBalances() {
     else if (c.payer === 'partner2') p2Capital += amt;
   });
 
-  // 4. Direct Settlements
+  // 4. Wholesale Collections Received in Partner's personal account
+  let p1WholesaleRecv = 0;
+  let p2WholesaleRecv = 0;
+  state.sales.forEach(s => {
+    if (s.paymentHistory && Array.isArray(s.paymentHistory) && s.paymentHistory.length > 0) {
+      s.paymentHistory.forEach(ph => {
+        const amt = Number(ph.amount) || 0;
+        if (ph.receivedBy === 'partner1') p1WholesaleRecv += amt;
+        else if (ph.receivedBy === 'partner2') p2WholesaleRecv += amt;
+      });
+    } else {
+      const amt = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? Number(s.totalAmount) : 0);
+      if (s.receivedBy === 'partner1') p1WholesaleRecv += amt;
+      else if (s.receivedBy === 'partner2') p2WholesaleRecv += amt;
+    }
+  });
+
+  // 5. Personal Drawings (ઉપાડ)
+  let p1Drawings = 0;
+  let p2Drawings = 0;
+  state.partnerTransactions.filter(t => t.type === 'drawing').forEach(d => {
+    const amt = Number(d.amount) || 0;
+    if (d.payer === 'partner1') p1Drawings += amt;
+    else if (d.payer === 'partner2') p2Drawings += amt;
+  });
+
+  // 6. Direct Settlements
   let p1SettlementAdj = 0;
   let p2SettlementAdj = 0;
   state.partnerTransactions.filter(t => t.type === 'settlement').forEach(s => {
@@ -620,8 +661,8 @@ function calculatePartnerBalances() {
     }
   });
 
-  const p1TotalPaid = p1Purchases + p1Expenses + p1Capital + p1SettlementAdj;
-  const p2TotalPaid = p2Purchases + p2Expenses + p2Capital + p2SettlementAdj;
+  const p1TotalPaid = (p1Purchases + p1Expenses + p1Capital + p1SettlementAdj) - (p1WholesaleRecv + p1Drawings);
+  const p2TotalPaid = (p2Purchases + p2Expenses + p2Capital + p2SettlementAdj) - (p2WholesaleRecv + p2Drawings);
   const totalCombinedPaid = p1TotalPaid + p2TotalPaid;
 
   const p1ExpectedShare = totalCombinedPaid * r1;
@@ -636,24 +677,32 @@ function calculatePartnerBalances() {
   const cP1Purch = document.getElementById("cardP1Purchases");
   const cP1Exp = document.getElementById("cardP1Expenses");
   const cP1Cap = document.getElementById("cardP1Capital");
+  const cP1Ws = document.getElementById("cardP1WholesaleRecv");
+  const cP1Draw = document.getElementById("cardP1Drawings");
   const cP1Set = document.getElementById("cardP1Settlements");
   const cP1Grand = document.getElementById("cardP1GrandTotal");
 
   if (cP1Purch) cP1Purch.textContent = formatCurrency(p1Purchases);
   if (cP1Exp) cP1Exp.textContent = formatCurrency(p1Expenses);
   if (cP1Cap) cP1Cap.textContent = formatCurrency(p1Capital);
+  if (cP1Ws) cP1Ws.textContent = formatCurrency(p1WholesaleRecv);
+  if (cP1Draw) cP1Draw.textContent = formatCurrency(p1Drawings);
   if (cP1Set) cP1Set.textContent = (p1SettlementAdj >= 0 ? "+" : "") + formatCurrency(p1SettlementAdj);
   if (cP1Grand) cP1Grand.textContent = formatCurrency(p1TotalPaid);
 
   const cP2Purch = document.getElementById("cardP2Purchases");
   const cP2Exp = document.getElementById("cardP2Expenses");
   const cP2Cap = document.getElementById("cardP2Capital");
+  const cP2Ws = document.getElementById("cardP2WholesaleRecv");
+  const cP2Draw = document.getElementById("cardP2Drawings");
   const cP2Set = document.getElementById("cardP2Settlements");
   const cP2Grand = document.getElementById("cardP2GrandTotal");
 
   if (cP2Purch) cP2Purch.textContent = formatCurrency(p2Purchases);
   if (cP2Exp) cP2Exp.textContent = formatCurrency(p2Expenses);
   if (cP2Cap) cP2Cap.textContent = formatCurrency(p2Capital);
+  if (cP2Ws) cP2Ws.textContent = formatCurrency(p2WholesaleRecv);
+  if (cP2Draw) cP2Draw.textContent = formatCurrency(p2Drawings);
   if (cP2Set) cP2Set.textContent = (p2SettlementAdj >= 0 ? "+" : "") + formatCurrency(p2SettlementAdj);
   if (cP2Grand) cP2Grand.textContent = formatCurrency(p2TotalPaid);
 
@@ -707,7 +756,7 @@ function renderPartnerTransactionsTable() {
   if (!tbody) return;
 
   if (state.partnerTransactions.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="py-5 text-center text-slate-400">No capital or settlement transactions found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="py-5 text-center text-slate-400">No partner capital, drawings or settlement records found.</td></tr>`;
     return;
   }
 
@@ -715,22 +764,34 @@ function renderPartnerTransactionsTable() {
   const p2 = state.settings.partner2Name;
 
   tbody.innerHTML = state.partnerTransactions.map(tx => {
-    const isCapital = tx.type === 'capital';
+    let badgeClass = "badge-paid";
+    let badgeLabel = "Settlement";
+    let receiverName = tx.receiver ? (tx.receiver === 'partner1' ? p1 : (tx.receiver === 'partner2' ? p2 : 'Business Account')) : 'Business Account';
+
+    if (tx.type === 'capital') {
+      badgeClass = "badge-neutral";
+      badgeLabel = "Capital Added";
+    } else if (tx.type === 'drawing') {
+      badgeClass = "bg-amber-100 text-amber-800 border border-amber-300 font-bold";
+      badgeLabel = "Drawing (ઉપાડ)";
+      receiverName = "Self / Personal Use";
+    }
+
     const payerName = tx.payer === 'partner1' ? p1 : p2;
-    const receiverName = tx.receiver ? (tx.receiver === 'partner1' ? p1 : (tx.receiver === 'partner2' ? p2 : 'Business Account')) : 'Business Account';
+    const notesDisplay = tx.source ? `${escapeHtml(tx.source)}${tx.notes ? ' - ' + escapeHtml(tx.notes) : ''}` : (tx.notes || '-');
 
     return `
       <tr>
-        <td class="text-slate-500 font-mono">${formatDate(tx.date)}</td>
+        <td class="text-slate-500 font-mono text-xs">${formatDate(tx.date)}</td>
         <td>
-          <span class="badge-status ${isCapital ? 'badge-neutral' : 'badge-paid'}">
-            ${isCapital ? 'Capital Added' : 'Settlement'}
+          <span class="badge-status ${badgeClass}">
+            ${badgeLabel}
           </span>
         </td>
         <td class="font-semibold text-slate-900">${escapeHtml(payerName)}</td>
         <td class="text-slate-600">${escapeHtml(receiverName)}</td>
-        <td class="text-slate-500">${escapeHtml(tx.notes || '-')}</td>
-        <td class="text-right font-bold font-mono text-slate-900">${formatCurrency(tx.amount)}</td>
+        <td class="text-slate-500 text-xs">${notesDisplay}</td>
+        <td class="text-right font-bold font-mono text-slate-900 ${tx.type === 'drawing' ? 'text-amber-700' : ''}">${formatCurrency(tx.amount)}</td>
         <td class="text-center space-x-1">
           <button onclick="editPartnerTx('${tx.id}')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Edit">
             <i class="fa-solid fa-pen-to-square"></i>
@@ -947,6 +1008,279 @@ function handleSaveAdjustment(e) {
   showToast(`Stock successfully ${type === 'add' ? 'increased (+)' : 'reduced (-)'}!`);
 }
 
+// ==================== DAILY ONLINE DISPATCHES (MEESHO / AMAZON / FLIPKART) ====================
+function initOnlineDispatchModal() {
+  const form = document.getElementById("dispatchForm");
+  if (form) form.reset();
+
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById("dispatchDate").value = today;
+  document.getElementById("dispatchEditId").value = "";
+  document.getElementById("dispatchModalTitle").innerHTML = `<i class="fa-solid fa-truck-fast text-indigo-600"></i> Daily Online Dispatch (ઓનલાઇન માલ રવાનગી)`;
+  document.getElementById("dispatchItemsContainer").innerHTML = "";
+
+  updateDispatchAccountsDropdown();
+  addDispatchItemRow();
+  calculateDispatchTotals();
+}
+
+function updateDispatchAccountsDropdown() {
+  const platform = document.getElementById("dispatchPlatform")?.value || "Meesho";
+  const select = document.getElementById("dispatchAccount");
+  if (!select) return;
+
+  const accounts = getSellerAccounts().filter(acc => acc.platform === platform || acc.platform === 'Other' || platform === 'Other');
+  if (accounts.length > 0) {
+    select.innerHTML = accounts.map(acc => `<option value="${acc.id}">${escapeHtml(acc.name)}</option>`).join('');
+  } else {
+    select.innerHTML = `<option value="${platform.toLowerCase()}_default">${platform} Main ID</option>`;
+  }
+}
+
+function addDispatchItemRow(prodId = "", qty = 1) {
+  const container = document.getElementById("dispatchItemsContainer");
+  if (!container) return;
+
+  const rowIndex = Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+  const row = document.createElement("div");
+  row.className = "flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 dispatch-item-row";
+  row.id = `disp_row_${rowIndex}`;
+
+  row.innerHTML = `
+    <div class="flex-grow">
+      <select id="disp_prod_${rowIndex}" onchange="calculateDispatchTotals()" required class="input-pro py-1 text-xs font-semibold">
+        <option value="">-- Select Product --</option>
+        ${state.products.map(p => `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
+      </select>
+    </div>
+    <div class="w-24 sm:w-28 flex items-center gap-1">
+      <input type="number" id="disp_qty_${rowIndex}" min="1" value="${qty}" oninput="calculateDispatchTotals()" placeholder="Qty" required class="input-pro py-1 text-xs text-center font-bold font-mono text-indigo-700">
+      <span class="text-xs text-slate-500 font-medium">pcs</span>
+    </div>
+    <button type="button" onclick="removeDispatchItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 p-1 flex-shrink-0" title="Remove">
+      <i class="fa-solid fa-trash-can"></i>
+    </button>
+  `;
+
+  container.appendChild(row);
+  calculateDispatchTotals();
+}
+
+function removeDispatchItemRow(rowIndex) {
+  const row = document.getElementById(`disp_row_${rowIndex}`);
+  if (row) row.remove();
+  calculateDispatchTotals();
+}
+
+function calculateDispatchTotals() {
+  const rows = document.querySelectorAll(".dispatch-item-row");
+  let totalUnits = 0;
+  rows.forEach(row => {
+    const id = row.id.replace("disp_row_", "");
+    const qtyInput = document.getElementById(`disp_qty_${id}`);
+    if (qtyInput) {
+      totalUnits += (parseInt(qtyInput.value) || 0);
+    }
+  });
+
+  const dispEl = document.getElementById("dispatchTotalUnitsDisplay");
+  if (dispEl) dispEl.textContent = `${totalUnits} pcs`;
+}
+
+function handleSaveOnlineDispatch(e) {
+  e.preventDefault();
+  const editId = document.getElementById("dispatchEditId").value;
+  const date = document.getElementById("dispatchDate").value;
+  const platform = document.getElementById("dispatchPlatform").value;
+  const accountId = document.getElementById("dispatchAccount").value;
+  const accountSelect = document.getElementById("dispatchAccount");
+  const accountName = accountSelect.options[accountSelect.selectedIndex]?.text || platform;
+  const notes = document.getElementById("dispatchNotes").value.trim();
+
+  const rows = document.querySelectorAll(".dispatch-item-row");
+  if (rows.length === 0) {
+    showToast("Please select at least one product to dispatch!", true);
+    return;
+  }
+
+  const items = [];
+  let totalUnits = 0;
+
+  rows.forEach(row => {
+    const id = row.id.replace("disp_row_", "");
+    const prodId = document.getElementById(`disp_prod_${id}`)?.value;
+    const qty = parseInt(document.getElementById(`disp_qty_${id}`)?.value) || 0;
+
+    if (!prodId || qty <= 0) return;
+
+    const prod = state.products.find(p => p.id === prodId);
+    if (!prod) return;
+
+    totalUnits += qty;
+    items.push({
+      productId: prod.id,
+      productName: prod.name,
+      sku: prod.sku || '',
+      costPrice: prod.costPrice || 0,
+      retailPrice: prod.retailPrice || 0,
+      qty
+    });
+  });
+
+  if (items.length === 0) {
+    showToast("Please select valid products with quantity > 0!", true);
+    return;
+  }
+
+  // If editing, first revert old stock quantities
+  if (editId) {
+    const oldDisp = (state.onlineDispatches || []).find(d => d.id === editId);
+    if (oldDisp && Array.isArray(oldDisp.items)) {
+      oldDisp.items.forEach(oldItem => {
+        const prod = state.products.find(p => p.id === oldItem.productId);
+        if (prod) {
+          prod.currentStock = (Number(prod.currentStock) || 0) + (Number(oldItem.qty) || 0);
+        }
+      });
+    }
+  }
+
+  // Deduct new dispatched quantities from stock
+  items.forEach(item => {
+    const prod = state.products.find(p => p.id === item.productId);
+    if (prod) {
+      prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - Number(item.qty));
+    }
+  });
+
+  if (!state.onlineDispatches) state.onlineDispatches = [];
+
+  if (editId) {
+    const existing = state.onlineDispatches.find(d => d.id === editId);
+    if (existing) {
+      existing.date = date;
+      existing.platform = platform;
+      existing.accountId = accountId;
+      existing.accountName = accountName;
+      existing.items = items;
+      existing.totalUnits = totalUnits;
+      existing.notes = notes;
+      showToast(`Dispatch entry updated & stock adjusted!`);
+    }
+  } else {
+    const newDisp = {
+      id: "disp_" + Date.now(),
+      date,
+      platform,
+      accountId,
+      accountName,
+      items,
+      totalUnits,
+      notes
+    };
+    state.onlineDispatches.push(newDisp);
+    showToast(`Recorded ${totalUnits} pcs dispatched on ${platform} (${accountName}) & stock updated!`);
+  }
+
+  saveState();
+  closeModal('onlineDispatchModal');
+  refreshAllUI();
+}
+
+function renderDispatchesTable() {
+  const tbody = document.getElementById("dispatchesTableBody");
+  if (!tbody) return;
+
+  if (!state.onlineDispatches || state.onlineDispatches.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="py-5 text-center text-slate-400">No online dispatches recorded yet. Click "New Dispatch Out" to record daily dispatches.</td></tr>`;
+    return;
+  }
+
+  const sorted = [...state.onlineDispatches].sort((a, b) => (b.date > a.date ? 1 : -1));
+
+  tbody.innerHTML = sorted.map(d => {
+    let platformBadgeClass = "bg-slate-100 text-slate-700";
+    if (d.platform === 'Meesho') platformBadgeClass = "bg-pink-50 text-pink-700 border border-pink-200 font-bold";
+    else if (d.platform === 'Amazon') platformBadgeClass = "bg-amber-50 text-amber-800 border border-amber-200 font-bold";
+    else if (d.platform === 'Flipkart') platformBadgeClass = "bg-blue-50 text-blue-700 border border-blue-200 font-bold";
+    else if (d.platform === 'Other') platformBadgeClass = "bg-purple-50 text-purple-700 border border-purple-200 font-bold";
+
+    const itemsSummary = (d.items || []).map(it => `
+      <span class="inline-flex items-center gap-1 bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-[11px] font-medium mr-1 mb-1">
+        <b>${escapeHtml(it.productName)}</b>: <span class="font-mono font-bold text-indigo-700">${it.qty} pcs</span>
+      </span>
+    `).join('');
+
+    return `
+      <tr>
+        <td class="font-mono text-slate-500 text-xs">${formatDate(d.date)}</td>
+        <td>
+          <span class="badge-status ${platformBadgeClass}">${escapeHtml(d.platform)}</span>
+        </td>
+        <td class="font-semibold text-slate-800 text-xs">${escapeHtml(d.accountName || d.platform)}</td>
+        <td class="max-w-md">${itemsSummary}</td>
+        <td class="text-right font-mono font-extrabold text-indigo-700 text-sm">${d.totalUnits} pcs</td>
+        <td class="text-slate-500 text-xs">${escapeHtml(d.notes || '-')}</td>
+        <td class="text-center space-x-1">
+          <button onclick="editOnlineDispatch('${d.id}')" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Edit Dispatch">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button onclick="deleteOnlineDispatch('${d.id}')" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded" title="Delete Dispatch">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function editOnlineDispatch(id) {
+  const disp = (state.onlineDispatches || []).find(d => d.id === id);
+  if (!disp) return;
+
+  const form = document.getElementById("dispatchForm");
+  if (form) form.reset();
+
+  document.getElementById("dispatchEditId").value = disp.id;
+  document.getElementById("dispatchDate").value = disp.date;
+  document.getElementById("dispatchPlatform").value = disp.platform;
+  updateDispatchAccountsDropdown();
+  document.getElementById("dispatchAccount").value = disp.accountId;
+  document.getElementById("dispatchNotes").value = disp.notes || "";
+  document.getElementById("dispatchModalTitle").innerHTML = `<i class="fa-solid fa-truck-fast text-indigo-600"></i> Edit Dispatch (${disp.platform})`;
+
+  const container = document.getElementById("dispatchItemsContainer");
+  container.innerHTML = "";
+
+  (disp.items || []).forEach(it => {
+    addDispatchItemRow(it.productId, it.qty);
+  });
+
+  calculateDispatchTotals();
+  openModal('onlineDispatchModal', 'edit');
+}
+
+function deleteOnlineDispatch(id) {
+  const disp = (state.onlineDispatches || []).find(d => d.id === id);
+  if (!disp) return;
+
+  if (confirm(`Are you sure you want to delete this dispatch entry of ${disp.totalUnits} pcs? Note: Stock will be restored.`)) {
+    if (disp.items && Array.isArray(disp.items)) {
+      disp.items.forEach(item => {
+        const prod = state.products.find(p => p.id === item.productId);
+        if (prod) {
+          prod.currentStock = (Number(prod.currentStock) || 0) + (Number(item.qty) || 0);
+        }
+      });
+    }
+
+    state.onlineDispatches = state.onlineDispatches.filter(d => d.id !== id);
+    saveState();
+    refreshAllUI();
+    showToast("Dispatch deleted and stock restored!");
+  }
+}
+
 // ==================== SALES MANAGEMENT ====================
 function initSaleModal(saleType = 'retail_online') {
   const form = document.getElementById("saleForm");
@@ -993,6 +1327,9 @@ function editSale(id) {
 
   document.getElementById("salePaymentStatus").value = sale.paymentStatus || "Paid";
   document.getElementById("salePaidAmount").value = sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Pending' ? 0 : sale.totalAmount);
+  if (document.getElementById("saleReceivedBy")) {
+    document.getElementById("saleReceivedBy").value = sale.receivedBy || "partner1";
+  }
   document.getElementById("saleNotes").value = sale.notes || "";
 
   const container = document.getElementById("saleItemsContainer");
@@ -1240,6 +1577,8 @@ function handleSaveSale(e) {
     }
   });
 
+  const receivedBy = document.getElementById("saleReceivedBy")?.value || "partner1";
+
   if (editId) {
     const existing = state.sales.find(s => s.id === editId);
     if (existing) {
@@ -1253,6 +1592,7 @@ function handleSaveSale(e) {
       existing.totalAmount = grandTotal;
       existing.paymentStatus = paymentStatus;
       existing.paidAmount = paidAmount;
+      existing.receivedBy = receivedBy;
       existing.notes = notes;
       showToast(`Sale Invoice ${existing.invoiceNo} updated!`);
     }
@@ -1271,6 +1611,8 @@ function handleSaveSale(e) {
       totalAmount: grandTotal,
       paymentStatus,
       paidAmount,
+      receivedBy,
+      paymentHistory: paidAmount > 0 ? [{ date, amount: paidAmount, receivedBy, notes }] : [],
       notes
     };
     state.sales.push(newSale);
@@ -1334,6 +1676,12 @@ function renderSalesTable() {
       statusText = `Due: ${formatCurrency(pending)}`;
     }
 
+    const p1 = state.settings.partner1Name || "Kenil";
+    const p2 = state.settings.partner2Name || "Alpesh";
+    let recvLabel = "Business A/c";
+    if (s.receivedBy === 'partner1') recvLabel = p1;
+    else if (s.receivedBy === 'partner2') recvLabel = p2;
+
     return `
       <tr>
         <td class="font-mono font-bold text-slate-900">${s.invoiceNo}</td>
@@ -1347,6 +1695,7 @@ function renderSalesTable() {
         <td class="text-right font-bold text-slate-900 font-mono text-sm">${formatCurrency(total)}</td>
         <td class="text-right">
           <span class="font-bold text-emerald-700 block font-mono text-xs">Recv: ${formatCurrency(paid)}</span>
+          ${paid > 0 ? `<span class="inline-block mt-0.5 text-[10px] px-1.5 py-0.2 rounded font-bold ${s.receivedBy === 'partner1' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : (s.receivedBy === 'partner2' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-slate-100 text-slate-700 border border-slate-200')}">In: ${escapeHtml(recvLabel)}</span>` : ''}
           ${pending > 0 ? `<span class="text-[10px] text-rose-600 font-bold block font-mono">Due: ${formatCurrency(pending)}</span>` : ''}
         </td>
         <td class="text-right font-mono font-extrabold text-indigo-700 text-sm">
@@ -1416,6 +1765,9 @@ function openCustomerCollectModal(saleId) {
   document.getElementById("ccDate").value = new Date().toISOString().split('T')[0];
   document.getElementById("ccNotes").value = "";
 
+  const recv = document.getElementById("ccReceivedBy");
+  if (recv) recv.value = "partner1";
+
   openModal('customerCollectModal');
 }
 
@@ -1424,6 +1776,7 @@ function handleSaveCustomerCollect(e) {
   const saleId = document.getElementById("ccSaleId").value;
   const amount = parseFloat(document.getElementById("ccAmount").value) || 0;
   const date = document.getElementById("ccDate").value;
+  const receivedBy = document.getElementById("ccReceivedBy").value || "partner1";
   const notes = document.getElementById("ccNotes").value.trim();
 
   const sale = state.sales.find(s => s.id === saleId);
@@ -1445,14 +1798,26 @@ function handleSaveCustomerCollect(e) {
     sale.paymentStatus = 'Partial';
   }
 
+  if (!sale.paymentHistory) sale.paymentHistory = [];
+  sale.paymentHistory.push({
+    date,
+    amount,
+    receivedBy,
+    notes
+  });
+
+  const pName = receivedBy === 'partner1' ? state.settings.partner1Name : (receivedBy === 'partner2' ? state.settings.partner2Name : 'Business Account');
+
   if (notes) {
-    sale.notes = (sale.notes ? sale.notes + " | " : "") + `Received ₹${amount} on ${formatDate(date)} (${notes})`;
+    sale.notes = (sale.notes ? sale.notes + " | " : "") + `Received ₹${amount} in ${pName} on ${formatDate(date)} (${notes})`;
+  } else {
+    sale.notes = (sale.notes ? sale.notes + " | " : "") + `Received ₹${amount} in ${pName} on ${formatDate(date)}`;
   }
 
   saveState();
   closeModal('customerCollectModal');
   refreshAllUI();
-  showToast(`Collected ₹${amount} from customer!`);
+  showToast(`Recorded ₹${amount} received in ${pName}!`);
 }
 
 function viewInvoiceReceipt(id) {
@@ -1464,6 +1829,12 @@ function viewInvoiceReceipt(id) {
   const total = Number(sale.totalAmount) || 0;
   const paid = sale.paidAmount !== undefined ? Number(sale.paidAmount) : (sale.paymentStatus === 'Paid' ? total : 0);
   const pending = Math.max(0, total - paid);
+
+  const p1 = state.settings.partner1Name || "Kenil";
+  const p2 = state.settings.partner2Name || "Alpesh";
+  let recvLabel = "Business Account";
+  if (sale.receivedBy === 'partner1') recvLabel = `${p1}'s A/c`;
+  else if (sale.receivedBy === 'partner2') recvLabel = `${p2}'s A/c`;
 
   content.innerHTML = `
     <div class="text-center pb-3 border-b border-slate-200 flex flex-col items-center">
@@ -1478,7 +1849,7 @@ function viewInvoiceReceipt(id) {
       <div>
         <p><span class="text-slate-500">Invoice:</span> <b class="font-mono text-slate-900">${sale.invoiceNo}</b></p>
         <p><span class="text-slate-500">Date:</span> <b>${formatDate(sale.date)}</b></p>
-        <p><span class="text-slate-500">Channel:</span> <b>${sale.channel || sale.type}</b></p>
+        <p><span class="text-slate-500">Payment In:</span> <b>${escapeHtml(recvLabel)}</b></p>
       </div>
       <div class="text-right">
         <p><span class="text-slate-500">Customer:</span> <b>${escapeHtml(sale.customerName)}</b></p>
@@ -1534,28 +1905,163 @@ function viewInvoiceReceipt(id) {
   openModal('invoiceModal');
 }
 
-// ==================== ONLINE BANK PAYOUTS (15 ACCOUNTS) ====================
+// ==================== DYNAMIC SELLER ACCOUNTS MANAGEMENT ====================
+function getSellerAccounts() {
+  if (!state.settings.sellerAccounts || !Array.isArray(state.settings.sellerAccounts)) {
+    state.settings.sellerAccounts = [];
+  }
+  return state.settings.sellerAccounts;
+}
+
+function getSellerAccountName(id) {
+  const accs = getSellerAccounts();
+  const found = accs.find(a => a.id === id);
+  if (found) return found.name;
+  if (state.settings.accountNames && state.settings.accountNames[id]) return state.settings.accountNames[id];
+  return id || "Seller Account";
+}
+
 function updatePayoutAccountsDropdown() {
   const platform = document.getElementById("payoutPlatform")?.value || "Meesho";
   const select = document.getElementById("payoutAccountId");
   if (!select) return;
 
-  const names = state.settings.accountNames || {};
-  let ids = [];
-  if (platform === "Meesho") {
-    ids = ["meesho_1", "meesho_2", "meesho_3", "meesho_4", "meesho_5"];
-  } else if (platform === "Amazon") {
-    ids = ["amazon_1", "amazon_2", "amazon_3", "amazon_4", "amazon_5"];
-  } else if (platform === "Flipkart") {
-    ids = ["flipkart_1", "flipkart_2", "flipkart_3", "flipkart_4", "flipkart_5"];
+  const accs = getSellerAccounts().filter(a => a.platform === platform || (platform === 'Other' && a.platform !== 'Meesho' && a.platform !== 'Amazon' && a.platform !== 'Flipkart'));
+
+  if (accs.length === 0) {
+    select.innerHTML = `<option value="">-- No ${platform} accounts yet. Click "+ New Account" --</option>`;
+    return;
   }
 
-  select.innerHTML = ids.map(id => {
-    const label = names[id] || id.replace('_', ' - ID ').toUpperCase();
-    return `<option value="${id}">${escapeHtml(label)}</option>`;
-  }).join('');
+  select.innerHTML = accs.map(a => `
+    <option value="${a.id}">${escapeHtml(a.name)}</option>
+  `).join('');
 }
 
+function quickAddNewSellerAccount() {
+  const currentPlatform = document.getElementById("payoutPlatform")?.value || "Amazon";
+  const existingCount = getSellerAccounts().filter(a => a.platform === currentPlatform).length;
+  const defaultName = `${currentPlatform} - ID ${existingCount + 1}`;
+  const accName = prompt(`Enter new seller account name for ${currentPlatform}:`, defaultName);
+
+  if (accName && accName.trim()) {
+    const newId = "acc_" + Date.now();
+    if (!state.settings.sellerAccounts) state.settings.sellerAccounts = [];
+    state.settings.sellerAccounts.push({
+      id: newId,
+      platform: currentPlatform,
+      name: accName.trim()
+    });
+    saveState();
+    updatePayoutAccountsDropdown();
+    const select = document.getElementById("payoutAccountId");
+    if (select) select.value = newId;
+    renderOnlinePayouts();
+    showToast(`New account "${accName.trim()}" added to ${currentPlatform}!`);
+  }
+}
+
+function handleAddNewSellerAccount(e) {
+  e.preventDefault();
+  const platform = document.getElementById("newAccountPlatform").value;
+  const name = document.getElementById("newAccountName").value.trim();
+  if (!name) return;
+
+  if (!state.settings.sellerAccounts) state.settings.sellerAccounts = [];
+  const newId = "acc_" + Date.now();
+  state.settings.sellerAccounts.push({
+    id: newId,
+    platform,
+    name
+  });
+  saveState();
+  document.getElementById("newAccountName").value = "";
+  renderSellerAccountsManager();
+  renderOnlinePayouts();
+  updatePayoutAccountsDropdown();
+  showToast(`Account "${name}" added successfully!`);
+}
+
+function deleteSellerAccount(id) {
+  const acc = getSellerAccounts().find(a => a.id === id);
+  if (!acc) return;
+
+  if (confirm(`Are you sure you want to remove "${acc.name}"? Past recorded payouts will stay safe.`)) {
+    state.settings.sellerAccounts = getSellerAccounts().filter(a => a.id !== id);
+    saveState();
+    renderSellerAccountsManager();
+    renderOnlinePayouts();
+    updatePayoutAccountsDropdown();
+    showToast(`Account "${acc.name}" removed.`);
+  }
+}
+
+function renameSellerAccount(id) {
+  const acc = getSellerAccounts().find(a => a.id === id);
+  if (!acc) return;
+
+  const newName = prompt("Edit account name:", acc.name);
+  if (newName && newName.trim() && newName.trim() !== acc.name) {
+    acc.name = newName.trim();
+    saveState();
+    renderSellerAccountsManager();
+    renderOnlinePayouts();
+    updatePayoutAccountsDropdown();
+    showToast(`Account renamed to "${acc.name}".`);
+  }
+}
+
+function renderSellerAccountsManager() {
+  const container = document.getElementById("sellerAccountsListContainer");
+  if (!container) return;
+
+  const accs = getSellerAccounts();
+  if (accs.length === 0) {
+    container.innerHTML = `<p class="text-xs text-slate-400 text-center py-4 bg-slate-50 rounded-lg border border-dashed border-slate-200">No seller accounts registered yet. Add your first account above.</p>`;
+    return;
+  }
+
+  // Group by platform
+  const groups = {};
+  accs.forEach(a => {
+    if (!groups[a.platform]) groups[a.platform] = [];
+    groups[a.platform].push(a);
+  });
+
+  let html = "";
+  Object.keys(groups).forEach(platform => {
+    let badgeClass = "bg-purple-100 text-purple-800";
+    if (platform === "Amazon") badgeClass = "bg-amber-100 text-amber-800";
+    else if (platform === "Flipkart") badgeClass = "bg-blue-100 text-blue-800";
+
+    html += `
+      <div class="p-2.5 bg-white border border-slate-200 rounded-lg space-y-1.5 shadow-sm">
+        <div class="flex items-center justify-between pb-1 border-b border-slate-100">
+          <span class="text-xs font-bold px-2 py-0.5 rounded ${badgeClass}">${escapeHtml(platform)} (${groups[platform].length} Accounts)</span>
+        </div>
+        <div class="space-y-1">
+          ${groups[platform].map(a => `
+            <div class="flex items-center justify-between p-1.5 rounded hover:bg-slate-50 text-xs">
+              <span class="font-semibold text-slate-800">${escapeHtml(a.name)}</span>
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="renameSellerAccount('${a.id}')" class="p-1 text-slate-400 hover:text-amber-600 rounded" title="Rename Account">
+                  <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <button type="button" onclick="deleteSellerAccount('${a.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded" title="Delete Account">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+// ==================== ONLINE BANK PAYOUTS ====================
 function handleSavePayout(e) {
   e.preventDefault();
   const editId = document.getElementById("payoutEditId")?.value;
@@ -1608,72 +2114,96 @@ function handleSavePayout(e) {
 function renderOnlinePayouts() {
   if (!state.onlinePayouts) state.onlinePayouts = [];
 
-  const names = state.settings.accountNames || {};
-  let meeshoTotal = 0, amazonTotal = 0, flipkartTotal = 0;
+  const accs = getSellerAccounts();
   const accountTotals = {};
+  const platformTotals = { Meesho: 0, Amazon: 0, Flipkart: 0, Other: 0 };
 
-  for (let i = 1; i <= 5; i++) {
-    accountTotals[`meesho_${i}`] = 0;
-    accountTotals[`amazon_${i}`] = 0;
-    accountTotals[`flipkart_${i}`] = 0;
-  }
+  accs.forEach(a => {
+    accountTotals[a.id] = 0;
+    if (!platformTotals[a.platform]) platformTotals[a.platform] = 0;
+  });
 
   state.onlinePayouts.forEach(op => {
     const amt = Number(op.bankAmount) || 0;
-    if (op.platform === 'Meesho') meeshoTotal += amt;
-    else if (op.platform === 'Amazon') amazonTotal += amt;
-    else if (op.platform === 'Flipkart') flipkartTotal += amt;
+    const plat = op.platform || "Other";
+    if (platformTotals[plat] !== undefined) platformTotals[plat] += amt;
+    else platformTotals[plat] = (platformTotals[plat] || 0) + amt;
 
     if (accountTotals[op.accountId] !== undefined) {
       accountTotals[op.accountId] += amt;
     }
   });
 
-  const mTot = document.getElementById("meeshoTotalPayout");
-  const aTot = document.getElementById("amazonTotalPayout");
-  const fTot = document.getElementById("flipkartTotalPayout");
-  if (mTot) mTot.textContent = formatCurrency(meeshoTotal);
-  if (aTot) aTot.textContent = formatCurrency(amazonTotal);
-  if (fTot) fTot.textContent = formatCurrency(flipkartTotal);
+  // Render Dynamic Platform Cards Container
+  const container = document.getElementById("platformAccountsCardsContainer");
+  if (container) {
+    if (accs.length === 0) {
+      container.innerHTML = `
+        <div class="col-span-full pro-card p-6 text-center space-y-3 bg-white border border-dashed border-slate-300">
+          <div class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto text-lg">
+            <i class="fa-solid fa-building-columns"></i>
+          </div>
+          <div class="space-y-1">
+            <h4 class="font-bold text-slate-800 text-sm">કોઈ એકાઉન્ટ ઉમેરેલ નથી (No Accounts Added)</h4>
+            <p class="text-xs text-slate-500 max-w-md mx-auto">
+              તમે તમારી જાતે જ જેટલા પણ એકાઉન્ટ્સ ચલાવતા હોવ (Amazon, Meesho કે Flipkart), તે અહીં ઉમેરી શકો છો.
+            </p>
+          </div>
+          <button onclick="openModal('sellerAccountsModal')" class="btn-solid-primary text-xs py-2 px-4 mx-auto">
+            <i class="fa-solid fa-plus"></i> Add Your Seller Account
+          </button>
+        </div>
+      `;
+    } else {
+      // Unique platforms from user added accounts
+      const platforms = [];
+      accs.forEach(a => {
+        if (!platforms.includes(a.platform)) platforms.push(a.platform);
+      });
 
-  // Render individual IDs list
-  const mList = document.getElementById("meeshoAccountsList");
-  if (mList) {
-    mList.innerHTML = [1,2,3,4,5].map(i => {
-      const id = `meesho_${i}`;
-      const name = names[id] || `Meesho - ID ${i}`;
-      const val = accountTotals[id] || 0;
-      return `<div class="flex justify-between py-0.5 border-b border-slate-100">
-        <span>${escapeHtml(name)}:</span>
-        <b class="font-mono text-slate-800">${formatCurrency(val)}</b>
-      </div>`;
-    }).join('');
-  }
+      container.innerHTML = platforms.map(plat => {
+        let platBorder = "border-l-purple-500";
+        let platBadge = "bg-purple-100 text-purple-700";
+        let platLetter = plat.charAt(0).toUpperCase();
 
-  const aList = document.getElementById("amazonAccountsList");
-  if (aList) {
-    aList.innerHTML = [1,2,3,4,5].map(i => {
-      const id = `amazon_${i}`;
-      const name = names[id] || `Amazon - ID ${i}`;
-      const val = accountTotals[id] || 0;
-      return `<div class="flex justify-between py-0.5 border-b border-slate-100">
-        <span>${escapeHtml(name)}:</span>
-        <b class="font-mono text-slate-800">${formatCurrency(val)}</b>
-      </div>`;
-    }).join('');
-  }
+        if (plat === 'Amazon') {
+          platBorder = "border-l-amber-500";
+          platBadge = "bg-amber-100 text-amber-700";
+        } else if (plat === 'Flipkart') {
+          platBorder = "border-l-blue-500";
+          platBadge = "bg-blue-100 text-blue-700";
+        } else if (plat === 'Meesho') {
+          platBorder = "border-l-purple-500";
+          platBadge = "bg-purple-100 text-purple-700";
+        } else {
+          platBorder = "border-l-indigo-500";
+          platBadge = "bg-indigo-100 text-indigo-700";
+        }
 
-  const fList = document.getElementById("flipkartAccountsList");
-  if (fList) {
-    fList.innerHTML = [1,2,3,4,5].map(i => {
-      const id = `flipkart_${i}`;
-      const name = names[id] || `Flipkart - ID ${i}`;
-      const val = accountTotals[id] || 0;
-      return `<div class="flex justify-between py-0.5 border-b border-slate-100">
-        <span>${escapeHtml(name)}:</span>
-        <b class="font-mono text-slate-800">${formatCurrency(val)}</b>
-      </div>`;
-    }).join('');
+        const platAccs = accs.filter(a => a.platform === plat);
+        const total = platformTotals[plat] || 0;
+
+        return `
+          <div class="pro-card p-4 space-y-2 border-l-4 ${platBorder}">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full ${platBadge} flex items-center justify-center text-xs font-bold">${platLetter}</span>
+                <h4 class="font-bold text-slate-900 text-xs sm:text-sm">${escapeHtml(plat)} (${platAccs.length} Accounts)</h4>
+              </div>
+              <span class="text-xs font-bold font-mono text-slate-900">${formatCurrency(total)}</span>
+            </div>
+            <div class="space-y-1 text-xs text-slate-600 pt-1">
+              ${platAccs.map(a => `
+                <div class="flex justify-between py-0.5 border-b border-slate-100">
+                  <span class="truncate pr-2">${escapeHtml(a.name)}:</span>
+                  <b class="font-mono text-slate-800 flex-shrink-0">${formatCurrency(accountTotals[a.id] || 0)}</b>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
   }
 
   // Render Table
@@ -1686,7 +2216,7 @@ function renderOnlinePayouts() {
   }
 
   tbody.innerHTML = state.onlinePayouts.slice().reverse().map(op => {
-    const accName = names[op.accountId] || op.accountId;
+    const accName = getSellerAccountName(op.accountId);
     const bank = Number(op.bankAmount) || 0;
     const cost = Number(op.approxCost) || 0;
     const margin = bank - cost;
@@ -2316,6 +2846,15 @@ function editPartnerTx(id) {
     document.getElementById("capitalNotes").value = tx.notes || "";
     document.getElementById("capitalModalTitle").textContent = "Edit Capital Investment";
     openModal('capitalModal', 'edit');
+  } else if (tx.type === 'drawing') {
+    document.getElementById("drawingEditId").value = tx.id;
+    document.getElementById("drawingDate").value = tx.date;
+    document.getElementById("drawingPartner").value = tx.payer;
+    document.getElementById("drawingAmount").value = tx.amount;
+    document.getElementById("drawingSource").value = tx.source || "Business Bank Account";
+    document.getElementById("drawingNotes").value = tx.notes || "";
+    document.getElementById("drawingModalTitle").innerHTML = `<i class="fa-solid fa-money-bill-transfer text-amber-600"></i> Edit Partner Drawing (ઉપાડ)`;
+    openModal('drawingModal', 'edit');
   } else {
     document.getElementById("settleEditId").value = tx.id;
     document.getElementById("settleDate").value = tx.date;
@@ -2326,6 +2865,51 @@ function editPartnerTx(id) {
     document.getElementById("settleModalTitle").textContent = "Edit Partner Settlement";
     openModal('settleModal', 'edit');
   }
+}
+
+function handleSaveDrawing(e) {
+  e.preventDefault();
+  const editId = document.getElementById("drawingEditId").value;
+  const date = document.getElementById("drawingDate").value;
+  const partner = document.getElementById("drawingPartner").value;
+  const amount = parseFloat(document.getElementById("drawingAmount").value) || 0;
+  const source = document.getElementById("drawingSource").value;
+  const notes = document.getElementById("drawingNotes").value.trim();
+
+  if (amount <= 0) {
+    showToast("Amount must be greater than 0!", true);
+    return;
+  }
+
+  const pName = partner === 'partner1' ? state.settings.partner1Name : state.settings.partner2Name;
+
+  if (editId) {
+    const existing = state.partnerTransactions.find(t => t.id === editId);
+    if (existing) {
+      existing.date = date;
+      existing.payer = partner;
+      existing.amount = amount;
+      existing.source = source;
+      existing.notes = notes;
+      showToast("Partner drawing updated!");
+    }
+  } else {
+    state.partnerTransactions.push({
+      id: "tx_" + Date.now(),
+      date,
+      type: 'drawing',
+      payer: partner,
+      receiver: 'personal',
+      source,
+      amount,
+      notes
+    });
+    showToast(`Recorded ₹${amount} personal drawing (ઉપાડ) for ${pName}!`);
+  }
+
+  saveState();
+  closeModal('drawingModal');
+  refreshAllUI();
 }
 
 function handleSaveSettlement(e) {
@@ -2447,11 +3031,10 @@ function exportAllToExcel() {
   const wb = XLSX.utils.book_new();
 
   // 1. Online Bank Payouts Sheet
-  const names = state.settings.accountNames || {};
   const payoutsData = (state.onlinePayouts || []).map(op => ({
     "Date": op.date,
     "Platform": op.platform,
-    "Seller Account": names[op.accountId] || op.accountId,
+    "Seller Account": getSellerAccountName(op.accountId),
     "Bank Payout (₹)": op.bankAmount,
     "Dispatched Units": op.unitsDispatched || 0,
     "Approx Item Cost (₹)": op.approxCost || 0,
@@ -2459,7 +3042,7 @@ function exportAllToExcel() {
     "Bank UTR / Notes": op.notes || ''
   }));
   const wsPayouts = XLSX.utils.json_to_sheet(payoutsData);
-  XLSX.utils.book_append_sheet(wb, wsPayouts, "15 IDs Bank Payouts");
+  XLSX.utils.book_append_sheet(wb, wsPayouts, "Online Bank Payouts");
 
   // 2. Stock Sheet
   const stockData = state.products.map(p => ({
@@ -2475,12 +3058,37 @@ function exportAllToExcel() {
   const wsStock = XLSX.utils.json_to_sheet(stockData);
   XLSX.utils.book_append_sheet(wb, wsStock, "Inventory Stock");
 
+  // 2.1 Online Daily Dispatches Sheet
+  const dispExportData = [];
+  (state.onlineDispatches || []).forEach(d => {
+    (d.items || []).forEach(it => {
+      dispExportData.push({
+        "Date": d.date,
+        "Platform": d.platform,
+        "Seller Account": d.accountName || d.platform,
+        "Product Name": it.productName,
+        "SKU": it.sku || '',
+        "Qty Dispatched (pcs)": it.qty,
+        "Batch Total Units": d.totalUnits,
+        "Courier / Notes": d.notes || ''
+      });
+    });
+  });
+  const wsDispatches = XLSX.utils.json_to_sheet(dispExportData);
+  XLSX.utils.book_append_sheet(wb, wsDispatches, "Online Dispatches");
+
   // 3. Wholesale Sales Sheet
   const salesData = [];
+  const p1Name = state.settings.partner1Name || "Kenil";
+  const p2Name = state.settings.partner2Name || "Alpesh";
+
   state.sales.forEach(s => {
     const total = Number(s.totalAmount) || 0;
     const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
     const pending = Math.max(0, total - paid);
+    let recvName = "Business Account";
+    if (s.receivedBy === 'partner1') recvName = `${p1Name}'s Account`;
+    else if (s.receivedBy === 'partner2') recvName = `${p2Name}'s Account`;
 
     (s.items || []).forEach(it => {
       salesData.push({
@@ -2497,6 +3105,7 @@ function exportAllToExcel() {
         "Bill Total (₹)": total,
         "Paid Amount (₹)": paid,
         "Pending Due (₹)": pending,
+        "Payment Received In": recvName,
         "Gross Profit (₹)": (Number(it.price) - (Number(it.costPrice) || 0)) * Number(it.qty),
         "Payment Status": s.paymentStatus,
         "Remarks": s.notes || ''
@@ -2546,14 +3155,27 @@ function exportAllToExcel() {
   XLSX.utils.book_append_sheet(wb, wsExp, "Daily Expenses");
 
   // 6. Partner Ledger Sheet
-  const partnerData = state.partnerTransactions.map(t => ({
-    "Date": t.date,
-    "Type": t.type === 'capital' ? 'Capital' : 'Settlement',
-    "Paid By": t.payer === 'partner1' ? state.settings.partner1Name : state.settings.partner2Name,
-    "Received By": t.receiver === 'partner1' ? state.settings.partner1Name : (t.receiver === 'partner2' ? state.settings.partner2Name : 'Business Account'),
-    "Amount (₹)": t.amount,
-    "Remarks": t.notes || ''
-  }));
+  const partnerData = state.partnerTransactions.map(t => {
+    let typeLabel = "Settlement";
+    let receiver = t.receiver === 'partner1' ? state.settings.partner1Name : (t.receiver === 'partner2' ? state.settings.partner2Name : 'Business Account');
+
+    if (t.type === 'capital') {
+      typeLabel = "Capital Invested";
+    } else if (t.type === 'drawing') {
+      typeLabel = "Personal Drawing (ઉપાડ)";
+      receiver = "Self (Personal Use)";
+    }
+
+    return {
+      "Date": t.date,
+      "Transaction Type": typeLabel,
+      "Partner / Payer": t.payer === 'partner1' ? state.settings.partner1Name : state.settings.partner2Name,
+      "Received By": receiver,
+      "Source / Account": t.source || '',
+      "Amount (₹)": t.amount,
+      "Remarks": t.notes || ''
+    };
+  });
   const wsPartner = XLSX.utils.json_to_sheet(partnerData);
   XLSX.utils.book_append_sheet(wb, wsPartner, "Partner Ledger");
 
@@ -2563,11 +3185,10 @@ function exportAllToExcel() {
 }
 
 function exportPayoutsToExcel() {
-  const names = state.settings.accountNames || {};
   const data = (state.onlinePayouts || []).map(op => ({
     "Date": op.date,
     "Platform": op.platform,
-    "Account ID / Name": names[op.accountId] || op.accountId,
+    "Account ID / Name": getSellerAccountName(op.accountId),
     "Bank Payout (₹)": op.bankAmount,
     "Dispatched Orders": op.unitsDispatched || 0,
     "Approx Item Cost (₹)": op.approxCost || 0,
@@ -2576,7 +3197,7 @@ function exportPayoutsToExcel() {
   }));
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
-  XLSX.utils.book_append_sheet(wb, ws, "15 IDs Bank Payouts");
+  XLSX.utils.book_append_sheet(wb, ws, "Online Bank Payouts");
   XLSX.writeFile(wb, `Online_Bank_Payouts_${Date.now()}.xlsx`);
   showToast("Online payouts Excel downloaded!");
 }
@@ -2599,10 +3220,40 @@ function exportStockToExcel() {
   showToast("Stock report downloaded!");
 }
 
+function exportDispatchesToExcel() {
+  const dispExportData = [];
+  (state.onlineDispatches || []).forEach(d => {
+    (d.items || []).forEach(it => {
+      dispExportData.push({
+        "Date": d.date,
+        "Platform": d.platform,
+        "Seller Account": d.accountName || d.platform,
+        "Product Name": it.productName,
+        "SKU": it.sku || '',
+        "Qty Dispatched (pcs)": it.qty,
+        "Batch Total Units": d.totalUnits,
+        "Courier / Notes": d.notes || ''
+      });
+    });
+  });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(dispExportData);
+  XLSX.utils.book_append_sheet(wb, ws, "Online Dispatches");
+  XLSX.writeFile(wb, `Online_Dispatches_Report_${Date.now()}.xlsx`);
+  showToast("Online dispatches Excel downloaded!");
+}
+
 function exportSalesToExcel() {
+  const p1Name = state.settings.partner1Name || "Kenil";
+  const p2Name = state.settings.partner2Name || "Alpesh";
+
   const salesData = state.sales.map(s => {
     const total = Number(s.totalAmount) || 0;
     const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
+    let recvName = "Business Account";
+    if (s.receivedBy === 'partner1') recvName = `${p1Name}'s Account`;
+    else if (s.receivedBy === 'partner2') recvName = `${p2Name}'s Account`;
+
     return {
       "Bill No": s.invoiceNo,
       "Date": s.date,
@@ -2611,6 +3262,7 @@ function exportSalesToExcel() {
       "Bill Amount": total,
       "Paid Amount": paid,
       "Pending Balance": Math.max(0, total - paid),
+      "Payment Received In": recvName,
       "Payment Status": s.paymentStatus
     };
   });
@@ -2709,48 +3361,10 @@ function refreshAllUI() {
   renderDashboard();
   renderOnlinePayouts();
   renderProductsTable();
+  renderDispatchesTable();
   renderSalesTable();
   renderPurchasesTable();
   renderExpensesTable();
-  setTimeout(init3DTiltEffects, 50);
-}
-
-// ==================== 3D TILT & INTERACTION ENGINE ====================
-function init3DTiltEffects() {
-  const cards = document.querySelectorAll(".pro-card");
-  cards.forEach(card => {
-    if (card.dataset.tiltInitialized) return;
-    card.dataset.tiltInitialized = "true";
-
-    card.addEventListener("mousemove", (e) => {
-      const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-
-      const rotateX = ((y - centerY) / centerY) * -10; // 10 deg dynamic tilt
-      const rotateY = ((x - centerX) / centerX) * 10;
-
-      card.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-8px) scale3d(1.02, 1.02, 1.02)`;
-      card.style.borderColor = '#94a3b8';
-      card.style.borderBottomColor = '#64748b';
-    });
-
-    card.addEventListener("mouseleave", () => {
-      card.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px) scale3d(1, 1, 1)";
-      card.style.borderColor = '#e2e8f0';
-      card.style.borderBottomColor = '#cbd5e1';
-    });
-
-    card.addEventListener("touchstart", () => {
-      card.style.transform = "perspective(1000px) translateY(-5px) scale3d(1.02, 1.02, 1.02)";
-    }, { passive: true });
-
-    card.addEventListener("touchend", () => {
-      card.style.transform = "perspective(1000px) translateY(0px) scale3d(1, 1, 1)";
-    }, { passive: true });
-  });
 }
 
 function escapeHtml(str) {
