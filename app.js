@@ -4,6 +4,8 @@
  */
 
 // Global State (Clean Pristine Database & Custom User Accounts)
+const DEFAULT_FIREBASE_RTDB_URL = "https://dwarkadhish-erp-default-rtdb.firebaseio.com/dwarkadhish_state.json";
+
 const INITIAL_STORE_DATABASE = {
   settings: {
     bizName: "Dwarkadhish Enterprise",
@@ -11,7 +13,7 @@ const INITIAL_STORE_DATABASE = {
     partner2Name: "Alpesh",
     partner1Ratio: 50,
     partner2Ratio: 50,
-    firebaseConfig: "",
+    firebaseConfig: "https://dwarkadhish-erp-default-rtdb.firebaseio.com/",
     sellerAccounts: [],
     accountNames: {}
   },
@@ -29,11 +31,6 @@ const INITIAL_STORE_DATABASE = {
 let state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
 
 const STORAGE_KEY = "DWARKADHISH_ENTERPRISE_V2_CLEAN";
-const CLOUD_SYNC_KEY = "dwarkadhish_enterprise_v2_clean";
-const CLOUD_ENDPOINT_URL = `https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/2d9f8e7a/${CLOUD_SYNC_KEY}/`;
-const CLOUD_FETCH_URL = `https://keyvalue.immanuel.co/api/KeyVal/GetValue/2d9f8e7a/${CLOUD_SYNC_KEY}`;
-
-let firebaseDb = null;
 let isSyncingFromCloud = false;
 let cloudSyncTimer = null;
 
@@ -161,9 +158,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1. Initial Cloud Sync Fetch
   fetchFromInstantCloud();
 
-  // 2. Periodic Live Sync (Every 15 Seconds)
+  // 2. Periodic Live Sync (Every 5 Seconds)
   if (cloudSyncTimer) clearInterval(cloudSyncTimer);
-  cloudSyncTimer = setInterval(fetchFromInstantCloud, 15000);
+  cloudSyncTimer = setInterval(fetchFromInstantCloud, 5000);
 
   // 3. Sync on tab focus
   window.addEventListener("focus", fetchFromInstantCloud);
@@ -171,8 +168,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ==================== ZERO-SETUP INSTANT CLOUD SYNC & FIREBASE ====================
 function getFirebaseSyncUrl() {
-  const config = state.settings.firebaseConfig || localStorage.getItem("FIREBASE_CONFIG_KEY") || "";
-  if (!config) return null;
+  const config = state.settings.firebaseConfig || localStorage.getItem("FIREBASE_CONFIG_KEY") || DEFAULT_FIREBASE_RTDB_URL;
+  if (!config) return DEFAULT_FIREBASE_RTDB_URL;
 
   try {
     const trimmed = config.trim();
@@ -199,7 +196,7 @@ function getFirebaseSyncUrl() {
       return cleanUrl;
     }
   }
-  return null;
+  return DEFAULT_FIREBASE_RTDB_URL;
 }
 
 function initFirebaseSync() {
@@ -219,7 +216,11 @@ async function fetchFromInstantCloud() {
           const cloudTime = cloudState._syncTime || 0;
           const localTime = state._syncTime || 0;
 
-          if (cloudTime > localTime) {
+          // If cloud has newer data OR local has no data but cloud has data (e.g. partner opening for first time)
+          const localHasNoData = (!state.expenses || state.expenses.length === 0) && (!state.sales || state.sales.length === 0) && (!state.partnerTransactions || state.partnerTransactions.length === 0) && (!state.products || state.products.length === 0);
+          const cloudHasData = (cloudState.expenses && cloudState.expenses.length > 0) || (cloudState.sales && cloudState.sales.length > 0) || (cloudState.partnerTransactions && cloudState.partnerTransactions.length > 0) || (cloudState.products && cloudState.products.length > 0);
+
+          if (cloudTime > localTime || (localHasNoData && cloudHasData)) {
             isSyncingFromCloud = true;
             state = { ...state, ...cloudState };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
