@@ -1434,21 +1434,103 @@ function deleteOnlineDispatch(id) {
   }
 }
 
-// ==================== SALES MANAGEMENT ====================
-function initSaleModal(saleType = 'retail_online') {
+// ==================== WHOLESALE PARTIES DIRECTORY & SALES ====================
+function getWholesaleParties() {
+  if (!state.customers || !Array.isArray(state.customers)) {
+    state.customers = [];
+  }
+  
+  const existingNames = new Set(state.customers.map(c => (c.name || '').trim().toLowerCase()));
+  (state.sales || []).forEach(s => {
+    const name = (s.customerName || '').trim();
+    if (name && !existingNames.has(name.toLowerCase())) {
+      existingNames.add(name.toLowerCase());
+      state.customers.push({
+        id: "cust_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
+        name: name,
+        phone: s.customerPhone || "",
+        city: s.customerCity || ""
+      });
+    }
+  });
+
+  return state.customers;
+}
+
+function updatePartiesDatalist() {
+  const datalist = document.getElementById("partiesDatalist");
+  if (!datalist) return;
+
+  const parties = getWholesaleParties();
+  datalist.innerHTML = parties.map(p => `
+    <option value="${escapeHtml(p.name)}">${p.city ? `(${escapeHtml(p.city)})` : ''} ${p.phone ? `Ph: ${escapeHtml(p.phone)}` : ''}</option>
+  `).join('');
+}
+
+function onPartyNameSelected() {
+  const nameInput = document.getElementById("saleCustomerName");
+  if (!nameInput) return;
+  const name = nameInput.value.trim();
+  if (!name) return;
+
+  const parties = getWholesaleParties();
+  const matched = parties.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (matched) {
+    const phoneInput = document.getElementById("saleCustomerPhone");
+    const cityInput = document.getElementById("saleCustomerCity");
+    if (phoneInput && matched.phone) phoneInput.value = matched.phone;
+    if (cityInput && matched.city) cityInput.value = matched.city;
+  }
+}
+
+function quickAddNewPartyPrompt() {
+  const name = prompt("Enter Wholesale Party / Customer Name:");
+  if (!name || !name.trim()) return;
+
+  const cleanName = name.trim();
+  const phone = prompt(`Enter Mobile / WhatsApp for "${cleanName}" (optional):`, "") || "";
+  const city = prompt(`Enter City / Location for "${cleanName}" (optional):`, "") || "";
+
+  const parties = getWholesaleParties();
+  const existing = parties.find(p => p.name.toLowerCase() === cleanName.toLowerCase());
+
+  if (existing) {
+    if (phone.trim()) existing.phone = phone.trim();
+    if (city.trim()) existing.city = city.trim();
+  } else {
+    state.customers.push({
+      id: "cust_" + Date.now(),
+      name: cleanName,
+      phone: phone.trim(),
+      city: city.trim()
+    });
+  }
+
+  saveState();
+  updatePartiesDatalist();
+
+  const nameInput = document.getElementById("saleCustomerName");
+  const phoneInput = document.getElementById("saleCustomerPhone");
+  const cityInput = document.getElementById("saleCustomerCity");
+  if (nameInput) nameInput.value = cleanName;
+  if (phoneInput) phoneInput.value = phone.trim();
+  if (cityInput) cityInput.value = city.trim();
+
+  showToast(`Party "${cleanName}" added & selected!`);
+}
+
+function initSaleModal(saleType = 'wholesale') {
   const form = document.getElementById("saleForm");
   if (form) form.reset();
 
   const today = new Date().toISOString().split('T')[0];
   document.getElementById("saleDate").value = today;
   document.getElementById("saleEditId").value = "";
-  document.getElementById("saleModalTitle").textContent = "New Sale Entry";
+  document.getElementById("saleModalTitle").textContent = "New Wholesale Bill (B2B)";
   document.getElementById("saleItemsContainer").innerHTML = "";
 
-  const radio = form.querySelector(`input[name="saleType"][value="${saleType || 'retail_online'}"]`);
-  if (radio) radio.checked = true;
+  updatePartiesDatalist();
 
-  toggleSaleTypeUI();
   addSaleItemRow();
   calculateSaleTotal();
 }
@@ -1460,23 +1542,15 @@ function editSale(id) {
   const form = document.getElementById("saleForm");
   if (form) form.reset();
 
+  updatePartiesDatalist();
+
   document.getElementById("saleEditId").value = sale.id;
   document.getElementById("saleDate").value = sale.date;
   document.getElementById("saleModalTitle").textContent = `Edit Sale (${sale.invoiceNo})`;
 
-  const radio = form.querySelector(`input[name="saleType"][value="${sale.type}"]`);
-  if (radio) radio.checked = true;
-
-  toggleSaleTypeUI();
-
-  if (sale.type === 'retail_online') {
-    document.getElementById("saleChannel").value = sale.channel || "Amazon";
-    document.getElementById("saleCustomerName").value = sale.customerName || "";
-  } else {
-    document.getElementById("saleCustomerName").value = sale.customerName || "";
-    document.getElementById("saleCustomerPhone").value = sale.customerPhone || "";
-    document.getElementById("saleCustomerCity").value = sale.customerCity || "";
-  }
+  document.getElementById("saleCustomerName").value = sale.customerName || "";
+  document.getElementById("saleCustomerPhone").value = sale.customerPhone || "";
+  document.getElementById("saleCustomerCity").value = sale.customerCity || "";
 
   document.getElementById("salePaymentStatus").value = sale.paymentStatus || "Paid";
   document.getElementById("salePaidAmount").value = sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Pending' ? 0 : sale.totalAmount);
@@ -1494,25 +1568,6 @@ function editSale(id) {
 
   calculateSaleTotal();
   openModal('saleModal', 'edit');
-}
-
-function toggleSaleTypeUI() {
-  const saleType = document.querySelector('input[name="saleType"]:checked')?.value || 'retail_online';
-  const wholesaleFields = document.getElementById("wholesaleExtraFields");
-  const channelGroup = document.getElementById("saleChannelGroup");
-  const custLabel = document.getElementById("saleCustomerLabel");
-
-  if (saleType === 'wholesale') {
-    if (wholesaleFields) wholesaleFields.classList.remove("hidden");
-    if (channelGroup) channelGroup.classList.add("hidden");
-    if (custLabel) custLabel.textContent = "Customer / Business Name *";
-  } else {
-    if (wholesaleFields) wholesaleFields.classList.add("hidden");
-    if (channelGroup) channelGroup.classList.remove("hidden");
-    if (custLabel) custLabel.textContent = "Customer Name / Order ID";
-  }
-
-  updateSaleItemPricesBasedOnType(saleType);
 }
 
 function addSaleItemRow(prodId = "", qty = 1, customPrice = null, discPercent = null, discAmount = null) {
@@ -1760,148 +1815,173 @@ function toggleSalePaidAmount() {
 }
 
 function handleSaveSale(e) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
 
-  const editId = document.getElementById("saleEditId").value;
-  const saleType = document.querySelector('input[name="saleType"]:checked').value;
-  const date = document.getElementById("saleDate").value;
-  const channel = saleType === 'wholesale' ? 'Wholesale Party' : document.getElementById("saleChannel").value;
-  const customerName = document.getElementById("saleCustomerName").value.trim() || (saleType === 'wholesale' ? 'Wholesale Customer' : 'Online Customer');
-  const customerPhone = document.getElementById("saleCustomerPhone")?.value.trim() || "";
-  const customerCity = document.getElementById("saleCustomerCity")?.value.trim() || "";
-  let paymentStatus = document.getElementById("salePaymentStatus").value;
-  const notes = document.getElementById("saleNotes").value.trim();
+  try {
+    const editId = document.getElementById("saleEditId")?.value || "";
+    const date = document.getElementById("saleDate")?.value || new Date().toISOString().split('T')[0];
+    const customerName = document.getElementById("saleCustomerName")?.value.trim();
+    const customerPhone = document.getElementById("saleCustomerPhone")?.value.trim() || "";
+    const customerCity = document.getElementById("saleCustomerCity")?.value.trim() || "";
+    let paymentStatus = document.getElementById("salePaymentStatus")?.value || "Paid";
+    const notes = document.getElementById("saleNotes")?.value.trim() || "";
 
-  if (editId) {
-    const oldSale = state.sales.find(s => s.id === editId);
-    if (oldSale && oldSale.items) {
-      oldSale.items.forEach(it => {
-        const prod = state.products.find(p => p.id === it.productId);
-        if (prod) {
-          prod.currentStock = (Number(prod.currentStock) || 0) + (Number(it.qty) || 0);
-        }
+    if (!customerName) {
+      showToast("Please enter Party / Customer Name!", true);
+      document.getElementById("saleCustomerName")?.focus();
+      return;
+    }
+
+    // Auto save party into state.customers if new
+    const parties = getWholesaleParties();
+    const matched = parties.find(p => p.name.toLowerCase() === customerName.toLowerCase());
+    if (matched) {
+      if (customerPhone) matched.phone = customerPhone;
+      if (customerCity) matched.city = customerCity;
+    } else {
+      state.customers.push({
+        id: "cust_" + Date.now(),
+        name: customerName,
+        phone: customerPhone,
+        city: customerCity
       });
     }
-  }
 
-  const rows = document.querySelectorAll(".sale-item-row");
-  if (rows.length === 0) {
-    showToast("Please select at least one product!", true);
-    return;
-  }
+    if (editId) {
+      const oldSale = state.sales.find(s => s.id === editId);
+      if (oldSale && oldSale.items) {
+        oldSale.items.forEach(it => {
+          const prod = state.products.find(p => p.id === it.productId);
+          if (prod) {
+            prod.currentStock = (Number(prod.currentStock) || 0) + (Number(it.qty) || 0);
+          }
+        });
+      }
+    }
 
-  const items = [];
-  let totalGross = 0;
-  let totalDiscounts = 0;
-  let netGrandTotal = 0;
+    const rows = document.querySelectorAll(".sale-item-row");
+    if (rows.length === 0) {
+      showToast("Please select at least one product!", true);
+      return;
+    }
 
-  rows.forEach(row => {
-    const id = row.id.replace("sale_row_", "");
-    const prodId = document.getElementById(`sale_prod_${id}`).value;
-    const qty = parseInt(document.getElementById(`sale_qty_${id}`).value) || 0;
-    const price = parseFloat(document.getElementById(`sale_price_${id}`).value) || 0;
-    const discountPercent = parseFloat(document.getElementById(`sale_disc_pct_${id}`)?.value) || 0;
-    const discountAmount = parseFloat(document.getElementById(`sale_disc_amt_${id}`)?.value) || 0;
+    const items = [];
+    let totalGross = 0;
+    let totalDiscounts = 0;
+    let netGrandTotal = 0;
 
-    if (!prodId) return;
+    rows.forEach(row => {
+      const id = row.id.replace("sale_row_", "");
+      const prodId = document.getElementById(`sale_prod_${id}`)?.value;
+      const qty = parseInt(document.getElementById(`sale_qty_${id}`)?.value) || 0;
+      const price = parseFloat(document.getElementById(`sale_price_${id}`)?.value) || 0;
+      const discountPercent = parseFloat(document.getElementById(`sale_disc_pct_${id}`)?.value) || 0;
+      const discountAmount = parseFloat(document.getElementById(`sale_disc_amt_${id}`)?.value) || 0;
 
-    const prod = state.products.find(p => p.id === prodId);
-    if (!prod) return;
+      if (!prodId || qty <= 0) return;
 
-    const gross = qty * price;
-    const rowTotal = Math.max(0, gross - discountAmount);
-    totalGross += gross;
-    totalDiscounts += discountAmount;
-    netGrandTotal += rowTotal;
+      const prod = state.products.find(p => p.id === prodId);
+      if (!prod) return;
 
-    items.push({
-      productId: prod.id,
-      productName: prod.name,
-      sku: prod.sku,
-      qty,
-      price,
-      costPrice: prod.costPrice,
-      discountPercent,
-      discountAmount,
-      grossTotal: gross,
-      total: rowTotal
+      const gross = qty * price;
+      const rowTotal = Math.max(0, gross - discountAmount);
+      totalGross += gross;
+      totalDiscounts += discountAmount;
+      netGrandTotal += rowTotal;
+
+      items.push({
+        productId: prod.id,
+        productName: prod.name,
+        sku: prod.sku || "",
+        qty,
+        price,
+        costPrice: prod.costPrice || 0,
+        discountPercent,
+        discountAmount,
+        grossTotal: gross,
+        total: rowTotal
+      });
     });
-  });
 
-  if (items.length === 0) {
-    showToast("Please select a valid product!", true);
-    return;
-  }
-
-  let paidAmount = parseFloat(document.getElementById("salePaidAmount").value);
-  if (isNaN(paidAmount)) paidAmount = (paymentStatus === 'Paid' ? netGrandTotal : 0);
-
-  if (paidAmount >= netGrandTotal) {
-    paymentStatus = 'Paid';
-    paidAmount = netGrandTotal;
-  } else if (paidAmount <= 0) {
-    paymentStatus = 'Pending';
-    paidAmount = 0;
-  } else {
-    paymentStatus = 'Partial';
-  }
-
-  items.forEach(item => {
-    const prod = state.products.find(p => p.id === item.productId);
-    if (prod) {
-      prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - item.qty);
+    if (items.length === 0) {
+      showToast("Please select a product and valid quantity!", true);
+      return;
     }
-  });
 
-  const receivedBy = document.getElementById("saleReceivedBy")?.value || "partner1";
+    let paidAmount = parseFloat(document.getElementById("salePaidAmount")?.value);
+    if (isNaN(paidAmount)) paidAmount = (paymentStatus === 'Paid' ? netGrandTotal : 0);
 
-  if (editId) {
-    const existing = state.sales.find(s => s.id === editId);
-    if (existing) {
-      existing.date = date;
-      existing.type = saleType;
-      existing.channel = channel;
-      existing.customerName = customerName;
-      existing.customerPhone = customerPhone;
-      existing.customerCity = customerCity;
-      existing.items = items;
-      existing.subtotal = totalGross;
-      existing.discountAmount = totalDiscounts;
-      existing.totalAmount = netGrandTotal;
-      existing.paymentStatus = paymentStatus;
-      existing.paidAmount = paidAmount;
-      existing.receivedBy = receivedBy;
-      existing.notes = notes;
-      showToast(`Sale Invoice ${existing.invoiceNo} updated!`);
+    if (paidAmount >= netGrandTotal) {
+      paymentStatus = 'Paid';
+      paidAmount = netGrandTotal;
+    } else if (paidAmount <= 0) {
+      paymentStatus = 'Pending';
+      paidAmount = 0;
+    } else {
+      paymentStatus = 'Partial';
     }
-  } else {
-    const invoiceNo = (saleType === 'wholesale' ? 'WS-' : 'INV-') + (state.sales.length + 101);
-    const newSale = {
-      id: "sale_" + Date.now(),
-      invoiceNo,
-      date,
-      type: saleType,
-      channel,
-      customerName,
-      customerPhone,
-      customerCity,
-      items,
-      subtotal: totalGross,
-      discountAmount: totalDiscounts,
-      totalAmount: netGrandTotal,
-      paymentStatus,
-      paidAmount,
-      receivedBy,
-      paymentHistory: paidAmount > 0 ? [{ date, amount: paidAmount, receivedBy, notes }] : [],
-      notes
-    };
-    state.sales.push(newSale);
-    showToast(`Sale Invoice ${invoiceNo} saved!`);
-  }
 
-  saveState();
-  closeModal('saleModal');
-  refreshAllUI();
+    // Deduct stock
+    items.forEach(item => {
+      const prod = state.products.find(p => p.id === item.productId);
+      if (prod) {
+        prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - item.qty);
+      }
+    });
+
+    const receivedBy = document.getElementById("saleReceivedBy")?.value || "partner1";
+
+    if (editId) {
+      const existing = state.sales.find(s => s.id === editId);
+      if (existing) {
+        existing.date = date;
+        existing.type = 'wholesale';
+        existing.channel = 'Wholesale Party';
+        existing.customerName = customerName;
+        existing.customerPhone = customerPhone;
+        existing.customerCity = customerCity;
+        existing.items = items;
+        existing.subtotal = totalGross;
+        existing.discountAmount = totalDiscounts;
+        existing.totalAmount = netGrandTotal;
+        existing.paymentStatus = paymentStatus;
+        existing.paidAmount = paidAmount;
+        existing.receivedBy = receivedBy;
+        existing.notes = notes;
+        showToast(`Wholesale Bill ${existing.invoiceNo} updated successfully!`);
+      }
+    } else {
+      const invoiceNo = 'WS-' + (state.sales.length + 101);
+      const newSale = {
+        id: "sale_" + Date.now(),
+        invoiceNo,
+        date,
+        type: 'wholesale',
+        channel: 'Wholesale Party',
+        customerName,
+        customerPhone,
+        customerCity,
+        items,
+        subtotal: totalGross,
+        discountAmount: totalDiscounts,
+        totalAmount: netGrandTotal,
+        paymentStatus,
+        paidAmount,
+        receivedBy,
+        paymentHistory: paidAmount > 0 ? [{ date, amount: paidAmount, receivedBy, notes }] : [],
+        notes
+      };
+      state.sales.push(newSale);
+      showToast(`Wholesale Bill ${invoiceNo} saved successfully!`);
+    }
+
+    saveState();
+    closeModal('saleModal');
+    refreshAllUI();
+  } catch (err) {
+    console.error("Error saving sale:", err);
+    showToast("Error saving bill: " + err.message, true);
+  }
 }
 
 function renderSalesTable() {
@@ -2571,7 +2651,61 @@ function deletePayout(id) {
   }
 }
 
-// ==================== PURCHASES & STOCK INWARD ====================
+// ==================== SUPPLIERS DIRECTORY & PURCHASES ====================
+function getSuppliers() {
+  if (!state.suppliers || !Array.isArray(state.suppliers)) {
+    state.suppliers = [];
+  }
+
+  const existingNames = new Set(state.suppliers.map(s => (s.name || '').trim().toLowerCase()));
+  (state.purchases || []).forEach(p => {
+    const name = (p.vendor || '').trim();
+    if (name && !existingNames.has(name.toLowerCase())) {
+      existingNames.add(name.toLowerCase());
+      state.suppliers.push({
+        id: "supp_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
+        name: name
+      });
+    }
+  });
+
+  return state.suppliers;
+}
+
+function updateSuppliersDatalist() {
+  const datalist = document.getElementById("suppliersDatalist");
+  if (!datalist) return;
+
+  const suppliers = getSuppliers();
+  datalist.innerHTML = suppliers.map(s => `
+    <option value="${escapeHtml(s.name)}"></option>
+  `).join('');
+}
+
+function quickAddNewSupplierPrompt() {
+  const name = prompt("Enter Supplier / Vendor Name:");
+  if (!name || !name.trim()) return;
+
+  const cleanName = name.trim();
+  const suppliers = getSuppliers();
+  const existing = suppliers.find(s => s.name.toLowerCase() === cleanName.toLowerCase());
+
+  if (!existing) {
+    state.suppliers.push({
+      id: "supp_" + Date.now(),
+      name: cleanName
+    });
+  }
+
+  saveState();
+  updateSuppliersDatalist();
+
+  const vendorInput = document.getElementById("purchaseVendor");
+  if (vendorInput) vendorInput.value = cleanName;
+
+  showToast(`Supplier "${cleanName}" added & selected!`);
+}
+
 function initPurchaseModal() {
   const form = document.getElementById("purchaseForm");
   if (form) form.reset();
@@ -2580,6 +2714,8 @@ function initPurchaseModal() {
   document.getElementById("purchaseEditId").value = "";
   document.getElementById("purchaseModalTitle").textContent = "New Purchase Bill";
   document.getElementById("purchaseItemsContainer").innerHTML = "";
+
+  updateSuppliersDatalist();
 
   document.getElementById("purchasePaymentStatus").value = "Paid";
   togglePurchasePaymentUI();
@@ -2620,6 +2756,8 @@ function editPurchase(id) {
 
   const form = document.getElementById("purchaseForm");
   if (form) form.reset();
+
+  updateSuppliersDatalist();
 
   document.getElementById("purchaseEditId").value = purch.id;
   document.getElementById("purchaseDate").value = purch.date;
@@ -2843,132 +2981,153 @@ function calculatePurchaseTotal() {
 }
 
 function handleSavePurchase(e) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
 
-  const editId = document.getElementById("purchaseEditId").value;
-  const date = document.getElementById("purchaseDate").value;
-  const vendor = document.getElementById("purchaseVendor").value.trim();
-  const billNo = document.getElementById("purchaseBillNo").value.trim() || ("PB-" + (state.purchases.length + 101));
-  let paymentStatus = document.getElementById("purchasePaymentStatus").value;
-  const paidBy = document.querySelector('input[name="purchasePaidBy"]:checked')?.value || 'partner1';
-  const notes = document.getElementById("purchaseNotes").value.trim();
+  try {
+    const editId = document.getElementById("purchaseEditId")?.value || "";
+    const date = document.getElementById("purchaseDate")?.value || new Date().toISOString().split('T')[0];
+    const vendor = document.getElementById("purchaseVendor")?.value.trim();
+    const billNo = document.getElementById("purchaseBillNo")?.value.trim() || ("PB-" + (state.purchases.length + 101));
+    let paymentStatus = document.getElementById("purchasePaymentStatus")?.value || "Paid";
+    const paidBy = document.querySelector('input[name="purchasePaidBy"]:checked')?.value || 'partner1';
+    const notes = document.getElementById("purchaseNotes")?.value.trim() || "";
 
-  if (editId) {
-    const oldPurch = state.purchases.find(p => p.id === editId);
-    if (oldPurch && oldPurch.items) {
-      oldPurch.items.forEach(it => {
-        const prod = state.products.find(p => p.id === it.productId);
-        if (prod) {
-          prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - (Number(it.qty) || 0));
-        }
+    if (!vendor) {
+      showToast("Please enter Supplier / Vendor Name!", true);
+      document.getElementById("purchaseVendor")?.focus();
+      return;
+    }
+
+    // Auto save supplier into state.suppliers if new
+    const suppliers = getSuppliers();
+    const matched = suppliers.find(s => s.name.toLowerCase() === vendor.toLowerCase());
+    if (!matched) {
+      state.suppliers.push({
+        id: "supp_" + Date.now(),
+        name: vendor
       });
     }
-  }
 
-  const rows = document.querySelectorAll(".purchase-item-row");
-  if (rows.length === 0) {
-    showToast("Please add at least one item!", true);
-    return;
-  }
+    if (editId) {
+      const oldPurch = state.purchases.find(p => p.id === editId);
+      if (oldPurch && oldPurch.items) {
+        oldPurch.items.forEach(it => {
+          const prod = state.products.find(p => p.id === it.productId);
+          if (prod) {
+            prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - (Number(it.qty) || 0));
+          }
+        });
+      }
+    }
 
-  const items = [];
-  let totalGross = 0;
-  let totalDiscounts = 0;
-  let netGrandTotal = 0;
-  const shouldUpdateMasterCost = document.getElementById("purchaseUpdateMasterCost") ? document.getElementById("purchaseUpdateMasterCost").checked : true;
+    const rows = document.querySelectorAll(".purchase-item-row");
+    if (rows.length === 0) {
+      showToast("Please add at least one item!", true);
+      return;
+    }
 
-  rows.forEach(row => {
-    const id = row.id.replace("purch_row_", "");
-    const prodId = document.getElementById(`purch_prod_${id}`).value;
-    const qty = parseInt(document.getElementById(`purch_qty_${id}`).value) || 0;
-    const costPrice = parseFloat(document.getElementById(`purch_cost_${id}`).value) || 0;
-    const discountPercent = parseFloat(document.getElementById(`purch_disc_pct_${id}`)?.value) || 0;
-    const discountAmount = parseFloat(document.getElementById(`purch_disc_amt_${id}`)?.value) || 0;
+    const items = [];
+    let totalGross = 0;
+    let totalDiscounts = 0;
+    let netGrandTotal = 0;
+    const shouldUpdateMasterCost = document.getElementById("purchaseUpdateMasterCost") ? document.getElementById("purchaseUpdateMasterCost").checked : true;
 
-    if (!prodId) return;
+    rows.forEach(row => {
+      const id = row.id.replace("purch_row_", "");
+      const prodId = document.getElementById(`purch_prod_${id}`)?.value;
+      const qty = parseInt(document.getElementById(`purch_qty_${id}`)?.value) || 0;
+      const costPrice = parseFloat(document.getElementById(`purch_cost_${id}`)?.value) || 0;
+      const discountPercent = parseFloat(document.getElementById(`purch_disc_pct_${id}`)?.value) || 0;
+      const discountAmount = parseFloat(document.getElementById(`purch_disc_amt_${id}`)?.value) || 0;
 
-    const prod = state.products.find(p => p.id === prodId);
-    if (!prod) return;
+      if (!prodId || qty <= 0) return;
 
-    const gross = qty * costPrice;
-    const rowTotal = Math.max(0, gross - discountAmount);
-    totalGross += gross;
-    totalDiscounts += discountAmount;
-    netGrandTotal += rowTotal;
+      const prod = state.products.find(p => p.id === prodId);
+      if (!prod) return;
 
-    items.push({
-      productId: prod.id,
-      productName: prod.name,
-      qty,
-      costPrice,
-      discountPercent,
-      discountAmount,
-      grossTotal: gross,
-      total: rowTotal
+      const gross = qty * costPrice;
+      const rowTotal = Math.max(0, gross - discountAmount);
+      totalGross += gross;
+      totalDiscounts += discountAmount;
+      netGrandTotal += rowTotal;
+
+      items.push({
+        productId: prod.id,
+        productName: prod.name,
+        qty,
+        costPrice,
+        discountPercent,
+        discountAmount,
+        grossTotal: gross,
+        total: rowTotal
+      });
+
+      prod.currentStock = (Number(prod.currentStock) || 0) + qty;
+      if (shouldUpdateMasterCost && costPrice > 0) {
+        prod.costPrice = costPrice;
+      }
     });
 
-    prod.currentStock = (Number(prod.currentStock) || 0) + qty;
-    if (shouldUpdateMasterCost && costPrice > 0) {
-      prod.costPrice = costPrice;
+    if (items.length === 0) {
+      showToast("Please select a valid item and quantity!", true);
+      return;
     }
-  });
 
-  if (items.length === 0) {
-    showToast("Please select a valid item!", true);
-    return;
-  }
+    let paidAmount = parseFloat(document.getElementById("purchasePaidAmount")?.value);
+    if (isNaN(paidAmount)) paidAmount = (paymentStatus === 'Paid' ? netGrandTotal : 0);
 
-  let paidAmount = parseFloat(document.getElementById("purchasePaidAmount").value);
-  if (isNaN(paidAmount)) paidAmount = (paymentStatus === 'Paid' ? netGrandTotal : 0);
-
-  if (paidAmount >= netGrandTotal) {
-    paymentStatus = 'Paid';
-    paidAmount = netGrandTotal;
-  } else if (paidAmount <= 0) {
-    paymentStatus = 'Pending';
-    paidAmount = 0;
-  } else {
-    paymentStatus = 'Partial';
-  }
-
-  if (editId) {
-    const existing = state.purchases.find(p => p.id === editId);
-    if (existing) {
-      existing.date = date;
-      existing.vendor = vendor;
-      existing.billNo = billNo;
-      existing.paidBy = paidBy;
-      existing.items = items;
-      existing.subtotal = totalGross;
-      existing.discountAmount = totalDiscounts;
-      existing.totalAmount = netGrandTotal;
-      existing.paymentStatus = paymentStatus;
-      existing.paidAmount = paidAmount;
-      existing.notes = notes;
-      showToast(`Purchase bill ${existing.billNo} updated!`);
+    if (paidAmount >= netGrandTotal) {
+      paymentStatus = 'Paid';
+      paidAmount = netGrandTotal;
+    } else if (paidAmount <= 0) {
+      paymentStatus = 'Pending';
+      paidAmount = 0;
+    } else {
+      paymentStatus = 'Partial';
     }
-  } else {
-    const newPurchase = {
-      id: "purch_" + Date.now(),
-      billNo,
-      vendor,
-      date,
-      paidBy,
-      items,
-      subtotal: totalGross,
-      discountAmount: totalDiscounts,
-      totalAmount: netGrandTotal,
-      paymentStatus,
-      paidAmount,
-      notes
-    };
-    state.purchases.push(newPurchase);
-    showToast(`Purchase bill saved!`);
-  }
 
-  saveState();
-  closeModal('purchaseModal');
-  refreshAllUI();
+    if (editId) {
+      const existing = state.purchases.find(p => p.id === editId);
+      if (existing) {
+        existing.date = date;
+        existing.vendor = vendor;
+        existing.billNo = billNo;
+        existing.paidBy = paidBy;
+        existing.items = items;
+        existing.subtotal = totalGross;
+        existing.discountAmount = totalDiscounts;
+        existing.totalAmount = netGrandTotal;
+        existing.paymentStatus = paymentStatus;
+        existing.paidAmount = paidAmount;
+        existing.notes = notes;
+        showToast(`Purchase bill ${existing.billNo} updated successfully!`);
+      }
+    } else {
+      const newPurchase = {
+        id: "purch_" + Date.now(),
+        billNo,
+        vendor,
+        date,
+        paidBy,
+        items,
+        subtotal: totalGross,
+        discountAmount: totalDiscounts,
+        totalAmount: netGrandTotal,
+        paymentStatus,
+        paidAmount,
+        notes
+      };
+      state.purchases.push(newPurchase);
+      showToast(`Purchase bill ${billNo} saved successfully!`);
+    }
+
+    saveState();
+    closeModal('purchaseModal');
+    refreshAllUI();
+  } catch (err) {
+    console.error("Error saving purchase:", err);
+    showToast("Error saving purchase: " + err.message, true);
+  }
 }
 
 function renderPurchasesTable() {
