@@ -1536,35 +1536,50 @@ function addSaleItemRow(prodId = "", qty = 1, customPrice = null, discPercent = 
   const dAmt = (discAmount !== null && discAmount !== undefined && discAmount > 0) ? discAmount : "";
 
   const row = document.createElement("div");
-  row.className = "flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 sale-item-row hover:border-indigo-300 transition-colors";
+  row.className = "bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2.5 sale-item-row hover:border-indigo-400 transition-all";
   row.id = `sale_row_${rowIndex}`;
 
   row.innerHTML = `
-    <div class="flex-grow sm:w-4/12">
-      <select onchange="onSaleProductSelect('${rowIndex}')" id="sale_prod_${rowIndex}" required class="input-pro py-1.5 text-xs font-semibold">
-        <option value="">-- Select Product --</option>
-        ${state.products.map(p => `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
-      </select>
+    <!-- Top: Wide Product Select & Item Total Badge -->
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex-grow">
+        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+          <i class="fa-solid fa-box-open text-indigo-600"></i> Select Product *
+        </label>
+        <select onchange="onSaleProductSelect('${rowIndex}')" id="sale_prod_${rowIndex}" required class="input-pro py-1.5 text-xs sm:text-sm font-semibold">
+          <option value="">-- Choose Product --</option>
+          ${state.products.map(p => `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
+        </select>
+      </div>
+      <div class="text-right flex-shrink-0 pt-3">
+        <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Item Total</div>
+        <div class="flex items-center gap-2">
+          <span id="sale_subtotal_${rowIndex}" class="font-mono text-sm sm:text-base font-bold text-emerald-700">₹0</span>
+          <button type="button" onclick="removeSaleItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors" title="Remove Product">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
     </div>
-    <div class="w-full sm:w-1/12">
-      <input type="number" id="sale_qty_${rowIndex}" min="1" value="${qty}" oninput="onSaleRowQtyOrPriceChange('${rowIndex}')" placeholder="Qty" required class="input-pro py-1.5 text-xs text-center font-bold font-mono" title="Quantity">
-    </div>
-    <div class="w-full sm:w-2/12">
-      <input type="number" id="sale_price_${rowIndex}" min="0" step="any" value="${initialPrice > 0 ? initialPrice : ''}" oninput="onSaleRowQtyOrPriceChange('${rowIndex}')" placeholder="Rate ₹" required class="input-pro py-1.5 text-xs text-right font-bold text-slate-800 font-mono" title="Rate per unit">
-    </div>
-    <div class="w-full sm:w-2/12 relative">
-      <input type="number" id="sale_disc_pct_${rowIndex}" min="0" max="100" step="any" value="${dPct}" oninput="onSaleRowDiscPercentChange('${rowIndex}')" placeholder="Disc %" class="input-pro py-1.5 text-xs text-right font-mono font-semibold text-indigo-700 pr-5" title="Discount percentage for this item">
-      <span class="absolute right-2 top-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-    </div>
-    <div class="w-full sm:w-1.5/12 sm:w-2/12 relative">
-      <input type="number" id="sale_disc_amt_${rowIndex}" min="0" step="any" value="${dAmt}" oninput="onSaleRowDiscAmountChange('${rowIndex}')" placeholder="Disc ₹" class="input-pro py-1.5 text-xs text-right font-mono font-semibold text-rose-600 pl-4" title="Discount amount (₹) for this item">
-      <span class="absolute left-1.5 top-2 text-[10px] font-bold text-slate-400 pointer-events-none">₹</span>
-    </div>
-    <div class="w-full sm:w-2/12 text-right font-bold text-slate-900 text-xs px-1 flex items-center justify-between sm:justify-end gap-1.5">
-      <span id="sale_subtotal_${rowIndex}" class="font-mono text-xs sm:text-sm font-bold text-emerald-700">₹0</span>
-      <button type="button" onclick="removeSaleItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 p-1" title="Remove Item">
-        <i class="fa-solid fa-trash-can"></i>
-      </button>
+
+    <!-- Bottom: 4 Spacious Input Boxes with Top Labels -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Qty (pcs) *</label>
+        <input type="number" id="sale_qty_${rowIndex}" min="1" value="${qty}" oninput="onSaleRowQtyOrPriceChange('${rowIndex}')" placeholder="Qty" required class="input-pro py-1.5 text-xs sm:text-sm text-center font-bold font-mono">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Selling Rate (₹) *</label>
+        <input type="number" id="sale_price_${rowIndex}" min="0" step="any" value="${initialPrice > 0 ? initialPrice : ''}" oninput="onSaleRowQtyOrPriceChange('${rowIndex}')" placeholder="₹ Rate" required class="input-pro py-1.5 text-xs sm:text-sm text-right font-bold text-slate-800 font-mono">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Discount (%)</label>
+        <input type="number" id="sale_disc_pct_${rowIndex}" min="0" max="100" step="any" value="${dPct}" oninput="onSaleRowDiscPercentChange('${rowIndex}')" placeholder="0%" class="input-pro py-1.5 text-xs sm:text-sm text-right font-mono font-bold text-indigo-700">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Discount (₹)</label>
+        <input type="number" id="sale_disc_amt_${rowIndex}" min="0" step="any" value="${dAmt}" oninput="onSaleRowDiscAmountChange('${rowIndex}')" placeholder="₹0.00" class="input-pro py-1.5 text-xs sm:text-sm text-right font-mono font-bold text-rose-600">
+      </div>
     </div>
   `;
 
@@ -2650,35 +2665,50 @@ function addPurchaseItemRow(prodId = "", qty = 10, customCost = null, discPercen
   const dAmt = (discAmount !== null && discAmount !== undefined && discAmount > 0) ? discAmount : "";
 
   const row = document.createElement("div");
-  row.className = "flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 purchase-item-row hover:border-indigo-300 transition-colors";
+  row.className = "bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2.5 purchase-item-row hover:border-indigo-400 transition-all";
   row.id = `purch_row_${rowIndex}`;
 
   row.innerHTML = `
-    <div class="flex-grow sm:w-4/12">
-      <select onchange="onPurchaseProductSelect('${rowIndex}')" id="purch_prod_${rowIndex}" required class="input-pro py-1.5 text-xs font-semibold">
-        <option value="">-- Select Item --</option>
-        ${state.products.map(p => `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
-      </select>
+    <!-- Top: Wide Product Select & Item Total Badge -->
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex-grow">
+        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+          <i class="fa-solid fa-box-open text-indigo-600"></i> Select Purchased Item *
+        </label>
+        <select onchange="onPurchaseProductSelect('${rowIndex}')" id="purch_prod_${rowIndex}" required class="input-pro py-1.5 text-xs sm:text-sm font-semibold">
+          <option value="">-- Choose Item --</option>
+          ${state.products.map(p => `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
+        </select>
+      </div>
+      <div class="text-right flex-shrink-0 pt-3">
+        <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Item Total</div>
+        <div class="flex items-center gap-2">
+          <span id="purch_subtotal_${rowIndex}" class="font-mono text-sm sm:text-base font-bold text-slate-900">₹0</span>
+          <button type="button" onclick="removePurchaseItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors" title="Remove Item">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
     </div>
-    <div class="w-full sm:w-1/12">
-      <input type="number" id="purch_qty_${rowIndex}" min="1" value="${qty}" oninput="onPurchaseRowQtyOrCostChange('${rowIndex}')" placeholder="Qty" required class="input-pro py-1.5 text-xs text-center font-bold font-mono" title="Quantity">
-    </div>
-    <div class="w-full sm:w-2/12">
-      <input type="number" id="purch_cost_${rowIndex}" min="0" step="any" value="${initialCost > 0 ? initialCost : ''}" oninput="onPurchaseRowQtyOrCostChange('${rowIndex}')" placeholder="Cost ₹" required class="input-pro py-1.5 text-xs text-right font-bold text-slate-800 font-mono" title="Cost Price per unit">
-    </div>
-    <div class="w-full sm:w-2/12 relative">
-      <input type="number" id="purch_disc_pct_${rowIndex}" min="0" max="100" step="any" value="${dPct}" oninput="onPurchaseRowDiscPercentChange('${rowIndex}')" placeholder="Disc %" class="input-pro py-1.5 text-xs text-right font-mono font-semibold text-indigo-700 pr-5" title="Discount percentage for this item">
-      <span class="absolute right-2 top-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-    </div>
-    <div class="w-full sm:w-1.5/12 sm:w-2/12 relative">
-      <input type="number" id="purch_disc_amt_${rowIndex}" min="0" step="any" value="${dAmt}" oninput="onPurchaseRowDiscAmountChange('${rowIndex}')" placeholder="Disc ₹" class="input-pro py-1.5 text-xs text-right font-mono font-semibold text-emerald-600 pl-4" title="Discount amount (₹) for this item">
-      <span class="absolute left-1.5 top-2 text-[10px] font-bold text-slate-400 pointer-events-none">₹</span>
-    </div>
-    <div class="w-full sm:w-2/12 text-right font-bold text-slate-900 text-xs px-1 flex items-center justify-between sm:justify-end gap-1.5">
-      <span id="purch_subtotal_${rowIndex}" class="font-mono text-xs sm:text-sm font-bold text-slate-900">₹0</span>
-      <button type="button" onclick="removePurchaseItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 p-1" title="Remove Item">
-        <i class="fa-solid fa-trash-can"></i>
-      </button>
+
+    <!-- Bottom: 4 Spacious Input Boxes with Top Labels -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Qty (pcs) *</label>
+        <input type="number" id="purch_qty_${rowIndex}" min="1" value="${qty}" oninput="onPurchaseRowQtyOrCostChange('${rowIndex}')" placeholder="Qty" required class="input-pro py-1.5 text-xs sm:text-sm text-center font-bold font-mono">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Purchase Cost (₹) *</label>
+        <input type="number" id="purch_cost_${rowIndex}" min="0" step="any" value="${initialCost > 0 ? initialCost : ''}" oninput="onPurchaseRowQtyOrCostChange('${rowIndex}')" placeholder="₹ Cost" required class="input-pro py-1.5 text-xs sm:text-sm text-right font-bold text-slate-800 font-mono">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Discount (%)</label>
+        <input type="number" id="purch_disc_pct_${rowIndex}" min="0" max="100" step="any" value="${dPct}" oninput="onPurchaseRowDiscPercentChange('${rowIndex}')" placeholder="0%" class="input-pro py-1.5 text-xs sm:text-sm text-right font-mono font-bold text-indigo-700">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Discount (₹)</label>
+        <input type="number" id="purch_disc_amt_${rowIndex}" min="0" step="any" value="${dAmt}" oninput="onPurchaseRowDiscAmountChange('${rowIndex}')" placeholder="₹0.00" class="input-pro py-1.5 text-xs sm:text-sm text-right font-mono font-bold text-emerald-600">
+      </div>
     </div>
   `;
 
