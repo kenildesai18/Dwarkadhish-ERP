@@ -1170,14 +1170,44 @@
           </div>
         </div>
 
+        <!-- Discount Section (Bi-directional Auto Calculating) -->
+        <div class="bg-indigo-50/60 p-3 rounded-lg border border-indigo-100 space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-slate-800 flex items-center gap-1.5">
+              <i class="fa-solid fa-tags text-indigo-600"></i> Trade / Customer Discount (Auto-Calculating)
+            </span>
+            <span class="text-slate-600 font-mono text-[11px]">Items Subtotal: <b id="saleSubtotalDisplay" class="text-slate-900 font-bold">₹0</b></span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Discount Percentage (%)</label>
+              <div class="relative">
+                <input type="number" id="saleDiscountPercent" min="0" max="100" step="any" oninput="onSaleDiscountPercentChange()" placeholder="0%" class="input-pro py-1.5 text-xs font-mono font-bold text-indigo-700 pr-7" title="Enter % to auto calculate ₹ discount">
+                <span class="absolute right-2.5 top-2 text-[11px] font-bold text-slate-400 pointer-events-none">%</span>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Discount Amount (₹)</label>
+              <div class="relative">
+                <input type="number" id="saleDiscountAmount" min="0" step="any" oninput="onSaleDiscountAmountChange()" placeholder="0.00" class="input-pro py-1.5 text-xs font-mono font-bold text-rose-600 pl-6" title="Enter ₹ to auto calculate % discount">
+                <span class="absolute left-2.5 top-2 text-[11px] font-bold text-slate-400 pointer-events-none">₹</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Total & Payment -->
         <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-2.5">
           <div class="flex items-center justify-between text-xs sm:text-sm">
             <div class="flex items-center gap-2">
-              <span class="font-bold text-slate-700">Total Bill Amount:</span>
+              <span class="font-bold text-slate-700">Net Bill Amount:</span>
               <span id="saleProfitDisplay" class="text-[11px] font-bold text-emerald-700 bg-emerald-100/70 border border-emerald-300 px-2 py-0.5 rounded">Profit: +₹0</span>
             </div>
-            <span class="text-xl sm:text-2xl font-bold text-slate-900 font-mono" id="saleTotalDisplay">₹0</span>
+            <div class="text-right">
+              <span class="text-xl sm:text-2xl font-bold text-slate-900 font-mono" id="saleTotalDisplay">₹0</span>
+              <div id="saleDiscountSummaryDisplay" class="text-[10px] text-rose-600 font-semibold hidden"></div>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-2 border-t border-slate-200">
@@ -1525,10 +1555,40 @@
           </label>
         </div>
 
+        <!-- Discount Section (Bi-directional Auto Calculating) -->
+        <div class="bg-indigo-50/60 p-3 rounded-lg border border-indigo-100 space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-slate-800 flex items-center gap-1.5">
+              <i class="fa-solid fa-tags text-indigo-600"></i> Supplier / Purchase Discount (Auto-Calculating)
+            </span>
+            <span class="text-slate-600 font-mono text-[11px]">Items Subtotal: <b id="purchaseSubtotalDisplay" class="text-slate-900 font-bold">₹0</b></span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Discount Percentage (%)</label>
+              <div class="relative">
+                <input type="number" id="purchaseDiscountPercent" min="0" max="100" step="any" oninput="onPurchaseDiscountPercentChange()" placeholder="0%" class="input-pro py-1.5 text-xs font-mono font-bold text-indigo-700 pr-7" title="Enter % to auto calculate ₹ discount">
+                <span class="absolute right-2.5 top-2 text-[11px] font-bold text-slate-400 pointer-events-none">%</span>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Discount Amount (₹)</label>
+              <div class="relative">
+                <input type="number" id="purchaseDiscountAmount" min="0" step="any" oninput="onPurchaseDiscountAmountChange()" placeholder="0.00" class="input-pro py-1.5 text-xs font-mono font-bold text-emerald-600 pl-6" title="Enter ₹ to auto calculate % discount">
+                <span class="absolute left-2.5 top-2 text-[11px] font-bold text-slate-400 pointer-events-none">₹</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-2.5">
           <div class="flex items-center justify-between text-xs sm:text-sm">
-            <span class="font-bold text-slate-700">Total Bill Amount:</span>
-            <span class="text-xl sm:text-2xl font-bold text-slate-900 font-mono" id="purchaseTotalDisplay">₹0</span>
+            <span class="font-bold text-slate-700">Net Bill Amount:</span>
+            <div class="text-right">
+              <span class="text-xl sm:text-2xl font-bold text-slate-900 font-mono" id="purchaseTotalDisplay">₹0</span>
+              <div id="purchaseDiscountSummaryDisplay" class="text-[10px] text-emerald-600 font-semibold hidden"></div>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2 border-t border-slate-200">
@@ -1894,6 +1954,6 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="app.js?v=2026_live_firebase_v11"></script>
+  <script src="app.js?v=2026_discount_v12"></script>
 </body>
 </html>

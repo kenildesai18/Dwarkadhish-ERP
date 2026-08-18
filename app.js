@@ -1445,6 +1445,13 @@ function initSaleModal(saleType = 'retail_online') {
   document.getElementById("saleModalTitle").textContent = "New Sale Entry";
   document.getElementById("saleItemsContainer").innerHTML = "";
 
+  const discPct = document.getElementById("saleDiscountPercent");
+  const discAmt = document.getElementById("saleDiscountAmount");
+  if (discPct) discPct.value = "";
+  if (discAmt) discAmt.value = "";
+  const discSummary = document.getElementById("saleDiscountSummaryDisplay");
+  if (discSummary) discSummary.classList.add("hidden");
+
   const radio = form.querySelector(`input[name="saleType"][value="${saleType || 'retail_online'}"]`);
   if (radio) radio.checked = true;
 
@@ -1478,6 +1485,11 @@ function editSale(id) {
     document.getElementById("saleCustomerCity").value = sale.customerCity || "";
   }
 
+  const discPct = document.getElementById("saleDiscountPercent");
+  const discAmt = document.getElementById("saleDiscountAmount");
+  if (discPct) discPct.value = sale.discountPercent > 0 ? sale.discountPercent : "";
+  if (discAmt) discAmt.value = sale.discountAmount > 0 ? sale.discountAmount : "";
+
   document.getElementById("salePaymentStatus").value = sale.paymentStatus || "Paid";
   document.getElementById("salePaidAmount").value = sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Pending' ? 0 : sale.totalAmount);
   if (document.getElementById("saleReceivedBy")) {
@@ -1492,7 +1504,7 @@ function editSale(id) {
     addSaleItemRow(it.productId, it.qty, it.price);
   });
 
-  calculateSaleTotal();
+  calculateSaleTotal(false);
   openModal('saleModal', 'edit');
 }
 
@@ -1601,9 +1613,55 @@ function updateSaleItemPricesBasedOnType(saleType) {
   calculateSaleTotal();
 }
 
-function calculateSaleTotal() {
+function getSaleItemsSubtotal() {
   const rows = document.querySelectorAll(".sale-item-row");
-  let grandTotal = 0;
+  let subtotal = 0;
+  rows.forEach(row => {
+    const id = row.id.replace("sale_row_", "");
+    const qty = parseFloat(document.getElementById(`sale_qty_${id}`)?.value) || 0;
+    const price = parseFloat(document.getElementById(`sale_price_${id}`)?.value) || 0;
+    subtotal += (qty * price);
+  });
+  return subtotal;
+}
+
+function onSaleDiscountPercentChange() {
+  const percentInput = document.getElementById("saleDiscountPercent");
+  const amountInput = document.getElementById("saleDiscountAmount");
+  let percent = parseFloat(percentInput?.value) || 0;
+  if (percent < 0) percent = 0;
+  if (percent > 100) percent = 100;
+  if (percentInput && percentInput.value !== "" && percentInput.value != percent) percentInput.value = percent;
+
+  const subtotal = getSaleItemsSubtotal();
+  if (percent > 0 && subtotal > 0) {
+    const discAmount = Math.round(((subtotal * percent) / 100) * 100) / 100;
+    if (amountInput) amountInput.value = discAmount;
+  } else {
+    if (amountInput) amountInput.value = "";
+  }
+  calculateSaleTotal(false);
+}
+
+function onSaleDiscountAmountChange() {
+  const percentInput = document.getElementById("saleDiscountPercent");
+  const amountInput = document.getElementById("saleDiscountAmount");
+  let amount = parseFloat(amountInput?.value) || 0;
+  if (amount < 0) amount = 0;
+
+  const subtotal = getSaleItemsSubtotal();
+  if (amount > 0 && subtotal > 0) {
+    const percent = Math.round(((amount / subtotal) * 100) * 100) / 100;
+    if (percentInput) percentInput.value = percent;
+  } else {
+    if (percentInput) percentInput.value = "";
+  }
+  calculateSaleTotal(false);
+}
+
+function calculateSaleTotal(recalcDiscount = true) {
+  const rows = document.querySelectorAll(".sale-item-row");
+  let itemsSubtotal = 0;
   let totalEstimatedCost = 0;
 
   rows.forEach(row => {
@@ -1612,7 +1670,7 @@ function calculateSaleTotal() {
     const qty = parseFloat(document.getElementById(`sale_qty_${id}`)?.value) || 0;
     const price = parseFloat(document.getElementById(`sale_price_${id}`)?.value) || 0;
     const subtotal = qty * price;
-    grandTotal += subtotal;
+    itemsSubtotal += subtotal;
 
     const prod = state.products.find(p => p.id === prodId);
     if (prod) {
@@ -1623,19 +1681,47 @@ function calculateSaleTotal() {
     if (subEl) subEl.textContent = formatCurrency(subtotal);
   });
 
+  const subtotalDisplay = document.getElementById("saleSubtotalDisplay");
+  if (subtotalDisplay) subtotalDisplay.textContent = formatCurrency(itemsSubtotal);
+
+  const percentInput = document.getElementById("saleDiscountPercent");
+  const amountInput = document.getElementById("saleDiscountAmount");
+
+  let discountAmount = 0;
+  if (recalcDiscount && percentInput && percentInput.value !== "") {
+    const percent = parseFloat(percentInput.value) || 0;
+    discountAmount = Math.round(((itemsSubtotal * percent) / 100) * 100) / 100;
+    if (amountInput) amountInput.value = discountAmount > 0 ? discountAmount : "";
+  } else if (amountInput && amountInput.value !== "") {
+    discountAmount = parseFloat(amountInput.value) || 0;
+  }
+
+  const netTotal = Math.max(0, itemsSubtotal - discountAmount);
+
   const dTotal = document.getElementById("saleTotalDisplay");
-  if (dTotal) dTotal.textContent = formatCurrency(grandTotal);
+  if (dTotal) dTotal.textContent = formatCurrency(netTotal);
 
   const profitEl = document.getElementById("saleProfitDisplay");
   if (profitEl) {
-    const profit = grandTotal - totalEstimatedCost;
-    profitEl.textContent = `Est. Profit: +${formatCurrency(profit)}`;
+    const profit = netTotal - totalEstimatedCost;
+    profitEl.textContent = `Profit: +${formatCurrency(profit)}`;
+  }
+
+  const discSummary = document.getElementById("saleDiscountSummaryDisplay");
+  if (discSummary) {
+    if (discountAmount > 0) {
+      const pct = percentInput && percentInput.value ? percentInput.value : (itemsSubtotal > 0 ? Math.round(((discountAmount / itemsSubtotal) * 100) * 10) / 10 : 0);
+      discSummary.textContent = `Discount: -${formatCurrency(discountAmount)} (${pct}%)`;
+      discSummary.classList.remove("hidden");
+    } else {
+      discSummary.classList.add("hidden");
+    }
   }
 
   const status = document.getElementById("salePaymentStatus")?.value;
   const paidInput = document.getElementById("salePaidAmount");
   if (status === 'Paid' && paidInput && !document.getElementById("saleEditId").value) {
-    paidInput.value = grandTotal;
+    paidInput.value = netTotal;
   }
 }
 
@@ -1683,7 +1769,7 @@ function handleSaveSale(e) {
   }
 
   const items = [];
-  let grandTotal = 0;
+  let itemsSubtotal = 0;
 
   rows.forEach(row => {
     const id = row.id.replace("sale_row_", "");
@@ -1697,7 +1783,7 @@ function handleSaveSale(e) {
     if (!prod) return;
 
     const subtotal = qty * price;
-    grandTotal += subtotal;
+    itemsSubtotal += subtotal;
 
     items.push({
       productId: prod.id,
@@ -1705,6 +1791,7 @@ function handleSaveSale(e) {
       sku: prod.sku,
       qty,
       price,
+      costPrice: prod.costPrice,
       total: subtotal
     });
   });
@@ -1714,12 +1801,16 @@ function handleSaveSale(e) {
     return;
   }
 
-  let paidAmount = parseFloat(document.getElementById("salePaidAmount").value);
-  if (isNaN(paidAmount)) paidAmount = (paymentStatus === 'Paid' ? grandTotal : 0);
+  const discountPercent = parseFloat(document.getElementById("saleDiscountPercent")?.value) || 0;
+  const discountAmount = parseFloat(document.getElementById("saleDiscountAmount")?.value) || 0;
+  const netTotal = Math.max(0, itemsSubtotal - discountAmount);
 
-  if (paidAmount >= grandTotal) {
+  let paidAmount = parseFloat(document.getElementById("salePaidAmount").value);
+  if (isNaN(paidAmount)) paidAmount = (paymentStatus === 'Paid' ? netTotal : 0);
+
+  if (paidAmount >= netTotal) {
     paymentStatus = 'Paid';
-    paidAmount = grandTotal;
+    paidAmount = netTotal;
   } else if (paidAmount <= 0) {
     paymentStatus = 'Pending';
     paidAmount = 0;
@@ -1746,7 +1837,10 @@ function handleSaveSale(e) {
       existing.customerPhone = customerPhone;
       existing.customerCity = customerCity;
       existing.items = items;
-      existing.totalAmount = grandTotal;
+      existing.subtotal = itemsSubtotal;
+      existing.discountPercent = discountPercent;
+      existing.discountAmount = discountAmount;
+      existing.totalAmount = netTotal;
       existing.paymentStatus = paymentStatus;
       existing.paidAmount = paidAmount;
       existing.receivedBy = receivedBy;
@@ -1765,7 +1859,10 @@ function handleSaveSale(e) {
       customerPhone,
       customerCity,
       items,
-      totalAmount: grandTotal,
+      subtotal: itemsSubtotal,
+      discountPercent,
+      discountAmount,
+      totalAmount: netTotal,
       paymentStatus,
       paidAmount,
       receivedBy,
@@ -2037,6 +2134,16 @@ function viewInvoiceReceipt(id) {
     </table>
 
     <div class="border-t border-slate-200 pt-2 space-y-1 text-xs">
+      ${sale.discountAmount > 0 ? `
+        <div class="flex justify-between text-slate-600">
+          <span>Items Subtotal:</span>
+          <span class="font-mono">${formatCurrency(sale.subtotal || (total + sale.discountAmount))}</span>
+        </div>
+        <div class="flex justify-between text-rose-600 font-semibold">
+          <span>Discount (${sale.discountPercent || 0}%):</span>
+          <span class="font-mono">-${formatCurrency(sale.discountAmount)}</span>
+        </div>
+      ` : ''}
       <div class="flex justify-between font-bold text-slate-900 text-sm">
         <span>Total Amount:</span>
         <span class="font-mono">${formatCurrency(total)}</span>
@@ -2436,7 +2543,7 @@ function deletePayout(id) {
   }
 }
 
-// ==================== SALES (WHOLESALE & BILLING) ====================
+// ==================== PURCHASES & STOCK INWARD ====================
 function initPurchaseModal() {
   const form = document.getElementById("purchaseForm");
   if (form) form.reset();
@@ -2445,6 +2552,14 @@ function initPurchaseModal() {
   document.getElementById("purchaseEditId").value = "";
   document.getElementById("purchaseModalTitle").textContent = "New Purchase Bill";
   document.getElementById("purchaseItemsContainer").innerHTML = "";
+
+  const discPct = document.getElementById("purchaseDiscountPercent");
+  const discAmt = document.getElementById("purchaseDiscountAmount");
+  if (discPct) discPct.value = "";
+  if (discAmt) discAmt.value = "";
+  const discSummary = document.getElementById("purchaseDiscountSummaryDisplay");
+  if (discSummary) discSummary.classList.add("hidden");
+
   document.getElementById("purchasePaymentStatus").value = "Paid";
   togglePurchasePaymentUI();
   addPurchaseItemRow();
@@ -2490,6 +2605,12 @@ function editPurchase(id) {
   document.getElementById("purchaseVendor").value = purch.vendor;
   document.getElementById("purchaseBillNo").value = purch.billNo;
   document.getElementById("purchaseNotes").value = purch.notes || "";
+
+  const discPct = document.getElementById("purchaseDiscountPercent");
+  const discAmt = document.getElementById("purchaseDiscountAmount");
+  if (discPct) discPct.value = purch.discountPercent > 0 ? purch.discountPercent : "";
+  if (discAmt) discAmt.value = purch.discountAmount > 0 ? purch.discountAmount : "";
+
   document.getElementById("purchasePaymentStatus").value = purch.paymentStatus || "Paid";
   document.getElementById("purchasePaidAmount").value = purch.paidAmount !== undefined ? purch.paidAmount : (purch.paymentStatus === 'Pending' ? 0 : purch.totalAmount);
   document.getElementById("purchaseModalTitle").textContent = `Edit Purchase (${purch.billNo})`;
@@ -2506,7 +2627,7 @@ function editPurchase(id) {
     addPurchaseItemRow(it.productId, it.qty, it.costPrice);
   });
 
-  calculatePurchaseTotal();
+  calculatePurchaseTotal(false);
   openModal('purchaseModal', 'edit');
 }
 
@@ -2572,23 +2693,103 @@ function onPurchaseProductSelect(rowIndex) {
   calculatePurchaseTotal();
 }
 
-function calculatePurchaseTotal() {
+function getPurchaseItemsSubtotal() {
   const rows = document.querySelectorAll(".purchase-item-row");
-  let grandTotal = 0;
+  let subtotal = 0;
+  rows.forEach(row => {
+    const id = row.id.replace("purch_row_", "");
+    const qty = parseFloat(document.getElementById(`purch_qty_${id}`)?.value) || 0;
+    const cost = parseFloat(document.getElementById(`purch_cost_${id}`)?.value) || 0;
+    subtotal += (qty * cost);
+  });
+  return subtotal;
+}
+
+function onPurchaseDiscountPercentChange() {
+  const percentInput = document.getElementById("purchaseDiscountPercent");
+  const amountInput = document.getElementById("purchaseDiscountAmount");
+  let percent = parseFloat(percentInput?.value) || 0;
+  if (percent < 0) percent = 0;
+  if (percent > 100) percent = 100;
+  if (percentInput && percentInput.value !== "" && percentInput.value != percent) percentInput.value = percent;
+
+  const subtotal = getPurchaseItemsSubtotal();
+  if (percent > 0 && subtotal > 0) {
+    const discAmount = Math.round(((subtotal * percent) / 100) * 100) / 100;
+    if (amountInput) amountInput.value = discAmount;
+  } else {
+    if (amountInput) amountInput.value = "";
+  }
+  calculatePurchaseTotal(false);
+}
+
+function onPurchaseDiscountAmountChange() {
+  const percentInput = document.getElementById("purchaseDiscountPercent");
+  const amountInput = document.getElementById("purchaseDiscountAmount");
+  let amount = parseFloat(amountInput?.value) || 0;
+  if (amount < 0) amount = 0;
+
+  const subtotal = getPurchaseItemsSubtotal();
+  if (amount > 0 && subtotal > 0) {
+    const percent = Math.round(((amount / subtotal) * 100) * 100) / 100;
+    if (percentInput) percentInput.value = percent;
+  } else {
+    if (percentInput) percentInput.value = "";
+  }
+  calculatePurchaseTotal(false);
+}
+
+function calculatePurchaseTotal(recalcDiscount = true) {
+  const rows = document.querySelectorAll(".purchase-item-row");
+  let itemsSubtotal = 0;
 
   rows.forEach(row => {
     const id = row.id.replace("purch_row_", "");
     const qty = parseFloat(document.getElementById(`purch_qty_${id}`)?.value) || 0;
     const cost = parseFloat(document.getElementById(`purch_cost_${id}`)?.value) || 0;
     const subtotal = qty * cost;
-    grandTotal += subtotal;
+    itemsSubtotal += subtotal;
 
     const subEl = document.getElementById(`purch_subtotal_${id}`);
     if (subEl) subEl.textContent = formatCurrency(subtotal);
   });
 
+  const subtotalDisplay = document.getElementById("purchaseSubtotalDisplay");
+  if (subtotalDisplay) subtotalDisplay.textContent = formatCurrency(itemsSubtotal);
+
+  const percentInput = document.getElementById("purchaseDiscountPercent");
+  const amountInput = document.getElementById("purchaseDiscountAmount");
+
+  let discountAmount = 0;
+  if (recalcDiscount && percentInput && percentInput.value !== "") {
+    const percent = parseFloat(percentInput.value) || 0;
+    discountAmount = Math.round(((itemsSubtotal * percent) / 100) * 100) / 100;
+    if (amountInput) amountInput.value = discountAmount > 0 ? discountAmount : "";
+  } else if (amountInput && amountInput.value !== "") {
+    discountAmount = parseFloat(amountInput.value) || 0;
+  }
+
+  const netTotal = Math.max(0, itemsSubtotal - discountAmount);
+
   const dTotal = document.getElementById("purchaseTotalDisplay");
-  if (dTotal) dTotal.textContent = formatCurrency(grandTotal);
+  if (dTotal) dTotal.textContent = formatCurrency(netTotal);
+
+  const discSummary = document.getElementById("purchaseDiscountSummaryDisplay");
+  if (discSummary) {
+    if (discountAmount > 0) {
+      const pct = percentInput && percentInput.value ? percentInput.value : (itemsSubtotal > 0 ? Math.round(((discountAmount / itemsSubtotal) * 100) * 10) / 10 : 0);
+      discSummary.textContent = `Discount: -${formatCurrency(discountAmount)} (${pct}%)`;
+      discSummary.classList.remove("hidden");
+    } else {
+      discSummary.classList.add("hidden");
+    }
+  }
+
+  const status = document.getElementById("purchasePaymentStatus")?.value;
+  const paidInput = document.getElementById("purchasePaidAmount");
+  if (status === 'Paid' && paidInput && !document.getElementById("purchaseEditId").value) {
+    paidInput.value = netTotal;
+  }
 }
 
 function handleSavePurchase(e) {
@@ -2621,7 +2822,7 @@ function handleSavePurchase(e) {
   }
 
   const items = [];
-  let grandTotal = 0;
+  let itemsSubtotal = 0;
   const shouldUpdateMasterCost = document.getElementById("purchaseUpdateMasterCost") ? document.getElementById("purchaseUpdateMasterCost").checked : true;
 
   rows.forEach(row => {
@@ -2636,7 +2837,7 @@ function handleSavePurchase(e) {
     if (!prod) return;
 
     const subtotal = qty * costPrice;
-    grandTotal += subtotal;
+    itemsSubtotal += subtotal;
 
     items.push({
       productId: prod.id,
@@ -2657,12 +2858,16 @@ function handleSavePurchase(e) {
     return;
   }
 
-  let paidAmount = parseFloat(document.getElementById("purchasePaidAmount").value);
-  if (isNaN(paidAmount)) paidAmount = (paymentStatus === 'Paid' ? grandTotal : 0);
+  const discountPercent = parseFloat(document.getElementById("purchaseDiscountPercent")?.value) || 0;
+  const discountAmount = parseFloat(document.getElementById("purchaseDiscountAmount")?.value) || 0;
+  const netTotal = Math.max(0, itemsSubtotal - discountAmount);
 
-  if (paidAmount >= grandTotal) {
+  let paidAmount = parseFloat(document.getElementById("purchasePaidAmount").value);
+  if (isNaN(paidAmount)) paidAmount = (paymentStatus === 'Paid' ? netTotal : 0);
+
+  if (paidAmount >= netTotal) {
     paymentStatus = 'Paid';
-    paidAmount = grandTotal;
+    paidAmount = netTotal;
   } else if (paidAmount <= 0) {
     paymentStatus = 'Pending';
     paidAmount = 0;
@@ -2678,7 +2883,10 @@ function handleSavePurchase(e) {
       existing.billNo = billNo;
       existing.paidBy = paidBy;
       existing.items = items;
-      existing.totalAmount = grandTotal;
+      existing.subtotal = itemsSubtotal;
+      existing.discountPercent = discountPercent;
+      existing.discountAmount = discountAmount;
+      existing.totalAmount = netTotal;
       existing.paymentStatus = paymentStatus;
       existing.paidAmount = paidAmount;
       existing.notes = notes;
@@ -2692,7 +2900,10 @@ function handleSavePurchase(e) {
       date,
       paidBy,
       items,
-      totalAmount: grandTotal,
+      subtotal: itemsSubtotal,
+      discountPercent,
+      discountAmount,
+      totalAmount: netTotal,
       paymentStatus,
       paidAmount,
       notes
@@ -3260,7 +3471,10 @@ function exportAllToExcel() {
         "Cost Price (₹)": it.costPrice || 0,
         "Selling Price (₹)": it.price,
         "Item Total (₹)": it.total,
-        "Bill Total (₹)": total,
+        "Bill Subtotal (₹)": s.subtotal || total,
+        "Discount (%)": s.discountPercent || 0,
+        "Discount (₹)": s.discountAmount || 0,
+        "Net Bill Total (₹)": total,
         "Paid Amount (₹)": paid,
         "Pending Due (₹)": pending,
         "Payment Received In": recvName,
@@ -3290,7 +3504,11 @@ function exportAllToExcel() {
         "Product": it.productName,
         "Qty": it.qty,
         "Cost Price (₹)": it.costPrice,
-        "Bill Total (₹)": total,
+        "Item Total (₹)": (Number(it.costPrice) || 0) * (Number(it.qty) || 0),
+        "Bill Subtotal (₹)": p.subtotal || total,
+        "Discount (%)": p.discountPercent || 0,
+        "Discount (₹)": p.discountAmount || 0,
+        "Net Bill Total (₹)": total,
         "Amount Paid (₹)": paid,
         "Pending Due (₹)": pending,
         "Payment Status": p.paymentStatus,
