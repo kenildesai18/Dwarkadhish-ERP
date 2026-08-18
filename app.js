@@ -1449,7 +1449,9 @@ function getWholesaleParties() {
         id: "cust_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
         name: name,
         phone: s.customerPhone || "",
-        city: s.customerCity || ""
+        city: s.customerCity || "",
+        gstNo: s.customerGst || "",
+        address: s.customerAddress || ""
       });
     }
   });
@@ -1459,12 +1461,43 @@ function getWholesaleParties() {
 
 function updatePartiesDatalist() {
   const datalist = document.getElementById("partiesDatalist");
-  if (!datalist) return;
+  const select = document.getElementById("salePartySelect");
+  const parties = getWholesaleParties();
+
+  if (datalist) {
+    datalist.innerHTML = parties.map(p => `
+      <option value="${escapeHtml(p.name)}">${p.city ? `(${escapeHtml(p.city)})` : ''} ${p.phone ? `Ph: ${escapeHtml(p.phone)}` : ''} ${p.gstNo ? `GST: ${escapeHtml(p.gstNo)}` : ''}</option>
+    `).join('');
+  }
+
+  if (select) {
+    const currentVal = select.value;
+    select.innerHTML = `
+      <option value="">-- Or Choose from Saved Parties Directory --</option>
+      ${parties.map(p => `
+        <option value="${p.id}" ${p.id === currentVal ? 'selected' : ''}>${escapeHtml(p.name)} (${escapeHtml(p.city || 'No City')} - Ph: ${escapeHtml(p.phone || 'N/A')}${p.gstNo ? ` - GST: ${escapeHtml(p.gstNo)}` : ''})</option>
+      `).join('')}
+    `;
+  }
+}
+
+function onPartySelectDropdownChange() {
+  const select = document.getElementById("salePartySelect");
+  if (!select) return;
+  const partyId = select.value;
+  if (!partyId) return;
 
   const parties = getWholesaleParties();
-  datalist.innerHTML = parties.map(p => `
-    <option value="${escapeHtml(p.name)}">${p.city ? `(${escapeHtml(p.city)})` : ''} ${p.phone ? `Ph: ${escapeHtml(p.phone)}` : ''}</option>
-  `).join('');
+  const party = parties.find(p => p.id === partyId);
+  if (!party) return;
+
+  if (document.getElementById("saleCustomerName")) document.getElementById("saleCustomerName").value = party.name || "";
+  if (document.getElementById("saleCustomerPhone")) document.getElementById("saleCustomerPhone").value = party.phone || "";
+  if (document.getElementById("saleCustomerCity")) document.getElementById("saleCustomerCity").value = party.city || "";
+  if (document.getElementById("saleCustomerGst")) document.getElementById("saleCustomerGst").value = party.gstNo || "";
+  if (document.getElementById("saleCustomerAddress")) document.getElementById("saleCustomerAddress").value = party.address || "";
+
+  showToast(`Auto-filled details for "${party.name}"!`);
 }
 
 function onPartyNameSelected() {
@@ -1476,47 +1509,176 @@ function onPartyNameSelected() {
   const parties = getWholesaleParties();
   const matched = parties.find(p => p.name.toLowerCase() === name.toLowerCase());
   if (matched) {
-    const phoneInput = document.getElementById("saleCustomerPhone");
-    const cityInput = document.getElementById("saleCustomerCity");
-    if (phoneInput && matched.phone) phoneInput.value = matched.phone;
-    if (cityInput && matched.city) cityInput.value = matched.city;
+    if (document.getElementById("saleCustomerPhone") && matched.phone) document.getElementById("saleCustomerPhone").value = matched.phone;
+    if (document.getElementById("saleCustomerCity") && matched.city) document.getElementById("saleCustomerCity").value = matched.city;
+    if (document.getElementById("saleCustomerGst") && matched.gstNo) document.getElementById("saleCustomerGst").value = matched.gstNo;
+    if (document.getElementById("saleCustomerAddress") && matched.address) document.getElementById("saleCustomerAddress").value = matched.address;
+    
+    const select = document.getElementById("salePartySelect");
+    if (select) select.value = matched.id;
   }
 }
 
-function quickAddNewPartyPrompt() {
-  const name = prompt("Enter Wholesale Party / Customer Name:");
-  if (!name || !name.trim()) return;
+function openPartyModal(partyId = "") {
+  const form = document.getElementById("partyForm");
+  if (form) form.reset();
 
-  const cleanName = name.trim();
-  const phone = prompt(`Enter Mobile / WhatsApp for "${cleanName}" (optional):`, "") || "";
-  const city = prompt(`Enter City / Location for "${cleanName}" (optional):`, "") || "";
+  document.getElementById("partyEditId").value = "";
+  document.getElementById("partyModalTitle").innerHTML = `<i class="fa-solid fa-user-tag text-indigo-600"></i> New Wholesale Party / Customer`;
 
-  const parties = getWholesaleParties();
-  const existing = parties.find(p => p.name.toLowerCase() === cleanName.toLowerCase());
-
-  if (existing) {
-    if (phone.trim()) existing.phone = phone.trim();
-    if (city.trim()) existing.city = city.trim();
+  if (partyId) {
+    const parties = getWholesaleParties();
+    const p = parties.find(x => x.id === partyId);
+    if (p) {
+      document.getElementById("partyEditId").value = p.id;
+      document.getElementById("partyName").value = p.name || "";
+      document.getElementById("partyPhone").value = p.phone || "";
+      document.getElementById("partyCity").value = p.city || "";
+      document.getElementById("partyGst").value = p.gstNo || "";
+      document.getElementById("partyAddress").value = p.address || "";
+      document.getElementById("partyModalTitle").innerHTML = `<i class="fa-solid fa-user-pen text-indigo-600"></i> Edit Party (${escapeHtml(p.name)})`;
+    }
   } else {
-    state.customers.push({
-      id: "cust_" + Date.now(),
-      name: cleanName,
-      phone: phone.trim(),
-      city: city.trim()
-    });
+    // Pre-fill from saleModal if open
+    const curName = document.getElementById("saleCustomerName")?.value || "";
+    const curPhone = document.getElementById("saleCustomerPhone")?.value || "";
+    const curCity = document.getElementById("saleCustomerCity")?.value || "";
+    const curGst = document.getElementById("saleCustomerGst")?.value || "";
+    const curAddr = document.getElementById("saleCustomerAddress")?.value || "";
+    if (curName) document.getElementById("partyName").value = curName;
+    if (curPhone) document.getElementById("partyPhone").value = curPhone;
+    if (curCity) document.getElementById("partyCity").value = curCity;
+    if (curGst) document.getElementById("partyGst").value = curGst;
+    if (curAddr) document.getElementById("partyAddress").value = curAddr;
+  }
+
+  openModal('partyModal');
+}
+
+function handleSaveParty(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const editId = document.getElementById("partyEditId")?.value || "";
+  const name = (document.getElementById("partyName")?.value || "").trim();
+  const phone = (document.getElementById("partyPhone")?.value || "").trim();
+  const city = (document.getElementById("partyCity")?.value || "").trim();
+  const gstNo = (document.getElementById("partyGst")?.value || "").trim().toUpperCase();
+  const address = (document.getElementById("partyAddress")?.value || "").trim();
+
+  if (!name) {
+    showToast("Please enter Party / Business Name!", true);
+    return;
+  }
+
+  if (!state.customers) state.customers = [];
+
+  let savedParty = null;
+  if (editId) {
+    const existing = state.customers.find(p => p.id === editId);
+    if (existing) {
+      existing.name = name;
+      existing.phone = phone;
+      existing.city = city;
+      existing.gstNo = gstNo;
+      existing.address = address;
+      savedParty = existing;
+      showToast(`Party "${name}" updated!`);
+    }
+  } else {
+    const existing = state.customers.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      existing.phone = phone || existing.phone;
+      existing.city = city || existing.city;
+      existing.gstNo = gstNo || existing.gstNo;
+      existing.address = address || existing.address;
+      savedParty = existing;
+      showToast(`Party "${name}" updated!`);
+    } else {
+      const newParty = {
+        id: "cust_" + Date.now(),
+        name,
+        phone,
+        city,
+        gstNo,
+        address
+      };
+      state.customers.push(newParty);
+      savedParty = newParty;
+      showToast(`Party "${name}" added successfully!`);
+    }
   }
 
   saveState();
+  closeModal('partyModal');
   updatePartiesDatalist();
 
-  const nameInput = document.getElementById("saleCustomerName");
-  const phoneInput = document.getElementById("saleCustomerPhone");
-  const cityInput = document.getElementById("saleCustomerCity");
-  if (nameInput) nameInput.value = cleanName;
-  if (phoneInput) phoneInput.value = phone.trim();
-  if (cityInput) cityInput.value = city.trim();
+  // If saleModal is open, auto-fill it
+  if (document.getElementById("saleCustomerName")) {
+    document.getElementById("saleCustomerName").value = name;
+    if (document.getElementById("saleCustomerPhone")) document.getElementById("saleCustomerPhone").value = phone;
+    if (document.getElementById("saleCustomerCity")) document.getElementById("saleCustomerCity").value = city;
+    if (document.getElementById("saleCustomerGst")) document.getElementById("saleCustomerGst").value = gstNo;
+    if (document.getElementById("saleCustomerAddress")) document.getElementById("saleCustomerAddress").value = address;
+    if (document.getElementById("salePartySelect") && savedParty) document.getElementById("salePartySelect").value = savedParty.id;
+  }
 
-  showToast(`Party "${cleanName}" added & selected!`);
+  renderPartiesManageTable();
+}
+
+function openPartiesManageModal() {
+  renderPartiesManageTable();
+  openModal('partiesManageModal');
+}
+
+function renderPartiesManageTable() {
+  const tbody = document.getElementById("partiesManageTableBody");
+  if (!tbody) return;
+
+  const query = (document.getElementById("partiesSearchInput")?.value || "").toLowerCase().trim();
+  let parties = getWholesaleParties();
+
+  if (query) {
+    parties = parties.filter(p => 
+      (p.name || '').toLowerCase().includes(query) ||
+      (p.phone || '').toLowerCase().includes(query) ||
+      (p.city || '').toLowerCase().includes(query) ||
+      (p.gstNo || '').toLowerCase().includes(query) ||
+      (p.address || '').toLowerCase().includes(query)
+    );
+  }
+
+  if (parties.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400">No parties found. Click "+ Add New Party" above.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = parties.map(p => `
+    <tr class="hover:bg-slate-50">
+      <td class="font-bold text-slate-900">${escapeHtml(p.name)}</td>
+      <td class="font-mono text-slate-700">${p.phone ? `<a href="tel:${escapeHtml(p.phone)}" class="text-indigo-600 hover:underline font-semibold">${escapeHtml(p.phone)}</a>` : '-'}</td>
+      <td class="text-slate-600">${escapeHtml(p.city || '-')}</td>
+      <td class="font-mono font-bold text-slate-800 text-xs">${p.gstNo ? `<span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">${escapeHtml(p.gstNo)}</span>` : '-'}</td>
+      <td class="text-slate-500 text-xs max-w-xs truncate" title="${escapeHtml(p.address || '')}">${escapeHtml(p.address || '-')}</td>
+      <td class="text-center space-x-1">
+        <button onclick="openPartyModal('${p.id}')" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Edit Party">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </button>
+        <button onclick="deleteParty('${p.id}')" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded" title="Delete Party">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function deleteParty(id) {
+  if (confirm("Are you sure you want to delete this party from the directory?")) {
+    state.customers = (state.customers || []).filter(p => p.id !== id);
+    saveState();
+    updatePartiesDatalist();
+    renderPartiesManageTable();
+    showToast("Party removed from directory!");
+  }
 }
 
 function initSaleModal(saleType = 'wholesale') {
@@ -1551,6 +1713,8 @@ function editSale(id) {
   document.getElementById("saleCustomerName").value = sale.customerName || "";
   document.getElementById("saleCustomerPhone").value = sale.customerPhone || "";
   document.getElementById("saleCustomerCity").value = sale.customerCity || "";
+  if (document.getElementById("saleCustomerGst")) document.getElementById("saleCustomerGst").value = sale.customerGst || "";
+  if (document.getElementById("saleCustomerAddress")) document.getElementById("saleCustomerAddress").value = sale.customerAddress || "";
 
   document.getElementById("salePaymentStatus").value = sale.paymentStatus || "Paid";
   document.getElementById("salePaidAmount").value = sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Pending' ? 0 : sale.totalAmount);
@@ -1823,6 +1987,8 @@ function handleSaveSale(e) {
     const customerName = document.getElementById("saleCustomerName")?.value.trim();
     const customerPhone = document.getElementById("saleCustomerPhone")?.value.trim() || "";
     const customerCity = document.getElementById("saleCustomerCity")?.value.trim() || "";
+    const customerGst = document.getElementById("saleCustomerGst")?.value.trim().toUpperCase() || "";
+    const customerAddress = document.getElementById("saleCustomerAddress")?.value.trim() || "";
     let paymentStatus = document.getElementById("salePaymentStatus")?.value || "Paid";
     const notes = document.getElementById("saleNotes")?.value.trim() || "";
 
@@ -1832,18 +1998,22 @@ function handleSaveSale(e) {
       return;
     }
 
-    // Auto save party into state.customers if new
+    // Auto save party into state.customers if new or update existing
     const parties = getWholesaleParties();
     const matched = parties.find(p => p.name.toLowerCase() === customerName.toLowerCase());
     if (matched) {
       if (customerPhone) matched.phone = customerPhone;
       if (customerCity) matched.city = customerCity;
+      if (customerGst) matched.gstNo = customerGst;
+      if (customerAddress) matched.address = customerAddress;
     } else {
       state.customers.push({
         id: "cust_" + Date.now(),
         name: customerName,
         phone: customerPhone,
-        city: customerCity
+        city: customerCity,
+        gstNo: customerGst,
+        address: customerAddress
       });
     }
 
@@ -1940,6 +2110,8 @@ function handleSaveSale(e) {
         existing.customerName = customerName;
         existing.customerPhone = customerPhone;
         existing.customerCity = customerCity;
+        existing.customerGst = customerGst;
+        existing.customerAddress = customerAddress;
         existing.items = items;
         existing.subtotal = totalGross;
         existing.discountAmount = totalDiscounts;
@@ -1961,6 +2133,8 @@ function handleSaveSale(e) {
         customerName,
         customerPhone,
         customerCity,
+        customerGst,
+        customerAddress,
         items,
         subtotal: totalGross,
         discountAmount: totalDiscounts,
@@ -2212,9 +2386,11 @@ function viewInvoiceReceipt(id) {
         <p><span class="text-slate-500">Payment In:</span> <b>${escapeHtml(recvLabel)}</b></p>
       </div>
       <div class="text-right">
-        <p><span class="text-slate-500">Customer:</span> <b>${escapeHtml(sale.customerName)}</b></p>
+        <p><span class="text-slate-500">Party:</span> <b>${escapeHtml(sale.customerName)}</b></p>
         ${sale.customerPhone ? `<p><span class="text-slate-500">Phone:</span> <b class="font-mono">${escapeHtml(sale.customerPhone)}</b></p>` : ''}
         ${sale.customerCity ? `<p><span class="text-slate-500">City:</span> <b>${escapeHtml(sale.customerCity)}</b></p>` : ''}
+        ${sale.customerGst ? `<p><span class="text-slate-500">GSTIN:</span> <b class="font-mono text-indigo-700 font-bold">${escapeHtml(sale.customerGst)}</b></p>` : ''}
+        ${sale.customerAddress ? `<p class="text-[10px] text-slate-500">${escapeHtml(sale.customerAddress)}</p>` : ''}
       </div>
     </div>
 
@@ -2664,7 +2840,11 @@ function getSuppliers() {
       existingNames.add(name.toLowerCase());
       state.suppliers.push({
         id: "supp_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
-        name: name
+        name: name,
+        phone: p.supplierPhone || "",
+        city: p.supplierCity || "",
+        gstNo: p.supplierGst || "",
+        address: p.supplierAddress || ""
       });
     }
   });
@@ -2674,36 +2854,218 @@ function getSuppliers() {
 
 function updateSuppliersDatalist() {
   const datalist = document.getElementById("suppliersDatalist");
-  if (!datalist) return;
-
+  const select = document.getElementById("purchaseSupplierSelect");
   const suppliers = getSuppliers();
-  datalist.innerHTML = suppliers.map(s => `
-    <option value="${escapeHtml(s.name)}"></option>
-  `).join('');
+
+  if (datalist) {
+    datalist.innerHTML = suppliers.map(s => `
+      <option value="${escapeHtml(s.name)}">${s.city ? `(${escapeHtml(s.city)})` : ''} ${s.phone ? `Ph: ${escapeHtml(s.phone)}` : ''} ${s.gstNo ? `GST: ${escapeHtml(s.gstNo)}` : ''}</option>
+    `).join('');
+  }
+
+  if (select) {
+    const currentVal = select.value;
+    select.innerHTML = `
+      <option value="">-- Or Choose from Saved Suppliers Directory --</option>
+      ${suppliers.map(s => `
+        <option value="${s.id}" ${s.id === currentVal ? 'selected' : ''}>${escapeHtml(s.name)} (${escapeHtml(s.city || 'No City')} - Ph: ${escapeHtml(s.phone || 'N/A')}${s.gstNo ? ` - GST: ${escapeHtml(s.gstNo)}` : ''})</option>
+      `).join('')}
+    `;
+  }
 }
 
-function quickAddNewSupplierPrompt() {
-  const name = prompt("Enter Supplier / Vendor Name:");
-  if (!name || !name.trim()) return;
+function onSupplierSelectDropdownChange() {
+  const select = document.getElementById("purchaseSupplierSelect");
+  if (!select) return;
+  const suppId = select.value;
+  if (!suppId) return;
 
-  const cleanName = name.trim();
   const suppliers = getSuppliers();
-  const existing = suppliers.find(s => s.name.toLowerCase() === cleanName.toLowerCase());
+  const supp = suppliers.find(s => s.id === suppId);
+  if (!supp) return;
 
-  if (!existing) {
-    state.suppliers.push({
-      id: "supp_" + Date.now(),
-      name: cleanName
-    });
+  if (document.getElementById("purchaseVendor")) document.getElementById("purchaseVendor").value = supp.name || "";
+  if (document.getElementById("purchaseSupplierPhone")) document.getElementById("purchaseSupplierPhone").value = supp.phone || "";
+  if (document.getElementById("purchaseSupplierCity")) document.getElementById("purchaseSupplierCity").value = supp.city || supp.address || "";
+  if (document.getElementById("purchaseSupplierGst")) document.getElementById("purchaseSupplierGst").value = supp.gstNo || "";
+
+  showToast(`Auto-filled details for "${supp.name}"!`);
+}
+
+function onSupplierNameSelected() {
+  const nameInput = document.getElementById("purchaseVendor");
+  if (!nameInput) return;
+  const name = nameInput.value.trim();
+  if (!name) return;
+
+  const suppliers = getSuppliers();
+  const matched = suppliers.find(s => s.name.toLowerCase() === name.toLowerCase());
+  if (matched) {
+    if (document.getElementById("purchaseSupplierPhone") && matched.phone) document.getElementById("purchaseSupplierPhone").value = matched.phone;
+    if (document.getElementById("purchaseSupplierCity") && (matched.city || matched.address)) document.getElementById("purchaseSupplierCity").value = matched.city || matched.address;
+    if (document.getElementById("purchaseSupplierGst") && matched.gstNo) document.getElementById("purchaseSupplierGst").value = matched.gstNo;
+
+    const select = document.getElementById("purchaseSupplierSelect");
+    if (select) select.value = matched.id;
+  }
+}
+
+function openSupplierModal(supplierId = "") {
+  const form = document.getElementById("supplierForm");
+  if (form) form.reset();
+
+  document.getElementById("supplierEditId").value = "";
+  document.getElementById("supplierModalTitle").innerHTML = `<i class="fa-solid fa-truck-field text-indigo-600"></i> New Supplier / Vendor Details`;
+
+  if (supplierId) {
+    const suppliers = getSuppliers();
+    const s = suppliers.find(x => x.id === supplierId);
+    if (s) {
+      document.getElementById("supplierEditId").value = s.id;
+      document.getElementById("supplierName").value = s.name || "";
+      document.getElementById("supplierPhone").value = s.phone || "";
+      document.getElementById("supplierCity").value = s.city || "";
+      document.getElementById("supplierGst").value = s.gstNo || "";
+      document.getElementById("supplierAddress").value = s.address || "";
+      document.getElementById("supplierModalTitle").innerHTML = `<i class="fa-solid fa-truck-ramp-box text-indigo-600"></i> Edit Supplier (${escapeHtml(s.name)})`;
+    }
+  } else {
+    const curName = document.getElementById("purchaseVendor")?.value || "";
+    const curPhone = document.getElementById("purchaseSupplierPhone")?.value || "";
+    const curCity = document.getElementById("purchaseSupplierCity")?.value || "";
+    const curGst = document.getElementById("purchaseSupplierGst")?.value || "";
+    if (curName) document.getElementById("supplierName").value = curName;
+    if (curPhone) document.getElementById("supplierPhone").value = curPhone;
+    if (curCity) document.getElementById("supplierCity").value = curCity;
+    if (curGst) document.getElementById("supplierGst").value = curGst;
+  }
+
+  openModal('supplierModal');
+}
+
+function handleSaveSupplier(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const editId = document.getElementById("supplierEditId")?.value || "";
+  const name = (document.getElementById("supplierName")?.value || "").trim();
+  const phone = (document.getElementById("supplierPhone")?.value || "").trim();
+  const city = (document.getElementById("supplierCity")?.value || "").trim();
+  const gstNo = (document.getElementById("supplierGst")?.value || "").trim().toUpperCase();
+  const address = (document.getElementById("supplierAddress")?.value || "").trim();
+
+  if (!name) {
+    showToast("Please enter Supplier / Firm Name!", true);
+    return;
+  }
+
+  if (!state.suppliers) state.suppliers = [];
+
+  let savedSupp = null;
+  if (editId) {
+    const existing = state.suppliers.find(s => s.id === editId);
+    if (existing) {
+      existing.name = name;
+      existing.phone = phone;
+      existing.city = city;
+      existing.gstNo = gstNo;
+      existing.address = address;
+      savedSupp = existing;
+      showToast(`Supplier "${name}" updated!`);
+    }
+  } else {
+    const existing = state.suppliers.find(s => s.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      existing.phone = phone || existing.phone;
+      existing.city = city || existing.city;
+      existing.gstNo = gstNo || existing.gstNo;
+      existing.address = address || existing.address;
+      savedSupp = existing;
+      showToast(`Supplier "${name}" updated!`);
+    } else {
+      const newSupp = {
+        id: "supp_" + Date.now(),
+        name,
+        phone,
+        city,
+        gstNo,
+        address
+      };
+      state.suppliers.push(newSupp);
+      savedSupp = newSupp;
+      showToast(`Supplier "${name}" added successfully!`);
+    }
   }
 
   saveState();
+  closeModal('supplierModal');
   updateSuppliersDatalist();
 
-  const vendorInput = document.getElementById("purchaseVendor");
-  if (vendorInput) vendorInput.value = cleanName;
+  // If purchaseModal is open, auto-fill it
+  if (document.getElementById("purchaseVendor")) {
+    document.getElementById("purchaseVendor").value = name;
+    if (document.getElementById("purchaseSupplierPhone")) document.getElementById("purchaseSupplierPhone").value = phone;
+    if (document.getElementById("purchaseSupplierCity")) document.getElementById("purchaseSupplierCity").value = city || address;
+    if (document.getElementById("purchaseSupplierGst")) document.getElementById("purchaseSupplierGst").value = gstNo;
+    if (document.getElementById("purchaseSupplierSelect") && savedSupp) document.getElementById("purchaseSupplierSelect").value = savedSupp.id;
+  }
 
-  showToast(`Supplier "${cleanName}" added & selected!`);
+  renderSuppliersManageTable();
+}
+
+function openSuppliersManageModal() {
+  renderSuppliersManageTable();
+  openModal('suppliersManageModal');
+}
+
+function renderSuppliersManageTable() {
+  const tbody = document.getElementById("suppliersManageTableBody");
+  if (!tbody) return;
+
+  const query = (document.getElementById("suppliersSearchInput")?.value || "").toLowerCase().trim();
+  let suppliers = getSuppliers();
+
+  if (query) {
+    suppliers = suppliers.filter(s => 
+      (s.name || '').toLowerCase().includes(query) ||
+      (s.phone || '').toLowerCase().includes(query) ||
+      (s.city || '').toLowerCase().includes(query) ||
+      (s.gstNo || '').toLowerCase().includes(query) ||
+      (s.address || '').toLowerCase().includes(query)
+    );
+  }
+
+  if (suppliers.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400">No suppliers found. Click "+ Add New Supplier" above.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = suppliers.map(s => `
+    <tr class="hover:bg-slate-50">
+      <td class="font-bold text-slate-900">${escapeHtml(s.name)}</td>
+      <td class="font-mono text-slate-700">${s.phone ? `<a href="tel:${escapeHtml(s.phone)}" class="text-indigo-600 hover:underline font-semibold">${escapeHtml(s.phone)}</a>` : '-'}</td>
+      <td class="text-slate-600">${escapeHtml(s.city || '-')}</td>
+      <td class="font-mono font-bold text-slate-800 text-xs">${s.gstNo ? `<span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">${escapeHtml(s.gstNo)}</span>` : '-'}</td>
+      <td class="text-slate-500 text-xs max-w-xs truncate" title="${escapeHtml(s.address || '')}">${escapeHtml(s.address || '-')}</td>
+      <td class="text-center space-x-1">
+        <button onclick="openSupplierModal('${s.id}')" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Edit Supplier">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </button>
+        <button onclick="deleteSupplier('${s.id}')" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded" title="Delete Supplier">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function deleteSupplier(id) {
+  if (confirm("Are you sure you want to delete this supplier from the directory?")) {
+    state.suppliers = (state.suppliers || []).filter(s => s.id !== id);
+    saveState();
+    updateSuppliersDatalist();
+    renderSuppliersManageTable();
+    showToast("Supplier removed from directory!");
+  }
 }
 
 function initPurchaseModal() {
@@ -2761,8 +3123,11 @@ function editPurchase(id) {
 
   document.getElementById("purchaseEditId").value = purch.id;
   document.getElementById("purchaseDate").value = purch.date;
-  document.getElementById("purchaseVendor").value = purch.vendor;
-  document.getElementById("purchaseBillNo").value = purch.billNo;
+  document.getElementById("purchaseVendor").value = purch.vendor || "";
+  if (document.getElementById("purchaseSupplierPhone")) document.getElementById("purchaseSupplierPhone").value = purch.supplierPhone || "";
+  if (document.getElementById("purchaseSupplierCity")) document.getElementById("purchaseSupplierCity").value = purch.supplierCity || "";
+  if (document.getElementById("purchaseSupplierGst")) document.getElementById("purchaseSupplierGst").value = purch.supplierGst || "";
+  document.getElementById("purchaseBillNo").value = purch.billNo || "";
   document.getElementById("purchaseNotes").value = purch.notes || "";
 
   document.getElementById("purchasePaymentStatus").value = purch.paymentStatus || "Paid";
@@ -2987,6 +3352,9 @@ function handleSavePurchase(e) {
     const editId = document.getElementById("purchaseEditId")?.value || "";
     const date = document.getElementById("purchaseDate")?.value || new Date().toISOString().split('T')[0];
     const vendor = document.getElementById("purchaseVendor")?.value.trim();
+    const supplierPhone = document.getElementById("purchaseSupplierPhone")?.value.trim() || "";
+    const supplierCity = document.getElementById("purchaseSupplierCity")?.value.trim() || "";
+    const supplierGst = document.getElementById("purchaseSupplierGst")?.value.trim().toUpperCase() || "";
     const billNo = document.getElementById("purchaseBillNo")?.value.trim() || ("PB-" + (state.purchases.length + 101));
     let paymentStatus = document.getElementById("purchasePaymentStatus")?.value || "Paid";
     const paidBy = document.querySelector('input[name="purchasePaidBy"]:checked')?.value || 'partner1';
@@ -2998,13 +3366,20 @@ function handleSavePurchase(e) {
       return;
     }
 
-    // Auto save supplier into state.suppliers if new
+    // Auto save supplier into state.suppliers if new or update existing
     const suppliers = getSuppliers();
     const matched = suppliers.find(s => s.name.toLowerCase() === vendor.toLowerCase());
-    if (!matched) {
+    if (matched) {
+      if (supplierPhone) matched.phone = supplierPhone;
+      if (supplierCity) matched.city = supplierCity;
+      if (supplierGst) matched.gstNo = supplierGst;
+    } else {
       state.suppliers.push({
         id: "supp_" + Date.now(),
-        name: vendor
+        name: vendor,
+        phone: supplierPhone,
+        city: supplierCity,
+        gstNo: supplierGst
       });
     }
 
@@ -3091,6 +3466,9 @@ function handleSavePurchase(e) {
       if (existing) {
         existing.date = date;
         existing.vendor = vendor;
+        existing.supplierPhone = supplierPhone;
+        existing.supplierCity = supplierCity;
+        existing.supplierGst = supplierGst;
         existing.billNo = billNo;
         existing.paidBy = paidBy;
         existing.items = items;
@@ -3107,6 +3485,9 @@ function handleSavePurchase(e) {
         id: "purch_" + Date.now(),
         billNo,
         vendor,
+        supplierPhone,
+        supplierCity,
+        supplierGst,
         date,
         paidBy,
         items,
@@ -3851,7 +4232,12 @@ function exportSalesToExcel() {
       "Bill No": s.invoiceNo,
       "Date": s.date,
       "Party / Customer": s.customerName,
+      "Phone": s.customerPhone || '',
       "City": s.customerCity || '',
+      "GSTIN": s.customerGst || '',
+      "Address": s.customerAddress || '',
+      "Gross Total": s.subtotal || total,
+      "Item Discounts": s.discountAmount || 0,
       "Bill Amount": total,
       "Paid Amount": paid,
       "Pending Balance": Math.max(0, total - paid),
@@ -3867,35 +4253,54 @@ function exportSalesToExcel() {
 }
 
 function exportPurchasesToExcel() {
+  const p1Name = state.settings.partner1Name || "Kenil";
+  const p2Name = state.settings.partner2Name || "Alpesh";
+
   const purchData = state.purchases.map(p => {
     const total = Number(p.totalAmount) || 0;
-    const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Pending' ? 0 : total);
+    const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
+    let paidByName = "Business Account";
+    if (p.paidBy === 'partner1') paidByName = `${p1Name}'s Pocket`;
+    else if (p.paidBy === 'partner2') paidByName = `${p2Name}'s Pocket`;
+
     return {
       "Bill No": p.billNo,
       "Date": p.date,
-      "Supplier": p.vendor,
-      "Paid By": p.paidBy === 'partner1' ? state.settings.partner1Name : (p.paidBy === 'partner2' ? state.settings.partner2Name : 'Business Account'),
-      "Total Amount": total,
+      "Supplier / Vendor": p.vendor,
+      "Phone": p.supplierPhone || '',
+      "City": p.supplierCity || '',
+      "GSTIN": p.supplierGst || '',
+      "Bill Amount": total,
       "Paid Amount": paid,
       "Pending Balance": Math.max(0, total - paid),
+      "Paid By": paidByName,
       "Payment Status": p.paymentStatus
     };
   });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(purchData);
-  XLSX.utils.book_append_sheet(wb, ws, "Purchases");
+  XLSX.utils.book_append_sheet(wb, ws, "Purchase Bills");
   XLSX.writeFile(wb, `Purchases_Report_${Date.now()}.xlsx`);
   showToast("Purchases report downloaded!");
 }
 
 function exportExpensesToExcel() {
-  const expData = state.expenses.map(e => ({
-    "Date": e.date,
-    "Category": e.category,
-    "Paid By": e.paidBy === 'partner1' ? state.settings.partner1Name : (e.paidBy === 'partner2' ? state.settings.partner2Name : 'Business Account'),
-    "Amount": e.amount,
-    "Description": e.description
-  }));
+  const p1Name = state.settings.partner1Name || "Kenil";
+  const p2Name = state.settings.partner2Name || "Alpesh";
+
+  const expData = state.expenses.map(e => {
+    let paidByName = "Business Account";
+    if (e.paidBy === 'partner1') paidByName = `${p1Name}'s Pocket`;
+    else if (e.paidBy === 'partner2') paidByName = `${p2Name}'s Pocket`;
+
+    return {
+      "Date": e.date,
+      "Category": e.category,
+      "Amount": e.amount,
+      "Paid By": paidByName,
+      "Remarks": e.notes || ''
+    };
+  });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(expData);
   XLSX.utils.book_append_sheet(wb, ws, "Expenses");
@@ -3958,6 +4363,8 @@ function refreshAllUI() {
   renderSalesTable();
   renderPurchasesTable();
   renderExpensesTable();
+  updatePartiesDatalist();
+  updateSuppliersDatalist();
 }
 
 function escapeHtml(str) {

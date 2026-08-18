@@ -572,9 +572,14 @@
           </select>
         </div>
 
-        <button onclick="openModal('saleModal', 'wholesale')" class="btn-solid-primary text-xs sm:text-sm py-2 px-4 w-full sm:w-auto">
-          <i class="fa-solid fa-plus"></i> New Wholesale Bill
-        </button>
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button onclick="openPartiesManageModal()" class="btn-outline text-xs sm:text-sm py-2 px-3.5 flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-address-book text-indigo-600"></i> Parties Directory
+          </button>
+          <button onclick="openModal('saleModal', 'wholesale')" class="btn-solid-primary text-xs sm:text-sm py-2 px-4 w-full sm:w-auto">
+            <i class="fa-solid fa-plus"></i> New Wholesale Bill
+          </button>
+        </div>
       </div>
 
       <!-- Wholesale Bills Table -->
@@ -705,9 +710,14 @@
           <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Track inventory arrivals and partner out-of-pocket payments</p>
         </div>
         
-        <button onclick="openModal('purchaseModal')" class="btn-solid-primary text-xs sm:text-sm py-2 w-full sm:w-auto">
-          <i class="fa-solid fa-plus"></i> New Purchase Bill
-        </button>
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button onclick="openSuppliersManageModal()" class="btn-outline text-xs sm:text-sm py-2 px-3.5 flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-address-book text-indigo-600"></i> Suppliers Directory
+          </button>
+          <button onclick="openModal('purchaseModal')" class="btn-solid-primary text-xs sm:text-sm py-2 w-full sm:w-auto">
+            <i class="fa-solid fa-plus"></i> New Purchase Bill
+          </button>
+        </div>
       </div>
 
       <!-- Purchases Table -->
@@ -1128,24 +1138,35 @@
       <form id="saleForm" onsubmit="handleSaveSale(event)" class="space-y-3.5 mt-3.5">
         <input type="hidden" id="saleEditId" value="">
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+        <!-- Party Quick Selector & Auto-Fill -->
+        <div class="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100 space-y-2">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+            <label class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-users text-indigo-600"></i> Select Party / Customer (Auto-Fill Phone, City, GST)
+            </label>
+            <button type="button" onclick="openPartyModal()" class="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md shadow-sm flex items-center gap-1 transition-all self-start sm:self-auto">
+              <i class="fa-solid fa-user-plus text-[11px]"></i> + Add / Edit Party Details
+            </button>
+          </div>
+          <select id="salePartySelect" onchange="onPartySelectDropdownChange()" class="input-pro text-xs sm:text-sm font-semibold bg-white">
+            <option value="">-- Or Choose from Saved Parties Directory --</option>
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 sm:gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Bill Date *</label>
             <input type="date" id="saleDate" required class="input-pro font-mono">
           </div>
           <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs font-semibold text-slate-700">Party / Customer Name *</label>
-              <button type="button" onclick="quickAddNewPartyPrompt()" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5">
-                <i class="fa-solid fa-user-plus text-[10px]"></i> + Add Party
-              </button>
-            </div>
-            <div class="relative">
-              <input type="text" id="saleCustomerName" list="partiesDatalist" oninput="onPartyNameSelected()" onchange="onPartyNameSelected()" required placeholder="Select or type Party Name..." class="input-pro font-semibold" autocomplete="off">
-              <datalist id="partiesDatalist">
-                <!-- Dynamically populated parties -->
-              </datalist>
-            </div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Party / Customer Name *</label>
+            <input type="text" id="saleCustomerName" list="partiesDatalist" oninput="onPartyNameSelected()" onchange="onPartyNameSelected()" required placeholder="Party / Shop Name" class="input-pro font-semibold" autocomplete="off">
+            <datalist id="partiesDatalist"></datalist>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Mobile / WhatsApp</label>
+            <input type="text" id="saleCustomerPhone" placeholder="10-digit mobile" class="input-pro font-mono">
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">City / Location</label>
@@ -1153,9 +1174,15 @@
           </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Customer Phone Number</label>
-          <input type="text" id="saleCustomerPhone" placeholder="Mobile / WhatsApp" class="input-pro font-mono">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Party GSTIN / PAN (Optional)</label>
+            <input type="text" id="saleCustomerGst" placeholder="e.g. 24AAAAA0000A1Z5" class="input-pro font-mono uppercase">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Billing / Shipping Address (Optional)</label>
+            <input type="text" id="saleCustomerAddress" placeholder="Shop / Office address..." class="input-pro">
+          </div>
         </div>
 
         <!-- Multi-Item Wholesale List -->
@@ -1495,28 +1522,50 @@
       <form id="purchaseForm" onsubmit="handleSavePurchase(event)" class="space-y-3.5 mt-3.5">
         <input type="hidden" id="purchaseEditId" value="">
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+        <!-- Supplier Quick Selector & Auto-Fill -->
+        <div class="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100 space-y-2">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+            <label class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-truck-field text-indigo-600"></i> Select Supplier / Vendor (Auto-Fill Phone, City, GST)
+            </label>
+            <button type="button" onclick="openSupplierModal()" class="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md shadow-sm flex items-center gap-1 transition-all self-start sm:self-auto">
+              <i class="fa-solid fa-user-plus text-[11px]"></i> + Add / Edit Supplier Details
+            </button>
+          </div>
+          <select id="purchaseSupplierSelect" onchange="onSupplierSelectDropdownChange()" class="input-pro text-xs sm:text-sm font-semibold bg-white">
+            <option value="">-- Or Choose from Saved Suppliers Directory --</option>
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 sm:gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Bill Date *</label>
             <input type="date" id="purchaseDate" required class="input-pro font-mono">
           </div>
           <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs font-semibold text-slate-700">Supplier / Vendor *</label>
-              <button type="button" onclick="quickAddNewSupplierPrompt()" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5">
-                <i class="fa-solid fa-user-plus text-[10px]"></i> + Add Supplier
-              </button>
-            </div>
-            <div class="relative">
-              <input type="text" id="purchaseVendor" list="suppliersDatalist" required placeholder="Select or type Supplier..." class="input-pro font-semibold" autocomplete="off">
-              <datalist id="suppliersDatalist">
-                <!-- Dynamically populated suppliers -->
-              </datalist>
-            </div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Supplier / Vendor Name *</label>
+            <input type="text" id="purchaseVendor" list="suppliersDatalist" oninput="onSupplierNameSelected()" onchange="onSupplierNameSelected()" required placeholder="Supplier Name" class="input-pro font-semibold" autocomplete="off">
+            <datalist id="suppliersDatalist"></datalist>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Mobile / WhatsApp</label>
+            <input type="text" id="purchaseSupplierPhone" placeholder="Mobile number" class="input-pro font-mono">
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Bill / Invoice No</label>
             <input type="text" id="purchaseBillNo" placeholder="e.g. PB-101" class="input-pro font-mono">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Supplier GSTIN / PAN (Optional)</label>
+            <input type="text" id="purchaseSupplierGst" placeholder="e.g. 24AAAAA0000A1Z5" class="input-pro font-mono uppercase">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Supplier City / Address (Optional)</label>
+            <input type="text" id="purchaseSupplierCity" placeholder="City or warehouse address..." class="input-pro">
           </div>
         </div>
 
@@ -1912,6 +1961,202 @@
     </div>
   </div>
 
+  <!-- 11. PARTY (CUSTOMER) ADD / EDIT MODAL -->
+  <div id="partyModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="partyModalTitle">
+          <i class="fa-solid fa-user-tag text-indigo-600"></i> Wholesale Party / Customer Details
+        </h3>
+        <button onclick="closeModal('partyModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="partyForm" onsubmit="handleSaveParty(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="partyEditId" value="">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Party / Business Name *</label>
+          <input type="text" id="partyName" required placeholder="e.g. Shree Ram Enterprise" class="input-pro font-semibold">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Mobile / WhatsApp Number</label>
+            <input type="text" id="partyPhone" placeholder="10-digit mobile" class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">City / Location</label>
+            <input type="text" id="partyCity" placeholder="e.g. Surat, Rajkot" class="input-pro">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">GSTIN Number / PAN (Optional)</label>
+          <input type="text" id="partyGst" placeholder="e.g. 24AAAAA0000A1Z5" class="input-pro font-mono uppercase">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Billing / Shipping Address</label>
+          <textarea id="partyAddress" rows="2" placeholder="Full shop/office address..." class="input-pro text-xs"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('partyModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="button" onclick="handleSaveParty(event)" class="btn-solid-primary text-xs sm:text-sm py-2 px-5 font-bold shadow-md">
+            <i class="fa-solid fa-check"></i> Save Party
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 12. SUPPLIER (VENDOR) ADD / EDIT MODAL -->
+  <div id="supplierModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="supplierModalTitle">
+          <i class="fa-solid fa-truck-field text-indigo-600"></i> Supplier / Vendor Details
+        </h3>
+        <button onclick="closeModal('supplierModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="supplierForm" onsubmit="handleSaveSupplier(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="supplierEditId" value="">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Supplier / Firm Name *</label>
+          <input type="text" id="supplierName" required placeholder="e.g. Mahadev Traders" class="input-pro font-semibold">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Mobile / WhatsApp Number</label>
+            <input type="text" id="supplierPhone" placeholder="Mobile number" class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">City / Location</label>
+            <input type="text" id="supplierCity" placeholder="e.g. Ahmedabad, Mumbai" class="input-pro">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">GSTIN Number / PAN (Optional)</label>
+          <input type="text" id="supplierGst" placeholder="e.g. 24AAAAA0000A1Z5" class="input-pro font-mono uppercase">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Supplier Address / Warehouse</label>
+          <textarea id="supplierAddress" rows="2" placeholder="Address or payment notes..." class="input-pro text-xs"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('supplierModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="button" onclick="handleSaveSupplier(event)" class="btn-solid-primary text-xs sm:text-sm py-2 px-5 font-bold shadow-md">
+            <i class="fa-solid fa-check"></i> Save Supplier
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 13. PARTIES DIRECTORY MANAGEMENT MODAL -->
+  <div id="partiesManageModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-4xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-address-book text-indigo-600"></i> Wholesale Parties Directory
+          </h3>
+          <p class="text-xs text-slate-500">Manage all saved buyers, phone numbers, cities, and GSTIN numbers</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="openPartyModal()" class="btn-solid-primary text-xs py-1.5 px-3">
+            <i class="fa-solid fa-plus"></i> + Add New Party
+          </button>
+          <button onclick="closeModal('partiesManageModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-3.5 space-y-3">
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+          <input type="text" id="partiesSearchInput" oninput="renderPartiesManageTable()" placeholder="Search by party name, phone, city, GSTIN..." class="input-pro pl-8">
+        </div>
+
+        <div class="border border-slate-200 rounded-xl overflow-hidden max-h-96 overflow-y-auto">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>Party / Business Name</th>
+                <th>Phone / WhatsApp</th>
+                <th>City</th>
+                <th>GSTIN</th>
+                <th>Address</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="partiesManageTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 14. SUPPLIERS DIRECTORY MANAGEMENT MODAL -->
+  <div id="suppliersManageModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-4xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-address-book text-indigo-600"></i> Suppliers & Vendors Directory
+          </h3>
+          <p class="text-xs text-slate-500">Manage all inventory suppliers, phone numbers, cities, and GSTIN numbers</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="openSupplierModal()" class="btn-solid-primary text-xs py-1.5 px-3">
+            <i class="fa-solid fa-plus"></i> + Add New Supplier
+          </button>
+          <button onclick="closeModal('suppliersManageModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-3.5 space-y-3">
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+          <input type="text" id="suppliersSearchInput" oninput="renderSuppliersManageTable()" placeholder="Search by supplier name, phone, city, GSTIN..." class="input-pro pl-8">
+        </div>
+
+        <div class="border border-slate-200 rounded-xl overflow-hidden max-h-96 overflow-y-auto">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>Supplier / Firm Name</th>
+                <th>Phone / WhatsApp</th>
+                <th>City</th>
+                <th>GSTIN</th>
+                <th>Address / Notes</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="suppliersManageTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toastNotification" class="fixed bottom-4 sm:bottom-5 right-4 sm:right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-200 pointer-events-none">
     <div class="bg-slate-900 text-white px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border border-slate-700">
@@ -1921,6 +2166,6 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="app.js?v=2026_party_save_v15"></script>
+  <script src="app.js?v=2026_party_gst_v16"></script>
 </body>
 </html>
