@@ -2157,6 +2157,71 @@
     </div>
   </div>
 
+  <!-- 15. BATCH-WISE STOCK BREAKDOWN MODAL -->
+  <div id="batchBreakdownModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-3xl sm:max-w-4xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="batchModalTitle">
+            <i class="fa-solid fa-boxes-stacked text-indigo-600"></i> Batch-Wise Stock & Purchase Cost Breakdown
+          </h3>
+          <p class="text-xs text-slate-500" id="batchModalSubtitle">Detailed inward purchase lots, discounted landed rates, and available inventory</p>
+        </div>
+        <button onclick="closeModal('batchBreakdownModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="mt-3.5 space-y-3.5">
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          <div class="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100">
+            <span class="text-[10px] uppercase font-bold text-indigo-600">Total Stock</span>
+            <div class="text-lg sm:text-xl font-extrabold text-indigo-900 font-mono" id="batchSummaryTotalStock">0 pcs</div>
+          </div>
+          <div class="bg-emerald-50/70 p-3 rounded-xl border border-emerald-100">
+            <span class="text-[10px] uppercase font-bold text-emerald-600">Stock Valuation</span>
+            <div class="text-lg sm:text-xl font-extrabold text-emerald-800 font-mono" id="batchSummaryValuation">₹0</div>
+          </div>
+          <div class="bg-amber-50/70 p-3 rounded-xl border border-amber-100">
+            <span class="text-[10px] uppercase font-bold text-amber-700">Weighted Avg Cost</span>
+            <div class="text-lg sm:text-xl font-extrabold text-amber-900 font-mono" id="batchSummaryAvgCost">₹0.00</div>
+          </div>
+          <div class="bg-slate-100 p-3 rounded-xl border border-slate-200">
+            <span class="text-[10px] uppercase font-bold text-slate-600">Latest Purchase Rate</span>
+            <div class="text-lg sm:text-xl font-extrabold text-slate-900 font-mono" id="batchSummaryLatestRate">₹0.00</div>
+          </div>
+        </div>
+
+        <!-- Batches Table -->
+        <div class="border border-slate-200 rounded-xl overflow-hidden max-h-80 overflow-y-auto">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>Date / Batch</th>
+                <th>Bill # / Supplier</th>
+                <th class="text-right">Original Qty</th>
+                <th class="text-right">Gross Rate</th>
+                <th class="text-right">Discount</th>
+                <th class="text-right">Net Cost (₹)</th>
+                <th class="text-right font-bold text-indigo-900">Remaining Stock</th>
+                <th class="text-right font-bold text-emerald-700">Batch Value</th>
+                <th class="text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody id="batchBreakdownTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-3 border-t border-slate-100 mt-4">
+        <button type="button" onclick="closeModal('batchBreakdownModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toastNotification" class="fixed bottom-4 sm:bottom-5 right-4 sm:right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-200 pointer-events-none">
     <div class="bg-slate-900 text-white px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border border-slate-700">
@@ -2166,6 +2231,6 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="app.js?v=2026_unpaid_hide_v17"></script>
+  <script src="app.js?v=2026_batch_costing_v18"></script>
 </body>
 </html>

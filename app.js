@@ -304,6 +304,7 @@ function loadState() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
       if (!state.onlineDispatches) state.onlineDispatches = [];
+      rebuildProductBatchesFromHistory();
     } else {
       state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -312,6 +313,7 @@ function loadState() {
     console.error("Error loading state from localStorage", err);
     state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
   }
+  rebuildProductBatchesFromHistory();
 }
 
 function saveState() {
@@ -538,8 +540,11 @@ function renderDashboard() {
 
   state.products.forEach(p => {
     const stock = Number(p.currentStock) || 0;
-    const cost = Number(p.costPrice) || 0;
-    totalStockVal += stock * cost;
+    const activeBatches = (p.purchaseBatches || []).filter(b => b.remainingQty > 0);
+    const prodVal = activeBatches.length > 0 
+      ? activeBatches.reduce((acc, b) => acc + (b.remainingQty * b.netCostPrice), 0)
+      : (stock * (Number(p.costPrice) || 0));
+    totalStockVal += prodVal;
 
     const minStock = Number(p.minStockAlert) || 5;
     if (stock <= minStock) {
@@ -967,15 +972,214 @@ function deletePartnerTx(id) {
   }
 }
 
-// ==================== INVENTORY & PRODUCTS ====================
+// ==================== BATCH-WISE PURCHASE LOTS & COSTING ENGINE ====================
+function rebuildProductBatchesFromHistory() {
+  if (!state.products || !Array.isArray(state.products)) return;
+
+  state.products.forEach(p => {
+    // 1. Collect all inward lots
+    const inwardBatches = [];
+
+    // Opening Stock Batch (if opening stock was set or existed)
+    const initialOpening = Number(p.openingStock) || 0;
+    if (initialOpening > 0) {
+      inwardBatches.push({
+        id: "batch_open_" + p.id,
+        purchaseId: "opening",
+        date: "Initial Stock",
+        billNo: "Opening Stock",
+        vendor: "Opening",
+        qty: initialOpening,
+        remainingQty: initialOpening,
+        grossRate: Number(p.costPrice) || 0,
+        discountPercent: 0,
+        discountAmount: 0,
+        costPrice: Number(p.costPrice) || 0,
+        netCostPrice: Number(p.costPrice) || 0
+      });
+    }
+
+    // Purchase Inward Batches (sorted chronologically)
+    const sortedPurchases = [...(state.purchases || [])].sort((a, b) => (a.date > b.date ? 1 : (a.date < b.date ? -1 : 0)));
+    sortedPurchases.forEach((purch, pIdx) => {
+      (purch.items || []).forEach((it, itIdx) => {
+        if (it.productId === p.id) {
+          const qty = Number(it.qty) || 0;
+          if (qty <= 0) return;
+          const grossRate = Number(it.costPrice) || 0;
+          const discAmt = Number(it.discountAmount) || 0;
+          const discPct = Number(it.discountPercent) || 0;
+          const grossTotal = qty * grossRate;
+          const netTotal = Math.max(0, grossTotal - discAmt);
+          // Exact Landed Net Cost per piece (e.g. ₹10 minus 10% discount = ₹9.00)!
+          const netCost = Math.round((netTotal / qty) * 100) / 100;
+
+          inwardBatches.push({
+            id: `batch_${purch.id}_${itIdx}`,
+            purchaseId: purch.id,
+            date: purch.date,
+            billNo: purch.billNo || `PB-${pIdx + 101}`,
+            vendor: purch.vendor || 'Supplier',
+            qty: qty,
+            remainingQty: qty,
+            grossRate: grossRate,
+            discountPercent: discPct,
+            discountAmount: discAmt,
+            costPrice: netCost,
+            netCostPrice: netCost
+          });
+        }
+      });
+    });
+
+    // If no purchase records yet, but product has currentStock, create legacy base batch
+    if (inwardBatches.length === 0 && Number(p.currentStock) > 0) {
+      const curStock = Number(p.currentStock) || 0;
+      inwardBatches.push({
+        id: "batch_legacy_" + p.id,
+        purchaseId: "legacy",
+        date: "Current Stock",
+        billNo: "Existing Inventory",
+        vendor: "Godown",
+        qty: curStock,
+        remainingQty: curStock,
+        grossRate: Number(p.costPrice) || 0,
+        discountPercent: 0,
+        discountAmount: 0,
+        costPrice: Number(p.costPrice) || 0,
+        netCostPrice: Number(p.costPrice) || 0
+      });
+    }
+
+    // 2. Collect all outward stock reductions (Wholesale Sales & Online Dispatches)
+    let totalOutwardUnits = 0;
+
+    (state.sales || []).forEach(s => {
+      (s.items || []).forEach(it => {
+        if (it.productId === p.id) {
+          totalOutwardUnits += (Number(it.qty) || 0);
+        }
+      });
+    });
+
+    (state.onlineDispatches || []).forEach(d => {
+      (d.items || []).forEach(it => {
+        if (it.productId === p.id) {
+          totalOutwardUnits += (Number(it.qty) || 0);
+        }
+      });
+    });
+
+    // 3. FIFO Deductions across inward batches
+    let unitsToDeduct = totalOutwardUnits;
+    for (let i = 0; i < inwardBatches.length; i++) {
+      const b = inwardBatches[i];
+      if (unitsToDeduct <= 0) break;
+      if (b.remainingQty <= unitsToDeduct) {
+        unitsToDeduct -= b.remainingQty;
+        b.remainingQty = 0;
+      } else {
+        b.remainingQty -= unitsToDeduct;
+        unitsToDeduct = 0;
+      }
+    }
+
+    // 4. Calculate total remaining stock and accurate valuations
+    p.purchaseBatches = inwardBatches;
+    const activeBatches = inwardBatches.filter(b => b.remainingQty > 0);
+    const totalRemaining = activeBatches.reduce((acc, b) => acc + b.remainingQty, 0);
+    const totalValuation = activeBatches.reduce((acc, b) => acc + (b.remainingQty * b.netCostPrice), 0);
+
+    p.currentStock = totalRemaining;
+
+    if (activeBatches.length > 0) {
+      p.weightedAvgCost = Math.round((totalValuation / totalRemaining) * 100) / 100;
+      p.latestCost = inwardBatches[inwardBatches.length - 1].netCostPrice;
+      p.costPrice = p.latestCost; // Reflects net landed cost (after discount)
+    }
+  });
+}
+
+function openBatchBreakdownModal(prodId) {
+  rebuildProductBatchesFromHistory();
+
+  const prod = (state.products || []).find(p => p.id === prodId);
+  if (!prod) return;
+
+  document.getElementById("batchModalTitle").innerHTML = `<i class="fa-solid fa-boxes-stacked text-indigo-600"></i> ${escapeHtml(prod.name)} - Batch Breakdown`;
+  document.getElementById("batchModalSubtitle").textContent = `SKU: ${prod.sku || '-'} | Category: ${prod.category || 'General'}`;
+
+  const batches = prod.purchaseBatches || [];
+  const activeBatches = batches.filter(b => b.remainingQty > 0);
+  const totalStock = activeBatches.reduce((acc, b) => acc + b.remainingQty, 0);
+  const totalValuation = activeBatches.reduce((acc, b) => acc + (b.remainingQty * b.netCostPrice), 0);
+  const avgCost = totalStock > 0 ? (totalValuation / totalStock) : (Number(prod.costPrice) || 0);
+  const latestBatch = batches[batches.length - 1];
+  const latestRate = latestBatch ? latestBatch.netCostPrice : (Number(prod.costPrice) || 0);
+
+  document.getElementById("batchSummaryTotalStock").textContent = `${totalStock} pcs`;
+  document.getElementById("batchSummaryValuation").textContent = formatCurrency(totalValuation);
+  document.getElementById("batchSummaryAvgCost").textContent = formatCurrency(avgCost);
+  document.getElementById("batchSummaryLatestRate").textContent = formatCurrency(latestRate);
+
+  const tbody = document.getElementById("batchBreakdownTableBody");
+  if (!tbody) return;
+
+  if (batches.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">No purchase batches found for this product.</td></tr>`;
+  } else {
+    tbody.innerHTML = batches.map(b => {
+      let statusBadge = "bg-emerald-50 text-emerald-700 border border-emerald-200";
+      let statusText = "In Stock";
+
+      if (b.remainingQty === 0) {
+        statusBadge = "bg-slate-100 text-slate-500 border border-slate-200";
+        statusText = "Fully Sold";
+      } else if (b.remainingQty < b.qty) {
+        statusBadge = "bg-amber-50 text-amber-700 border border-amber-200";
+        statusText = "Partial Sold";
+      }
+
+      const discText = b.discountAmount > 0 
+        ? `${b.discountPercent ? `${b.discountPercent}% ` : ''}(-₹${b.discountAmount})`
+        : '-';
+
+      return `
+        <tr class="hover:bg-slate-50">
+          <td class="font-mono text-slate-600">${formatDate(b.date)}</td>
+          <td>
+            <div class="font-bold text-slate-900 text-xs">${escapeHtml(b.billNo || '-')}</div>
+            <div class="text-[11px] text-slate-500">${escapeHtml(b.vendor || '-')}</div>
+          </td>
+          <td class="text-right font-mono text-slate-700">${b.qty}</td>
+          <td class="text-right font-mono text-slate-500">${formatCurrency(b.grossRate)}</td>
+          <td class="text-right font-mono text-rose-600 text-xs">${discText}</td>
+          <td class="text-right font-mono font-bold text-emerald-700 text-sm bg-emerald-50/50" title="Effective Landed Price">${formatCurrency(b.netCostPrice)}</td>
+          <td class="text-right font-mono font-extrabold text-indigo-900 text-sm">${b.remainingQty} pcs</td>
+          <td class="text-right font-mono font-bold text-slate-900">${formatCurrency(b.remainingQty * b.netCostPrice)}</td>
+          <td class="text-center">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${statusBadge}">
+              ${statusText}
+            </span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  openModal('batchBreakdownModal');
+}
+
 function renderProductsTable() {
+  rebuildProductBatchesFromHistory();
+
   const tbody = document.getElementById("productsTableBody");
   if (!tbody) return;
 
   const search = (document.getElementById("productSearchInput")?.value || "").toLowerCase();
   const filterStock = document.getElementById("productFilterStock")?.value || "all";
 
-  let filtered = state.products.filter(p => {
+  const filtered = state.products.filter(p => {
     const matchSearch = (p.name && p.name.toLowerCase().includes(search)) ||
                         (p.sku && p.sku.toLowerCase().includes(search)) ||
                         (p.category && p.category.toLowerCase().includes(search));
@@ -1001,24 +1205,51 @@ function renderProductsTable() {
     if (stock <= 0) stockBadge = "badge-pending";
     else if (stock <= minStock) stockBadge = "badge-partial";
 
+    // Active batches summary display (e.g. 50 @ ₹10 | 100 @ ₹9)
+    const activeBatches = (p.purchaseBatches || []).filter(b => b.remainingQty > 0);
+    let batchSummaryHtml = "";
+    if (activeBatches.length > 1) {
+      const summaryParts = activeBatches.map(b => `${b.remainingQty} @ ${formatCurrency(b.netCostPrice)}`).join(' | ');
+      batchSummaryHtml = `
+        <div class="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer mt-0.5 flex items-center justify-center gap-1" onclick="openBatchBreakdownModal('${p.id}')" title="Click to view all purchase batches">
+          <i class="fa-solid fa-layer-group text-[9px]"></i> ${summaryParts}
+        </div>
+      `;
+    } else if (activeBatches.length === 1) {
+      batchSummaryHtml = `
+        <div class="text-[10px] text-slate-500 cursor-pointer hover:text-indigo-600 mt-0.5 flex items-center justify-center gap-1" onclick="openBatchBreakdownModal('${p.id}')" title="Click to view batch breakdown">
+          <i class="fa-solid fa-tag text-[9px]"></i> Net Cost: ${formatCurrency(activeBatches[0].netCostPrice)}
+        </div>
+      `;
+    }
+
     return `
       <tr>
         <td class="font-mono font-semibold text-slate-600">${escapeHtml(p.sku || '-')}</td>
-        <td class="font-bold text-slate-900">${escapeHtml(p.name)}</td>
-        <td><span class="badge-status badge-neutral">${escapeHtml(p.category || 'General')}</span></td>
-        <td class="text-right text-slate-600 font-mono">${formatCurrency(p.costPrice)}</td>
+        <td class="font-bold text-slate-900">
+          <div>${escapeHtml(p.name)}</div>
+          <div class="text-[11px] text-slate-400 font-normal sm:hidden">${escapeHtml(p.category || 'General')}</div>
+        </td>
+        <td class="hidden sm:table-cell"><span class="badge-status badge-neutral">${escapeHtml(p.category || 'General')}</span></td>
+        <td class="text-right font-mono font-bold text-slate-700" title="Net Landed Purchase Cost (After Discount)">
+          ${formatCurrency(p.costPrice)}
+        </td>
         <td class="text-right text-emerald-600 font-bold font-mono">${formatCurrency(p.retailPrice)}</td>
         <td class="text-right text-indigo-600 font-bold font-mono">${formatCurrency(p.wholesalePrice)}</td>
         <td class="text-center">
-          <span class="badge-status ${stockBadge} font-mono">
+          <span class="badge-status ${stockBadge} font-mono cursor-pointer" onclick="openBatchBreakdownModal('${p.id}')" title="Click to see Batch Breakdown">
             ${stock} Units
           </span>
+          ${batchSummaryHtml}
         </td>
         <td class="text-center space-x-1">
-          <button onclick="editProduct('${p.id}')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Edit">
+          <button onclick="openBatchBreakdownModal('${p.id}')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded" title="View Purchase Batches & Net Cost">
+            <i class="fa-solid fa-boxes-stacked"></i>
+          </button>
+          <button onclick="editProduct('${p.id}')" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Edit Product">
             <i class="fa-solid fa-pen-to-square"></i>
           </button>
-          <button onclick="quickAdjustStock('${p.id}')" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Adjust Stock">
+          <button onclick="quickAdjustStock('${p.id}')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Adjust Stock">
             <i class="fa-solid fa-sliders"></i>
           </button>
           <button onclick="deleteProduct('${p.id}')" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded" title="Delete">
@@ -1063,8 +1294,23 @@ function handleSaveProduct(e) {
       costPrice,
       retailPrice,
       wholesalePrice,
+      openingStock: openingStock,
       currentStock: openingStock,
-      minStockAlert: minStock
+      minStockAlert: minStock,
+      purchaseBatches: openingStock > 0 ? [{
+        id: "batch_open_" + Date.now(),
+        purchaseId: "opening",
+        date: new Date().toISOString().split('T')[0],
+        billNo: "Opening Stock",
+        vendor: "Opening",
+        qty: openingStock,
+        remainingQty: openingStock,
+        grossRate: costPrice,
+        discountPercent: 0,
+        discountAmount: 0,
+        costPrice: costPrice,
+        netCostPrice: costPrice
+      }] : []
     };
     state.products.push(newProd);
     showToast("New product added successfully!");
@@ -1772,7 +2018,16 @@ function addSaleItemRow(prodId = "", qty = 1, customPrice = null, discPercent = 
         </label>
         <select onchange="onSaleProductSelect('${rowIndex}')" id="sale_prod_${rowIndex}" required class="input-pro py-1.5 text-xs sm:text-sm font-semibold">
           <option value="">-- Choose Product --</option>
-          ${state.products.map(p => `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
+          ${state.products.map(p => {
+            const activeBatches = (p.purchaseBatches || []).filter(b => b.remainingQty > 0);
+            let batchInfo = `Stock: ${p.currentStock}`;
+            if (activeBatches.length > 1) {
+              batchInfo += ` [${activeBatches.map(b => `${b.remainingQty}@₹${b.netCostPrice}`).join(', ')}]`;
+            } else if (activeBatches.length === 1) {
+              batchInfo += ` [Cost: ₹${activeBatches[0].netCostPrice}]`;
+            }
+            return `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (${batchInfo})</option>`;
+          }).join('')}
         </select>
       </div>
       <div class="text-right flex-shrink-0 pt-3">
@@ -3459,6 +3714,8 @@ function handleSavePurchase(e) {
       totalDiscounts += discountAmount;
       netGrandTotal += rowTotal;
 
+      const netCostPrice = qty > 0 ? (Math.round((rowTotal / qty) * 100) / 100) : costPrice;
+
       items.push({
         productId: prod.id,
         productName: prod.name,
@@ -3466,13 +3723,14 @@ function handleSavePurchase(e) {
         costPrice,
         discountPercent,
         discountAmount,
+        netCostPrice,
         grossTotal: gross,
         total: rowTotal
       });
 
       prod.currentStock = (Number(prod.currentStock) || 0) + qty;
-      if (shouldUpdateMasterCost && costPrice > 0) {
-        prod.costPrice = costPrice;
+      if (shouldUpdateMasterCost && netCostPrice > 0) {
+        prod.costPrice = netCostPrice;
       }
     });
 
@@ -4210,16 +4468,25 @@ function exportPayoutsToExcel() {
 }
 
 function exportStockToExcel() {
-  const stockData = state.products.map(p => ({
-    "SKU": p.sku,
-    "Product Name": p.name,
-    "Category": p.category,
-    "Current Stock": p.currentStock,
-    "Cost Price": p.costPrice,
-    "Retail Price": p.retailPrice,
-    "Wholesale Price": p.wholesalePrice,
-    "Stock Valuation": p.currentStock * p.costPrice
-  }));
+  rebuildProductBatchesFromHistory();
+  const stockData = state.products.map(p => {
+    const activeBatches = (p.purchaseBatches || []).filter(b => b.remainingQty > 0);
+    const batchBreakdown = activeBatches.map(b => `${b.remainingQty} pcs @ ₹${b.netCostPrice} (${b.billNo})`).join('; ') || 'No batches';
+    const totalValuation = activeBatches.reduce((acc, b) => acc + (b.remainingQty * b.netCostPrice), 0);
+
+    return {
+      "SKU": p.sku,
+      "Product Name": p.name,
+      "Category": p.category,
+      "Current Stock": p.currentStock,
+      "Net Landed Cost (₹)": p.costPrice,
+      "Weighted Avg Cost (₹)": p.weightedAvgCost || p.costPrice,
+      "Retail Price (₹)": p.retailPrice,
+      "Wholesale Price (₹)": p.wholesalePrice,
+      "Stock Valuation (₹)": totalValuation || (p.currentStock * p.costPrice),
+      "Batch Breakdown": batchBreakdown
+    };
+  });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(stockData);
   XLSX.utils.book_append_sheet(wb, ws, "Stock");
