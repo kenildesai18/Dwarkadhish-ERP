@@ -1691,10 +1691,13 @@ function initSaleModal(saleType = 'wholesale') {
   document.getElementById("saleModalTitle").textContent = "New Wholesale Bill (B2B)";
   document.getElementById("saleItemsContainer").innerHTML = "";
 
+  document.getElementById("salePaymentStatus").value = "Paid";
+
   updatePartiesDatalist();
 
   addSaleItemRow();
   calculateSaleTotal();
+  toggleSalePaidAmount();
 }
 
 function editSale(id) {
@@ -1731,6 +1734,8 @@ function editSale(id) {
   });
 
   calculateSaleTotal();
+  toggleSalePaidAmount();
+  toggleSalePaidAmountInput();
   openModal('saleModal', 'edit');
 }
 
@@ -1961,20 +1966,45 @@ function calculateSaleTotal() {
 
   const status = document.getElementById("salePaymentStatus")?.value;
   const paidInput = document.getElementById("salePaidAmount");
+  const recvGroup = document.getElementById("saleReceivedByGroup");
+
   if (status === 'Paid' && paidInput && !document.getElementById("saleEditId").value) {
     paidInput.value = netGrandTotal;
+    if (recvGroup) recvGroup.classList.remove("hidden");
+  } else if (status === 'Pending') {
+    if (recvGroup) recvGroup.classList.add("hidden");
   }
 }
 
 function toggleSalePaidAmount() {
-  const status = document.getElementById("salePaymentStatus").value;
+  const status = document.getElementById("salePaymentStatus")?.value;
   const paidInput = document.getElementById("salePaidAmount");
-  const total = parseFloat(document.getElementById("saleTotalDisplay").textContent.replace(/[₹,]/g, '')) || 0;
+  const recvGroup = document.getElementById("saleReceivedByGroup");
+  const total = parseFloat(document.getElementById("saleTotalDisplay")?.textContent.replace(/[₹,]/g, '')) || 0;
 
-  if (status === 'Paid' && paidInput) {
-    paidInput.value = total;
-  } else if (status === 'Pending' && paidInput) {
-    paidInput.value = 0;
+  if (status === 'Paid') {
+    if (paidInput) paidInput.value = total;
+    if (recvGroup) recvGroup.classList.remove("hidden");
+  } else if (status === 'Pending') {
+    if (paidInput) paidInput.value = 0;
+    if (recvGroup) recvGroup.classList.add("hidden");
+  } else if (status === 'Partial') {
+    const paidAmt = parseFloat(paidInput?.value) || 0;
+    if (paidAmt > 0) {
+      if (recvGroup) recvGroup.classList.remove("hidden");
+    } else {
+      if (recvGroup) recvGroup.classList.add("hidden");
+    }
+  }
+}
+
+function toggleSalePaidAmountInput() {
+  const paidAmt = parseFloat(document.getElementById("salePaidAmount")?.value) || 0;
+  const recvGroup = document.getElementById("saleReceivedByGroup");
+  if (paidAmt > 0) {
+    if (recvGroup) recvGroup.classList.remove("hidden");
+  } else {
+    if (recvGroup) recvGroup.classList.add("hidden");
   }
 }
 
@@ -2366,9 +2396,12 @@ function viewInvoiceReceipt(id) {
 
   const p1 = state.settings.partner1Name || "Kenil";
   const p2 = state.settings.partner2Name || "Alpesh";
-  let recvLabel = "Business Account";
-  if (sale.receivedBy === 'partner1') recvLabel = `${p1}'s A/c`;
-  else if (sale.receivedBy === 'partner2') recvLabel = `${p2}'s A/c`;
+  let recvLabel = "Unpaid (Credit)";
+  if (paid > 0) {
+    recvLabel = "Business Account";
+    if (sale.receivedBy === 'partner1') recvLabel = `${p1}'s A/c`;
+    else if (sale.receivedBy === 'partner2') recvLabel = `${p2}'s A/c`;
+  }
 
   content.innerHTML = `
     <div class="text-center pb-3 border-b border-slate-200 flex flex-col items-center">
@@ -2383,7 +2416,7 @@ function viewInvoiceReceipt(id) {
       <div>
         <p><span class="text-slate-500">Invoice:</span> <b class="font-mono text-slate-900">${sale.invoiceNo}</b></p>
         <p><span class="text-slate-500">Date:</span> <b>${formatDate(sale.date)}</b></p>
-        <p><span class="text-slate-500">Payment In:</span> <b>${escapeHtml(recvLabel)}</b></p>
+        <p><span class="text-slate-500">Payment Status:</span> <b class="${paid >= total ? 'text-emerald-700' : (paid > 0 ? 'text-indigo-700' : 'text-rose-600')}">${escapeHtml(recvLabel)}</b></p>
       </div>
       <div class="text-right">
         <p><span class="text-slate-500">Party:</span> <b>${escapeHtml(sale.customerName)}</b></p>
