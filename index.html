@@ -573,6 +573,9 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button onclick="openScrapSaleModal()" class="btn-solid-amber text-xs sm:text-sm py-2 px-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-recycle"></i> + Defect / Scrap Lot Sale
+          </button>
           <button onclick="openPartiesManageModal()" class="btn-outline text-xs sm:text-sm py-2 px-3.5 flex items-center gap-1.5 shadow-sm">
             <i class="fa-solid fa-address-book text-indigo-600"></i> Parties Directory
           </button>
@@ -715,10 +718,13 @@
       <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div>
           <h3 class="text-sm sm:text-base font-bold text-slate-900">Purchase Bills & Supplier Inward</h3>
-          <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Track inventory arrivals and partner out-of-pocket payments</p>
+          <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Track inventory arrivals, partner out-of-pocket payments, and supplier returns/exchanges</p>
         </div>
         
         <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button onclick="openSupplierReturnModal()" class="btn-solid-amber text-xs sm:text-sm py-2 px-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-rotate-left"></i> Supplier Return / Exchange
+          </button>
           <button onclick="openSuppliersManageModal()" class="btn-outline text-xs sm:text-sm py-2 px-3.5 flex items-center gap-1.5 shadow-sm">
             <i class="fa-solid fa-address-book text-indigo-600"></i> Suppliers Directory
           </button>
@@ -730,6 +736,10 @@
 
       <!-- Purchases Table -->
       <div class="pro-card overflow-hidden">
+        <div class="px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">Purchase Inward Bills</h3>
+          <span class="text-[11px] text-slate-400 font-medium">Inward Stock</span>
+        </div>
         <div class="overflow-x-auto scrollbar-none">
           <table class="pro-table">
             <thead>
@@ -743,6 +753,41 @@
               </tr>
             </thead>
             <tbody id="purchasesTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Supplier Returns & Debit Notes Log Table -->
+      <div class="pro-card overflow-hidden">
+        <div class="px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-amber-50/50 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-rotate-left text-amber-600"></i>
+            <div>
+              <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">Supplier Returns & Exchanges (Debit Notes)</h3>
+              <p class="text-[11px] text-slate-500">Unused or RTO items returned back to supplier or exchanged with inventory adjustment</p>
+            </div>
+          </div>
+          <button onclick="openSupplierReturnModal()" class="btn-solid-amber text-xs py-1.5 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-md flex items-center gap-1 shadow-sm">
+            <i class="fa-solid fa-plus"></i> Record Return / Exchange
+          </button>
+        </div>
+        <div class="overflow-x-auto scrollbar-none">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>Date / Ref #</th>
+                <th>Supplier / Vendor</th>
+                <th>Mode</th>
+                <th>Items Returned (-)</th>
+                <th>Items Exchanged (+)</th>
+                <th class="text-right">Net Value (₹)</th>
+                <th>Settlement</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="supplierReturnsTableBody">
               <!-- Dynamically populated -->
             </tbody>
           </table>
@@ -1412,19 +1457,53 @@
       <form id="productForm" onsubmit="handleSaveProduct(event)" class="space-y-3 mt-3.5">
         <input type="hidden" id="productEditId" value="">
 
+        <!-- Product Type Selector (Single vs Combo Bundle) -->
+        <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+          <label class="block text-xs font-bold text-slate-800 mb-1.5">Product Type *</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-bold cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-indigo-600 has-[:checked]:text-white text-slate-700 text-center shadow-2xs">
+              <input type="radio" name="prodType" id="prodTypeSingle" value="single" checked onchange="toggleProductTypeUI()" class="hidden">
+              <i class="fa-solid fa-box text-xs"></i> <span>Single Product (સામાન્ય)</span>
+            </label>
+            <label class="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-bold cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-indigo-600 has-[:checked]:text-white text-slate-700 text-center shadow-2xs">
+              <input type="radio" name="prodType" id="prodTypeBundle" value="bundle" onchange="toggleProductTypeUI()" class="hidden">
+              <i class="fa-solid fa-boxes-packing text-xs"></i> <span>Combo / Bundle Pack (કોમ્બો)</span>
+            </label>
+          </div>
+        </div>
+
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Product Name *</label>
-          <input type="text" id="prodName" required placeholder="e.g. Cotton Kurti / Silk Saree" class="input-pro">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Product / Combo Name *</label>
+          <input type="text" id="prodName" required placeholder="e.g. Garbage Bag + Dispenser Combo / Cotton Kurti" class="input-pro">
+        </div>
+
+        <!-- Combo Bundle Components Section (Shown only when type is bundle) -->
+        <div id="bundleComponentsSection" class="bg-amber-50/70 p-3 rounded-xl border border-amber-200 space-y-2 hidden">
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="block text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                <i class="fa-solid fa-boxes-packing text-amber-600"></i> Bundle Items (કોમ્બોમાં રહેલી પ્રોડક્ટ્સ)
+              </label>
+              <p class="text-[11px] text-amber-800">દા.ત. Garbage Bag (1 pc) + Dispenser (1 pc). સ્કેન કરવાથી બંને પ્રોડક્ટમાંથી સ્ટોક કપાશે.</p>
+            </div>
+            <button type="button" onclick="addBundleComponentRow()" class="text-xs font-bold text-amber-800 hover:text-amber-950 bg-white hover:bg-amber-50 border border-amber-300 px-2.5 py-1 rounded-md shadow-2xs flex items-center gap-1">
+              <i class="fa-solid fa-plus text-[11px]"></i> + Add Product
+            </button>
+          </div>
+
+          <div id="bundleComponentsContainer" class="space-y-2 max-h-44 overflow-y-auto">
+            <!-- Dynamically populated component rows -->
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">SKU / Item Code</label>
-            <input type="text" id="prodSku" placeholder="e.g. SKU-101" class="input-pro font-mono">
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Master SKU / Prefix *</label>
+            <input type="text" id="prodSku" placeholder="e.g. GBD (for GBD01, GBD02) or GB-DISP" class="input-pro font-mono">
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Category</label>
-            <input type="text" id="prodCategory" placeholder="Apparel / Accessories" class="input-pro">
+            <input type="text" id="prodCategory" placeholder="Home & Kitchen / Combos" class="input-pro">
           </div>
         </div>
 
@@ -2369,6 +2448,202 @@
     </div>
   </div>
 
+  <!-- 17. SUPPLIER PURCHASE RETURN & EXCHANGE MODAL -->
+  <div id="supplierReturnModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-3xl sm:max-w-4xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="supplierReturnModalTitle">
+            <i class="fa-solid fa-rotate-left text-amber-600"></i> Supplier Purchase Return & Exchange (Debit Note)
+          </h3>
+          <p class="text-xs text-slate-500">Return unused/damaged stock to supplier or exchange for other products with auto stock adjustment</p>
+        </div>
+        <button onclick="closeModal('supplierReturnModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="supplierReturnForm" onsubmit="handleSaveSupplierReturn(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="supplierReturnEditId" value="">
+
+        <!-- Supplier Select & Mode -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Return Date *</label>
+            <input type="date" id="supplierReturnDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Supplier / Vendor *</label>
+            <input type="text" id="supplierReturnVendor" list="suppliersDatalist" required placeholder="Supplier Name" class="input-pro font-semibold" autocomplete="off">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Return Mode *</label>
+            <select id="supplierReturnMode" onchange="toggleSupplierReturnModeUI()" class="input-pro font-bold text-amber-700 bg-amber-50/50">
+              <option value="return_only">Return Only (Stock Out & Credit/Refund)</option>
+              <option value="exchange">Return & Exchange (માલ બદલી - Stock Out & In)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Section 1: RETURNED ITEMS (Stock Minus) -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between bg-rose-50/70 px-3 py-2 rounded-lg border border-rose-200">
+            <span class="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-arrow-up-from-bracket text-rose-600"></i> Returned Items to Supplier (Stock Deducted -)
+            </span>
+            <button type="button" onclick="addReturnItemRow()" class="text-xs font-bold text-rose-700 hover:text-rose-900 bg-white hover:bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-md shadow-2xs flex items-center gap-1 transition-all">
+              <i class="fa-solid fa-plus"></i> + Add Returned Item
+            </button>
+          </div>
+
+          <div id="returnItemsContainer" class="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+            <!-- Dynamically populated return item rows -->
+          </div>
+        </div>
+
+        <!-- Section 2: EXCHANGED NEW ITEMS (Stock Plus) - Shown only when Mode = Exchange -->
+        <div id="exchangeItemsSection" class="space-y-2 hidden">
+          <div class="flex items-center justify-between bg-emerald-50/70 px-3 py-2 rounded-lg border border-emerald-200">
+            <span class="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-arrow-down-to-bracket text-emerald-600"></i> New Items Received in Exchange (Stock Added +)
+            </span>
+            <button type="button" onclick="addExchangeItemRow()" class="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-white hover:bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md shadow-2xs flex items-center gap-1 transition-all">
+              <i class="fa-solid fa-plus"></i> + Add Exchange Item
+            </button>
+          </div>
+
+          <div id="exchangeItemsContainer" class="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+            <!-- Dynamically populated exchange item rows -->
+          </div>
+        </div>
+
+        <!-- Section 3: TOTALS & FINANCIAL SETTLEMENT -->
+        <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-2.5">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm border-b border-slate-200 pb-2">
+            <div class="space-y-0.5">
+              <div class="text-xs text-rose-700 font-semibold">Total Returned Value: <span id="returnTotalValDisplay" class="font-mono font-bold">₹0</span></div>
+              <div id="exchangeTotalValContainer" class="text-xs text-emerald-700 font-semibold hidden">Total Exchanged Value: <span id="exchangeTotalValDisplay" class="font-mono font-bold">₹0</span></div>
+            </div>
+            <div class="text-right">
+              <div class="flex items-center justify-end gap-2">
+                <span class="font-bold text-slate-700" id="returnNetBalanceLabel">Net Refund / Credit Amount:</span>
+                <span class="text-xl sm:text-2xl font-bold text-slate-900 font-mono" id="returnNetBalanceDisplay">₹0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Financial Settlement Mode *</label>
+              <select id="returnSettlementMode" onchange="toggleReturnSettlementUI()" class="input-pro font-semibold">
+                <option value="ledger_credit">Adjust in Supplier Ledger / Next Purchase Credit (Debit Note)</option>
+                <option value="refund_received">Refund Money Received from Supplier (Cash / Bank)</option>
+                <option value="extra_paid">Extra Money Paid to Supplier (Cash / Bank)</option>
+                <option value="even_exchange">Even Exchange (No Money Changed Hands)</option>
+              </select>
+            </div>
+            <div id="returnRefundRecipientGroup">
+              <label class="block text-xs font-semibold text-slate-700 mb-1" id="returnAccountLabel">Refund Received In / Account *</label>
+              <select id="returnRefundRecipient" class="input-pro font-semibold">
+                <option value="partner1">Partner 1 Account</option>
+                <option value="partner2">Partner 2 Account</option>
+                <option value="business_account">Business Bank Account</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Reason / Notes (Optional)</label>
+            <input type="text" id="supplierReturnNotes" placeholder="e.g. Unused stock returned, RTO customer return returned to supplier..." class="input-pro">
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('supplierReturnModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-5 font-bold shadow-md bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Save Return & Adjust Stock
+          </button>
+        </div>
+      </form>
+    </div>
+  <!-- 18. DEFECT / SCRAP LOT CLEARANCE SALE MODAL -->
+  <div id="scrapSaleModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="scrapSaleModalTitle">
+            <i class="fa-solid fa-recycle text-amber-600"></i> Defect / Scrap Lot Sale (ભંગાર / લોટ-શોટ વેચાણ)
+          </h3>
+          <p class="text-xs text-slate-500">Quick lump-sum sale for Home & Kitchen defect / RTO scrap lots with partner cash receipt</p>
+        </div>
+        <button onclick="closeModal('scrapSaleModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="scrapSaleForm" onsubmit="handleSaveScrapSale(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="scrapSaleEditId" value="">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Sale Date *</label>
+            <input type="date" id="scrapSaleDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Lump-sum Amount Received (₹) *</label>
+            <input type="number" id="scrapSaleAmount" min="1" step="any" required placeholder="₹ Amount (e.g. 5000)" class="input-pro font-mono font-extrabold text-emerald-700 text-base">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Lot Description / Category *</label>
+          <input type="text" id="scrapSaleDescription" required value="Home & Kitchen Defect / Return Scrap Lot" placeholder="e.g. Monthly Home & Kitchen Defect Lot" class="input-pro font-semibold">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Buyer / Scrap Merchant (Optional)</label>
+          <input type="text" id="scrapSaleBuyer" placeholder="e.g. Scrap Buyer / Local Lot Merchant" class="input-pro">
+        </div>
+
+        <!-- Who Collected / Took The Cash -->
+        <div class="bg-amber-50/60 p-3 rounded-xl border border-amber-200 space-y-2">
+          <label class="block text-xs font-bold text-amber-900">
+            <i class="fa-solid fa-hand-holding-dollar text-amber-600"></i> Who Collected / Kept This Cash? (આ પૈસા કોણે લીધા?) *
+          </label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex items-center justify-center gap-1 py-2 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-amber-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="scrapReceivedBy" value="partner1" checked class="hidden">
+              <span id="scrapP1RadioLabel" class="truncate">Kenil (You)</span>
+            </label>
+            <label class="flex items-center justify-center gap-1 py-2 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-amber-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="scrapReceivedBy" value="partner2" class="hidden">
+              <span id="scrapP2RadioLabel" class="truncate">Alpesh</span>
+            </label>
+            <label class="flex items-center justify-center gap-1 py-2 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-amber-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="scrapReceivedBy" value="business_account" class="hidden">
+              <span>Business A/c</span>
+            </label>
+          </div>
+          <p class="text-[11px] text-amber-800">
+            <i class="fa-solid fa-circle-info"></i> આ રકમ સિલેક્ટ કરેલા પાર્ટનરના વ્યક્તિગત ખાતામાં સીધી જમા ગણાશે અને ૫૦/૫૦ નફા-નુકસાનમાં સરભર થશે.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Remarks / Notes (Optional)</label>
+          <input type="text" id="scrapSaleNotes" placeholder="Additional notes..." class="input-pro">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('scrapSaleModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-5 font-bold shadow-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Save Scrap Lot Sale
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toastNotification" class="fixed bottom-4 sm:bottom-5 right-4 sm:right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-200 pointer-events-none">
     <div class="bg-slate-900 text-white px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border border-slate-700">
@@ -2378,6 +2653,6 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="app.js?v=2026_gst_inventory_v22"></script>
+  <script src="app.js?v=2026_combo_bundle_v26"></script>
 </body>
 </html>

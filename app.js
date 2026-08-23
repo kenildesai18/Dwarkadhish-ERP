@@ -22,6 +22,7 @@ const INITIAL_STORE_DATABASE = {
   onlineDispatches: [],
   sales: [],
   purchases: [],
+  supplierReturns: [],
   expenses: [],
   adjustments: [],
   partnerTransactions: [],
@@ -304,6 +305,7 @@ function loadState() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
       if (!state.onlineDispatches) state.onlineDispatches = [];
+      if (!state.supplierReturns) state.supplierReturns = [];
       rebuildProductBatchesFromHistory();
     } else {
       state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
@@ -763,6 +765,15 @@ function calculatePartnerBalances() {
     else if (p.paidBy === 'partner2') p2Purchases += paid;
   });
 
+  // 1b. Extra Money Paid to Supplier on Item Exchanges
+  (state.supplierReturns || []).forEach(sr => {
+    if (sr.settlementMode === 'extra_paid') {
+      const extraAmt = Math.abs(Number(sr.netBalance) || 0);
+      if (sr.refundRecipient === 'partner1') p1Purchases += extraAmt;
+      else if (sr.refundRecipient === 'partner2') p2Purchases += extraAmt;
+    }
+  });
+
   // 2. Expenses Paid
   let p1Expenses = 0;
   let p2Expenses = 0;
@@ -781,7 +792,7 @@ function calculatePartnerBalances() {
     else if (c.payer === 'partner2') p2Capital += amt;
   });
 
-  // 4. Wholesale Collections Received in Partner's personal account
+  // 4. Wholesale Collections & Supplier Refunds Received in Partner's personal account
   let p1WholesaleRecv = 0;
   let p2WholesaleRecv = 0;
   state.sales.forEach(s => {
@@ -795,6 +806,15 @@ function calculatePartnerBalances() {
       const amt = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? Number(s.totalAmount) : 0);
       if (s.receivedBy === 'partner1') p1WholesaleRecv += amt;
       else if (s.receivedBy === 'partner2') p2WholesaleRecv += amt;
+    }
+  });
+
+  // 4b. Cash / Bank Refund Received from Supplier into Partner's account
+  (state.supplierReturns || []).forEach(sr => {
+    if (sr.settlementMode === 'refund_received') {
+      const refAmt = Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || 0);
+      if (sr.refundRecipient === 'partner1') p1WholesaleRecv += refAmt;
+      else if (sr.refundRecipient === 'partner2') p2WholesaleRecv += refAmt;
     }
   });  // 5. Personal Drawings
   let p1Drawings = 0;
@@ -1037,6 +1057,37 @@ function rebuildProductBatchesFromHistory() {
       });
     });
 
+    // Exchanged Inward Items from Supplier Returns (sorted chronologically)
+    (state.supplierReturns || []).forEach(sr => {
+      (sr.exchangedItems || []).forEach((it, itIdx) => {
+        if (it.productId === p.id) {
+          const qty = Number(it.qty) || 0;
+          if (qty <= 0) return;
+          const cost = Number(it.costPrice) || 0;
+          const gstRate = Number(it.gstRate) || 0;
+          const gstAmt = it.gstAmount !== undefined ? Number(it.gstAmount) : Math.round(((qty * cost * gstRate) / 100) * 100) / 100;
+          const netLandedCost = Math.round(((qty * cost + gstAmt) / qty) * 100) / 100;
+
+          inwardBatches.push({
+            id: `batch_exc_${sr.id}_${itIdx}`,
+            purchaseId: sr.id,
+            date: sr.date,
+            billNo: `Exchange (${sr.refNo || 'PR'})`,
+            vendor: sr.vendor || 'Supplier Exchange',
+            qty: qty,
+            remainingQty: qty,
+            grossRate: cost,
+            discountPercent: 0,
+            discountAmount: 0,
+            gstRate: gstRate,
+            gstAmount: gstAmt,
+            costPrice: netLandedCost,
+            netCostPrice: netLandedCost
+          });
+        }
+      });
+    });
+
     // If no purchase records yet, but product has currentStock, create legacy base batch
     if (inwardBatches.length === 0 && Number(p.currentStock) > 0) {
       const curStock = Number(p.currentStock) || 0;
@@ -1058,7 +1109,7 @@ function rebuildProductBatchesFromHistory() {
       });
     }
 
-    // 2. Collect all outward stock reductions (Wholesale Sales & Online Dispatches)
+    // 2. Collect all outward stock reductions (Wholesale Sales, Online Dispatches & Supplier Returns)
     let totalOutwardUnits = 0;
 
     (state.sales || []).forEach(s => {
@@ -1071,6 +1122,14 @@ function rebuildProductBatchesFromHistory() {
 
     (state.onlineDispatches || []).forEach(d => {
       (d.items || []).forEach(it => {
+        if (it.productId === p.id) {
+          totalOutwardUnits += (Number(it.qty) || 0);
+        }
+      });
+    });
+
+    (state.supplierReturns || []).forEach(sr => {
+      (sr.returnedItems || []).forEach(it => {
         if (it.productId === p.id) {
           totalOutwardUnits += (Number(it.qty) || 0);
         }
@@ -1211,11 +1270,27 @@ function renderProductsTable() {
   }
 
   tbody.innerHTML = filtered.map(p => {
-    const stock = Number(p.currentStock) || 0;
-    const minStock = Number(p.minStockAlert) || 5;
+    let stock = Number(p.currentStock) || 0;
+    let stockDisplay = `${stock} Units`;
     let stockBadge = "badge-paid";
-    if (stock <= 0) stockBadge = "badge-pending";
-    else if (stock <= minStock) stockBadge = "badge-partial";
+
+    if (p.isBundle && Array.isArray(p.bundleItems) && p.bundleItems.length > 0) {
+      const possibleCombos = p.bundleItems.map(comp => {
+        const cProd = state.products.find(prod => prod.id === comp.productId);
+        const cur = cProd ? Number(cProd.currentStock) || 0 : 0;
+        const req = Number(comp.qty) || 1;
+        return Math.floor(cur / req);
+      });
+      const maxCombos = possibleCombos.length > 0 ? Math.min(...possibleCombos) : 0;
+      stockDisplay = `${maxCombos} Combos Ready`;
+      if (maxCombos <= 0) stockBadge = "badge-pending";
+      else if (maxCombos <= (Number(p.minStockAlert) || 5)) stockBadge = "badge-partial";
+      else stockBadge = "bg-amber-100 text-amber-800 border border-amber-300 font-bold";
+    } else {
+      const minStock = Number(p.minStockAlert) || 5;
+      if (stock <= 0) stockBadge = "badge-pending";
+      else if (stock <= minStock) stockBadge = "badge-partial";
+    }
 
     // Active batches summary display (e.g. 50 @ ₹10 | 100 @ ₹9)
     const activeBatches = (p.purchaseBatches || []).filter(b => b.remainingQty > 0);
@@ -1233,13 +1308,27 @@ function renderProductsTable() {
           <i class="fa-solid fa-tag text-[9px]"></i> Net Cost: ${formatCurrency(activeBatches[0].netCostPrice)}
         </div>
       `;
+    } else if (p.isBundle && Array.isArray(p.bundleItems)) {
+      const compText = (p.bundleItems || []).map(b => {
+        const cp = state.products.find(x => x.id === b.productId);
+        return `${b.qty}x ${cp ? cp.name.split(' ')[0] : 'Item'}`;
+      }).join(' + ');
+      batchSummaryHtml = `
+        <div class="text-[10px] text-amber-700 font-semibold mt-0.5">
+          <i class="fa-solid fa-boxes-packing text-[9px]"></i> ${compText}
+        </div>
+      `;
     }
 
     return `
       <tr>
         <td class="font-mono font-semibold text-slate-600">${escapeHtml(p.sku || '-')}</td>
         <td class="font-bold text-slate-900">
-          <div>${escapeHtml(p.name)}</div>
+          <div class="flex items-center gap-1.5">
+            <span>${escapeHtml(p.name)}</span>
+            ${p.isBundle ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800"><i class="fa-solid fa-boxes-packing text-[9px]"></i> Combo</span>` : ''}
+          </div>
+          ${p.isBundle && Array.isArray(p.bundleItems) ? `<div class="text-[10px] text-slate-500 font-normal">Includes: ${(p.bundleItems || []).map(b => `${b.qty}x ${b.productName}`).join(' + ')}</div>` : ''}
           <div class="text-[11px] text-slate-400 font-normal sm:hidden">${escapeHtml(p.category || 'General')}</div>
         </td>
         <td class="hidden sm:table-cell"><span class="badge-status badge-neutral">${escapeHtml(p.category || 'General')}</span></td>
@@ -1249,8 +1338,8 @@ function renderProductsTable() {
         <td class="text-right text-emerald-600 font-bold font-mono">${formatCurrency(p.retailPrice)}</td>
         <td class="text-right text-indigo-600 font-bold font-mono">${formatCurrency(p.wholesalePrice)}</td>
         <td class="text-center">
-          <span class="badge-status ${stockBadge} font-mono cursor-pointer" onclick="openBatchBreakdownModal('${p.id}')" title="Click to see Batch Breakdown">
-            ${stock} Units
+          <span class="badge-status ${stockBadge} font-mono cursor-pointer" onclick="${p.isBundle ? `editProduct('${p.id}')` : `openBatchBreakdownModal('${p.id}')`}" title="${p.isBundle ? 'Click to edit combo components' : 'Click to see Batch Breakdown'}">
+            ${stockDisplay}
           </span>
           ${batchSummaryHtml}
         </td>
@@ -1286,19 +1375,23 @@ function addSkuMappingRow(sku = "", multiplier = 1, note = "") {
     <div class="flex-grow">
       <input type="text" value="${escapeHtml(sku)}" oninput="onSkuMappingCodeInput('${rowId}')" placeholder="Paste Meesho SKU / Style ID / Barcode" class="input-pro py-1 text-xs font-mono font-semibold skumap-code" required>
     </div>
-    <div class="w-32 flex-shrink-0 flex items-center gap-1">
+    <div class="w-36 flex-shrink-0 flex items-center gap-1">
       <select class="input-pro py-1 text-xs font-bold text-indigo-700 skumap-multiplier">
         <option value="1" ${multiplier == 1 ? 'selected' : ''}>Pack of 1 (1 pc)</option>
         <option value="2" ${multiplier == 2 ? 'selected' : ''}>Pack of 2 (2 pcs)</option>
         <option value="3" ${multiplier == 3 ? 'selected' : ''}>Pack of 3 (3 pcs)</option>
-        <option value="4" ${multiplier == 4 ? 'selected' : ''}>Pack of 4 (4 pcs)</option>
+        <option value="4" ${multiplier == 4 ? 'selected' : ''}>Pack of 4 (4 pcs / 4 Bags)</option>
         <option value="5" ${multiplier == 5 ? 'selected' : ''}>Pack of 5 (5 pcs)</option>
         <option value="6" ${multiplier == 6 ? 'selected' : ''}>Pack of 6 (6 pcs)</option>
-        <option value="10" ${multiplier == 10 ? 'selected' : ''}>Pack of 10 (10 pcs)</option>
+        <option value="8" ${multiplier == 8 ? 'selected' : ''}>Pack of 8 (8 pcs / 8 Bags)</option>
+        <option value="10" ${multiplier == 10 ? 'selected' : ''}>Pack of 10 (10 pcs / 10 Bags)</option>
+        <option value="12" ${multiplier == 12 ? 'selected' : ''}>Pack of 12 (12 pcs / 12 Bags)</option>
+        <option value="15" ${multiplier == 15 ? 'selected' : ''}>Pack of 15 (15 pcs)</option>
+        <option value="20" ${multiplier == 20 ? 'selected' : ''}>Pack of 20 (20 pcs)</option>
       </select>
     </div>
-    <div class="w-24 flex-shrink-0">
-      <input type="text" value="${escapeHtml(note)}" placeholder="Note (e.g. Set 2)" class="input-pro py-1 text-[11px] skumap-note">
+    <div class="w-28 flex-shrink-0">
+      <input type="text" value="${escapeHtml(note)}" placeholder="Note (e.g. 4 Bags + 1 Disp)" class="input-pro py-1 text-[11px] skumap-note">
     </div>
     <button type="button" onclick="removeSkuMappingRow('${rowId}')" class="text-slate-400 hover:text-rose-600 p-1 flex-shrink-0" title="Remove SKU">
       <i class="fa-solid fa-trash-can text-xs"></i>
@@ -1319,18 +1412,20 @@ function onSkuMappingCodeInput(rowId) {
   const val = codeInput.value.toLowerCase();
   let detected = null;
 
-  if (val.match(/pack\s*of\s*2|pack\s*2|set\s*of\s*2|2\s*pcs?|combo\s*of\s*2|pair/i)) detected = 2;
-  else if (val.match(/pack\s*of\s*3|pack\s*3|set\s*of\s*3|3\s*pcs?|combo\s*of\s*3/i)) detected = 3;
-  else if (val.match(/pack\s*of\s*4|pack\s*4|set\s*of\s*4|4\s*pcs?/i)) detected = 4;
-  else if (val.match(/pack\s*of\s*5|pack\s*5|set\s*of\s*5|5\s*pcs?/i)) detected = 5;
-  else if (val.match(/pack\s*of\s*6|pack\s*6|set\s*of\s*6|6\s*pcs?/i)) detected = 6;
-  else if (val.match(/pack\s*of\s*10|pack\s*10|10\s*pcs?/i)) detected = 10;
-  else if (val.match(/pack\s*of\s*1|pack\s*1|single|1\s*pc/i)) detected = 1;
+  if (val.match(/12\s*bags?|pack\s*of\s*12|pack\s*12|12\s*pcs?|gbd12|gb12/i)) detected = 12;
+  else if (val.match(/10\s*bags?|pack\s*of\s*10|pack\s*10|10\s*pcs?|gbd10|gb10/i)) detected = 10;
+  else if (val.match(/8\s*bags?|pack\s*of\s*8|pack\s*8|8\s*pcs?|gbd08|gb8/i)) detected = 8;
+  else if (val.match(/6\s*bags?|pack\s*of\s*6|pack\s*6|6\s*pcs?|gbd06|gb6/i)) detected = 6;
+  else if (val.match(/5\s*bags?|pack\s*of\s*5|pack\s*5|5\s*pcs?|gbd05|gb5/i)) detected = 5;
+  else if (val.match(/4\s*bags?|pack\s*of\s*4|pack\s*4|4\s*pcs?|gbd04|gb4/i)) detected = 4;
+  else if (val.match(/3\s*bags?|pack\s*of\s*3|pack\s*3|3\s*pcs?|gbd03|gb3/i)) detected = 3;
+  else if (val.match(/2\s*bags?|pack\s*of\s*2|pack\s*2|2\s*pcs?|gbd02|gb2|pair/i)) detected = 2;
+  else if (val.match(/1\s*bag|pack\s*of\s*1|pack\s*1|single|1\s*pc|gbd01|gb1/i)) detected = 1;
 
   if (detected) {
     multSelect.value = String(detected);
     if (noteInput && !noteInput.value) {
-      noteInput.value = `Pack of ${detected}`;
+      noteInput.value = `${detected} Bags + 1 Dispenser`;
     }
   }
 }
@@ -1338,6 +1433,84 @@ function onSkuMappingCodeInput(rowId) {
 function removeSkuMappingRow(rowId) {
   const row = document.getElementById(rowId);
   if (row) row.remove();
+}
+
+function toggleProductTypeUI() {
+  const isBundle = document.querySelector('input[name="prodType"]:checked')?.value === 'bundle';
+  const bundleSection = document.getElementById("bundleComponentsSection");
+  const openingGroup = document.getElementById("openingStockGroup");
+
+  if (isBundle) {
+    if (bundleSection) bundleSection.classList.remove("hidden");
+    if (openingGroup) openingGroup.classList.add("hidden");
+    const container = document.getElementById("bundleComponentsContainer");
+    if (container && container.children.length === 0) {
+      addBundleComponentRow();
+      addBundleComponentRow();
+    }
+  } else {
+    if (bundleSection) bundleSection.classList.add("hidden");
+    const editId = document.getElementById("productEditId")?.value;
+    if (!editId && openingGroup) openingGroup.classList.remove("hidden");
+  }
+}
+
+function addBundleComponentRow(selectedProdId = "", qty = 1) {
+  const container = document.getElementById("bundleComponentsContainer");
+  if (!container) return;
+
+  const rowId = "comp_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+  const row = document.createElement("div");
+  row.className = "flex items-center gap-2 bg-white p-2 rounded-lg border border-amber-200 shadow-2xs bundle-comp-row";
+  row.id = rowId;
+
+  // Single items list (exclude combos to prevent loops)
+  const singleProducts = (state.products || []).filter(p => !p.isBundle);
+
+  row.innerHTML = `
+    <div class="flex-grow">
+      <select onchange="recalculateBundleCost()" class="input-pro py-1 text-xs font-semibold comp-product-select" required>
+        <option value="">-- Choose Component Product --</option>
+        ${singleProducts.map(p => `<option value="${p.id}" ${p.id === selectedProdId ? 'selected' : ''}>${escapeHtml(p.name)} (Stock: ${p.currentStock})</option>`).join('')}
+      </select>
+    </div>
+    <div class="w-24 flex-shrink-0 flex items-center gap-1">
+      <input type="number" min="1" value="${qty}" oninput="recalculateBundleCost()" placeholder="Qty" class="input-pro py-1 text-xs font-bold text-center comp-qty" required>
+      <span class="text-[11px] text-slate-500 font-semibold">pcs</span>
+    </div>
+    <button type="button" onclick="removeBundleComponentRow('${rowId}')" class="text-slate-400 hover:text-rose-600 p-1 flex-shrink-0" title="Remove Component">
+      <i class="fa-solid fa-trash-can text-xs"></i>
+    </button>
+  `;
+
+  container.appendChild(row);
+  recalculateBundleCost();
+}
+
+function removeBundleComponentRow(rowId) {
+  const row = document.getElementById(rowId);
+  if (row) row.remove();
+  recalculateBundleCost();
+}
+
+function recalculateBundleCost() {
+  const compRows = document.querySelectorAll(".bundle-comp-row");
+  let totalCost = 0;
+  compRows.forEach(r => {
+    const prodId = r.querySelector(".comp-product-select")?.value;
+    const qty = parseFloat(r.querySelector(".comp-qty")?.value) || 0;
+    if (prodId && qty > 0) {
+      const prod = state.products.find(p => p.id === prodId);
+      if (prod) {
+        totalCost += (Number(prod.costPrice) || 0) * qty;
+      }
+    }
+  });
+
+  const costInput = document.getElementById("prodCostPrice");
+  if (costInput && totalCost > 0) {
+    costInput.value = Math.round(totalCost * 100) / 100;
+  }
 }
 
 function handleSaveProduct(e) {
@@ -1351,6 +1524,30 @@ function handleSaveProduct(e) {
   const retailPrice = parseFloat(document.getElementById("prodRetailPrice").value) || 0;
   const wholesalePrice = parseFloat(document.getElementById("prodWholesalePrice").value) || 0;
   const openingStock = parseInt(document.getElementById("prodOpeningStock").value) || 0;
+  const isBundle = document.querySelector('input[name="prodType"]:checked')?.value === 'bundle';
+
+  // Collect Bundle Components
+  const bundleItems = [];
+  if (isBundle) {
+    const compRows = document.querySelectorAll(".bundle-comp-row");
+    compRows.forEach(r => {
+      const pId = r.querySelector(".comp-product-select")?.value;
+      const q = parseInt(r.querySelector(".comp-qty")?.value) || 1;
+      if (pId && q > 0) {
+        const pObj = state.products.find(p => p.id === pId);
+        bundleItems.push({
+          productId: pId,
+          productName: pObj ? pObj.name : "Product",
+          qty: q
+        });
+      }
+    });
+
+    if (bundleItems.length < 2) {
+      showToast("Please add at least 2 products to create a combo bundle!", true);
+      return;
+    }
+  }
 
   // Collect SKU & Pack Multiplier mappings
   const mappingRows = document.querySelectorAll(".sku-mapping-row");
@@ -1380,22 +1577,26 @@ function handleSaveProduct(e) {
       prod.retailPrice = retailPrice;
       prod.wholesalePrice = wholesalePrice;
       prod.skuMappings = skuMappings;
-      showToast("Product updated successfully!");
+      prod.isBundle = isBundle;
+      prod.bundleItems = bundleItems;
+      showToast(`${isBundle ? 'Combo bundle' : 'Product'} updated successfully!`);
     }
   } else {
     const newProd = {
       id: "prod_" + Date.now(),
       name,
       sku: sku || "SKU-" + Math.floor(1000 + Math.random() * 9000),
-      category: category || "General",
+      category: category || (isBundle ? "Combo Packs" : "General"),
       costPrice,
       retailPrice,
       wholesalePrice,
-      openingStock: openingStock,
-      currentStock: openingStock,
+      isBundle: isBundle,
+      bundleItems: bundleItems,
+      openingStock: isBundle ? 0 : openingStock,
+      currentStock: isBundle ? 0 : openingStock,
       minStockAlert: minStock,
       skuMappings: skuMappings,
-      purchaseBatches: openingStock > 0 ? [{
+      purchaseBatches: (!isBundle && openingStock > 0) ? [{
         id: "batch_open_" + Date.now(),
         purchaseId: "opening",
         date: new Date().toISOString().split('T')[0],
@@ -1411,7 +1612,7 @@ function handleSaveProduct(e) {
       }] : []
     };
     state.products.push(newProd);
-    showToast("New product added successfully!");
+    showToast(`New ${isBundle ? 'combo bundle' : 'product'} added successfully!`);
   }
 
   saveState();
@@ -1433,6 +1634,28 @@ function editProduct(id) {
   document.getElementById("prodWholesalePrice").value = prod.wholesalePrice;
   document.getElementById("openingStockGroup").classList.add("hidden");
 
+  // Bundle vs Single Toggle
+  const isBundle = !!prod.isBundle;
+  const singleRadio = document.getElementById("prodTypeSingle");
+  const bundleRadio = document.getElementById("prodTypeBundle");
+  if (isBundle && bundleRadio) {
+    bundleRadio.checked = true;
+  } else if (singleRadio) {
+    singleRadio.checked = true;
+  }
+
+  // Load Bundle Components
+  const bundleContainer = document.getElementById("bundleComponentsContainer");
+  if (bundleContainer) {
+    bundleContainer.innerHTML = "";
+    if (isBundle && Array.isArray(prod.bundleItems) && prod.bundleItems.length > 0) {
+      prod.bundleItems.forEach(b => {
+        addBundleComponentRow(b.productId, b.qty);
+      });
+    }
+  }
+  toggleProductTypeUI();
+
   // Load existing SKU Mappings
   const container = document.getElementById("skuMappingsContainer");
   if (container) {
@@ -1444,7 +1667,7 @@ function editProduct(id) {
     }
   }
 
-  document.getElementById("productModalTitle").textContent = "Edit Product";
+  document.getElementById("productModalTitle").textContent = isBundle ? `Edit Combo Bundle (${prod.name})` : "Edit Product";
   openModal('productModal', 'edit');
 }
 
@@ -2004,8 +2227,33 @@ function processScannedBarcode(rawCode) {
   const prod = match.product;
   const multiplier = match.multiplier || 1;
 
-  // Deduct multiplier units from physical inventory stock
-  prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - multiplier);
+  let deductionSummaryText = "";
+
+  // Check if this is a Combo / Bundle Pack!
+  if (prod.isBundle && Array.isArray(prod.bundleItems) && prod.bundleItems.length > 0) {
+    const deductions = [];
+    prod.bundleItems.forEach((comp, idx) => {
+      const compProd = state.products.find(p => p.id === comp.productId);
+      if (compProd) {
+        // If secondary component has base qty of 1 (like 1 dispenser with 4, 8, 10, 12 bags), don't multiply dispenser!
+        let deductQty = 0;
+        if (idx === 0) {
+          // Primary item (e.g. Garbage Bags) scales with pack size multiplier (4, 8, 10, 12)
+          deductQty = (Number(comp.qty) || 1) * multiplier;
+        } else {
+          // Secondary accessories (e.g. 1 Dispenser) stay fixed at 1 pc per order package
+          deductQty = Number(comp.qty) || 1;
+        }
+        compProd.currentStock = Math.max(0, (Number(compProd.currentStock) || 0) - deductQty);
+        deductions.push(`-${deductQty} ${compProd.name}`);
+      }
+    });
+    deductionSummaryText = deductions.join(" & ");
+  } else {
+    // Normal Single Product deduction
+    prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - multiplier);
+    deductionSummaryText = `-${multiplier} pcs ${prod.name}`;
+  }
 
   // Add / Update item in scannerSession
   let sessionItem = scannerSession.items.find(it => it.productId === prod.id && it.matchedSku === match.matchedSku);
@@ -2019,6 +2267,8 @@ function processScannedBarcode(rawCode) {
       matchedSku: match.matchedSku,
       packLabel: match.label,
       multiplier: multiplier,
+      isBundle: !!prod.isBundle,
+      bundleSummary: prod.isBundle ? (prod.bundleItems || []).map((b, idx) => `${idx === 0 ? multiplier * (b.qty || 1) : b.qty}x ${b.productName}`).join(" + ") : "",
       count: 1,
       totalUnits: multiplier
     });
@@ -2033,8 +2283,7 @@ function processScannedBarcode(rawCode) {
     statusText.innerHTML = `
       <i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i>
       <b>${escapeHtml(prod.name)}</b> (${escapeHtml(match.label)}) ➔ 
-      <span class="text-emerald-800 font-extrabold font-mono">-${multiplier} pcs Stock Out</span> | 
-      <span class="text-slate-600 font-mono">Stock Remaining: <b>${prod.currentStock} pcs</b></span>
+      <span class="text-emerald-800 font-extrabold font-mono">${deductionSummaryText} Stock Out</span>
     `;
     statusText.className = "text-emerald-900 font-semibold";
   }
@@ -2052,23 +2301,26 @@ function recordScannerDispatchInState(prod, match, multiplier) {
 
   if (!state.onlineDispatches) state.onlineDispatches = [];
 
-  // Find if a dispatch entry already exists for today, platform and account
   let dispatchEntry = state.onlineDispatches.find(d => d.date === date && d.platform === platform && d.accountId === accountId);
+
+  const itemData = {
+    productId: prod.id,
+    productName: prod.name,
+    sku: match.matchedSku,
+    costPrice: prod.costPrice || 0,
+    retailPrice: prod.retailPrice || 0,
+    qty: multiplier,
+    isBundle: !!prod.isBundle,
+    bundleItems: prod.isBundle ? prod.bundleItems : null
+  };
 
   if (dispatchEntry) {
     if (!Array.isArray(dispatchEntry.items)) dispatchEntry.items = [];
-    let dispItem = dispatchEntry.items.find(it => it.productId === prod.id);
+    let dispItem = dispatchEntry.items.find(it => it.productId === prod.id && it.sku === match.matchedSku);
     if (dispItem) {
       dispItem.qty = (Number(dispItem.qty) || 0) + multiplier;
     } else {
-      dispatchEntry.items.push({
-        productId: prod.id,
-        productName: prod.name,
-        sku: match.matchedSku,
-        costPrice: prod.costPrice || 0,
-        retailPrice: prod.retailPrice || 0,
-        qty: multiplier
-      });
+      dispatchEntry.items.push(itemData);
     }
     dispatchEntry.totalUnits = dispatchEntry.items.reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
   } else {
@@ -2078,14 +2330,7 @@ function recordScannerDispatchInState(prod, match, multiplier) {
       platform,
       accountId,
       accountName,
-      items: [{
-        productId: prod.id,
-        productName: prod.name,
-        sku: match.matchedSku,
-        costPrice: prod.costPrice || 0,
-        retailPrice: prod.retailPrice || 0,
-        qty: multiplier
-      }],
+      items: [itemData],
       totalUnits: multiplier,
       notes: "Scanned via Barcode Scanner"
     };
@@ -2098,8 +2343,16 @@ function undoScannerSessionItem(index) {
   if (!item) return;
 
   const prod = state.products.find(p => p.id === item.productId);
-  if (prod) {
-    // Restore stock by multiplier
+  if (prod && prod.isBundle && Array.isArray(prod.bundleItems)) {
+    // Restore stock for all bundle components
+    prod.bundleItems.forEach((comp, idx) => {
+      const cProd = state.products.find(p => p.id === comp.productId);
+      if (cProd) {
+        const restoreQty = idx === 0 ? (Number(comp.qty) || 1) * item.multiplier : (Number(comp.qty) || 1);
+        cProd.currentStock = (Number(cProd.currentStock) || 0) + restoreQty;
+      }
+    });
+  } else if (prod) {
     prod.currentStock = (Number(prod.currentStock) || 0) + item.multiplier;
   }
 
@@ -2129,7 +2382,7 @@ function undoScannerSessionItem(index) {
 
   renderScannerSessionTable();
   saveState();
-  showToast("Scan undone! 1 package stock restored.");
+  showToast("Scan undone! Stock restored.");
 }
 
 function renderScannerSessionTable() {
@@ -2152,20 +2405,31 @@ function renderScannerSessionTable() {
 
   tbody.innerHTML = scannerSession.items.map((it, idx) => {
     const prod = state.products.find(p => p.id === it.productId);
-    const curStock = prod ? prod.currentStock : 0;
+    let stockDisplay = "";
+    if (prod && prod.isBundle && Array.isArray(prod.bundleItems)) {
+      stockDisplay = prod.bundleItems.map(comp => {
+        const cProd = state.products.find(p => p.id === comp.productId);
+        return `${cProd ? cProd.name.split(' ')[0] : 'Item'}: ${cProd ? cProd.currentStock : 0}`;
+      }).join(", ");
+    } else {
+      stockDisplay = `${prod ? prod.currentStock : 0} pcs`;
+    }
 
     return `
       <tr class="hover:bg-slate-50">
-        <td class="font-bold text-slate-900 text-xs">${escapeHtml(it.productName)}</td>
+        <td>
+          <div class="font-bold text-slate-900 text-xs">${escapeHtml(it.productName)}</div>
+          ${it.isBundle ? `<div class="text-[10px] text-amber-700 font-semibold"><i class="fa-solid fa-boxes-packing"></i> Combo (${escapeHtml(it.bundleSummary)})</div>` : ''}
+        </td>
         <td class="font-mono text-slate-600 text-xs">${escapeHtml(it.matchedSku)}</td>
         <td class="text-center">
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${it.isBundle ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'}">
             ${escapeHtml(it.packLabel)}
           </span>
         </td>
         <td class="text-right font-mono font-bold text-slate-800">${it.count}</td>
-        <td class="text-right font-mono font-extrabold text-indigo-900 text-sm bg-indigo-50/50">${it.totalUnits} pcs</td>
-        <td class="text-right font-mono font-bold text-emerald-700">${curStock} pcs</td>
+        <td class="text-right font-mono font-extrabold text-indigo-900 text-sm bg-indigo-50/50">${it.totalUnits} pkgs</td>
+        <td class="text-right font-mono font-bold text-emerald-700 text-xs">${stockDisplay}</td>
         <td class="text-center">
           <button onclick="undoScannerSessionItem(${idx})" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded" title="Undo / Minus 1 Scan">
             <i class="fa-solid fa-rotate-left text-xs"></i>
@@ -3067,6 +3331,142 @@ function handleSaveSale(e) {
   }
 }
 
+// ==================== DEFECT / SCRAP CLEARANCE LOT SALES ====================
+function openScrapSaleModal(id = "") {
+  const form = document.getElementById("scrapSaleForm");
+  if (form) form.reset();
+
+  const p1Name = state.settings.partner1Name || "Kenil (You)";
+  const p2Name = state.settings.partner2Name || "Alpesh";
+
+  const p1Radio = document.getElementById("scrapP1RadioLabel");
+  const p2Radio = document.getElementById("scrapP2RadioLabel");
+  if (p1Radio) p1Radio.textContent = p1Name;
+  if (p2Radio) p2Radio.textContent = p2Name;
+
+  document.getElementById("scrapSaleEditId").value = id || "";
+  document.getElementById("scrapSaleDate").value = new Date().toISOString().split('T')[0];
+  document.getElementById("scrapSaleDescription").value = "Home & Kitchen Defect / Return Scrap Lot";
+
+  if (id) {
+    const sale = state.sales.find(s => s.id === id);
+    if (sale) {
+      document.getElementById("scrapSaleDate").value = sale.date;
+      document.getElementById("scrapSaleAmount").value = sale.totalAmount;
+      document.getElementById("scrapSaleDescription").value = sale.items && sale.items[0] ? sale.items[0].productName : "Home & Kitchen Defect / Return Scrap Lot";
+      document.getElementById("scrapSaleBuyer").value = sale.customerName || "";
+      document.getElementById("scrapSaleNotes").value = sale.notes || "";
+      
+      const radio = form.querySelector(`input[name="scrapReceivedBy"][value="${sale.receivedBy || 'partner1'}"]`);
+      if (radio) radio.checked = true;
+      
+      document.getElementById("scrapSaleModalTitle").innerHTML = `<i class="fa-solid fa-recycle text-amber-600"></i> Edit Scrap Lot Sale (${sale.invoiceNo})`;
+    }
+  } else {
+    document.getElementById("scrapSaleModalTitle").innerHTML = `<i class="fa-solid fa-recycle text-amber-600"></i> Defect / Scrap Lot Sale (ભંગાર / લોટ-શોટ વેચાણ)`;
+  }
+
+  openModal('scrapSaleModal');
+}
+
+function handleSaveScrapSale(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  try {
+    const editId = document.getElementById("scrapSaleEditId")?.value || "";
+    const date = document.getElementById("scrapSaleDate")?.value || new Date().toISOString().split('T')[0];
+    const amount = parseFloat(document.getElementById("scrapSaleAmount")?.value) || 0;
+    const description = document.getElementById("scrapSaleDescription")?.value.trim() || "Home & Kitchen Defect / Return Scrap Lot";
+    const buyer = document.getElementById("scrapSaleBuyer")?.value.trim() || "Scrap / Clearance Lot Buyer";
+    const receivedBy = document.querySelector('input[name="scrapReceivedBy"]:checked')?.value || "partner1";
+    const notes = document.getElementById("scrapSaleNotes")?.value.trim() || "";
+
+    if (amount <= 0) {
+      showToast("Please enter a valid sale amount!", true);
+      document.getElementById("scrapSaleAmount")?.focus();
+      return;
+    }
+
+    const p1 = state.settings.partner1Name || "Kenil";
+    const p2 = state.settings.partner2Name || "Alpesh";
+    const receiverLabel = receivedBy === 'partner1' ? p1 : (receivedBy === 'partner2' ? p2 : 'Business Bank A/c');
+
+    const invoiceNo = editId 
+      ? (state.sales.find(s => s.id === editId)?.invoiceNo || "LOT-" + (state.sales.length + 101))
+      : ("LOT-" + (state.sales.length + 101));
+
+    const item = {
+      productId: "scrap_lot_item",
+      productName: description,
+      qty: 1,
+      price: amount,
+      costPrice: 0,
+      discountPercent: 0,
+      discountAmount: 0,
+      taxableAmount: amount,
+      gstRate: 0,
+      gstAmount: 0,
+      total: amount
+    };
+
+    if (editId) {
+      const existing = state.sales.find(s => s.id === editId);
+      if (existing) {
+        existing.date = date;
+        existing.customerName = buyer;
+        existing.type = "scrap_lot";
+        existing.items = [item];
+        existing.subtotal = amount;
+        existing.totalAmount = amount;
+        existing.paidAmount = amount;
+        existing.paymentStatus = "Paid";
+        existing.receivedBy = receivedBy;
+        existing.notes = notes ? `${description} (${notes})` : description;
+        showToast(`Scrap lot sale ${existing.invoiceNo} updated successfully!`);
+      }
+    } else {
+      const newSale = {
+        id: "sale_scrap_" + Date.now(),
+        invoiceNo,
+        date,
+        type: "scrap_lot",
+        channel: "Scrap Clearance",
+        customerName: buyer,
+        customerPhone: "",
+        customerCity: "Local Clearance",
+        customerGst: "",
+        customerAddress: "",
+        items: [item],
+        subtotal: amount,
+        discountPercent: 0,
+        discountAmount: 0,
+        taxableAmount: amount,
+        gstAmount: 0,
+        totalAmount: amount,
+        paymentStatus: "Paid",
+        paidAmount: amount,
+        receivedBy,
+        paymentHistory: [{
+          date,
+          amount,
+          receivedBy,
+          notes: `Full cash collected by ${receiverLabel}`
+        }],
+        notes: notes ? `${description} (${notes})` : description
+      };
+      state.sales.push(newSale);
+      showToast(`Recorded ₹${amount} scrap lot sale! Cash received by ${receiverLabel}.`);
+    }
+
+    saveState();
+    closeModal('scrapSaleModal');
+    refreshAllUI();
+  } catch (err) {
+    console.error("Error saving scrap sale:", err);
+    showToast("Error saving scrap sale: " + err.message, true);
+  }
+}
+
 function renderSalesTable() {
   const tbody = document.getElementById("salesTableBody");
   if (!tbody) return;
@@ -3086,18 +3486,21 @@ function renderSalesTable() {
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="py-5 text-center text-slate-400">No wholesale bills found. Click "New Wholesale Bill" above.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="py-5 text-center text-slate-400">No sales or scrap lot bills found. Click "New Wholesale Bill" or "+ Defect / Scrap Lot Sale".</td></tr>`;
     return;
   }
 
   tbody.innerHTML = filtered.map(s => {
+    const isScrap = s.type === 'scrap_lot';
     const itemsSummary = (s.items || []).map(it => `${it.productName} (${it.qty} pcs @ ₹${it.price})`).join(", ");
     const total = Number(s.totalAmount) || 0;
     const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
     const pending = Math.max(0, total - paid);
 
     let billProfit = 0;
-    if (s.items && s.items.length) {
+    if (isScrap) {
+      billProfit = total; // Pure revenue clearance recovery
+    } else if (s.items && s.items.length) {
       s.items.forEach(it => {
         const prod = state.products.find(p => p.id === it.productId);
         const cost = prod ? (Number(prod.costPrice) || 0) : (Number(it.costPrice) || 0);
@@ -3127,7 +3530,10 @@ function renderSalesTable() {
 
     return `
       <tr>
-        <td class="font-mono font-bold text-slate-900">${s.invoiceNo}</td>
+        <td>
+          <span class="font-mono font-bold text-slate-900 block">${s.invoiceNo}</span>
+          ${isScrap ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded mt-0.5"><i class="fa-solid fa-recycle text-[9px]"></i> Scrap Lot</span>` : ''}
+        </td>
         <td class="text-slate-500 font-mono text-xs">${formatDate(s.date)}</td>
         <td class="font-semibold text-slate-800">
           ${escapeHtml(s.customerName)}
@@ -3158,7 +3564,7 @@ function renderSalesTable() {
           <button onclick="viewInvoiceReceipt('${s.id}')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Print Bill Receipt">
             <i class="fa-solid fa-print"></i>
           </button>
-          <button onclick="editSale('${s.id}')" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Edit">
+          <button onclick="${isScrap ? `openScrapSaleModal('${s.id}')` : `editSale('${s.id}')`}" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Edit">
             <i class="fa-solid fa-pen-to-square"></i>
           </button>
           <button onclick="deleteSale('${s.id}')" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded" title="Delete">
@@ -4542,6 +4948,9 @@ function renderPurchasesTable() {
               Pay
             </button>
           ` : ''}
+          <button onclick="openSupplierReturnForPurchase('${p.id}')" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Return / Exchange with Supplier">
+            <i class="fa-solid fa-rotate-left"></i>
+          </button>
           <button onclick="editPurchase('${p.id}')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Edit">
             <i class="fa-solid fa-pen-to-square"></i>
           </button>
@@ -4631,6 +5040,604 @@ function handleSaveVendorPay(e) {
   closeModal('vendorPayModal');
   refreshAllUI();
   showToast(`Payment of ₹${amount} recorded to supplier!`);
+}
+
+// ==================== SUPPLIER PURCHASE RETURNS & EXCHANGES ====================
+function openSupplierReturnModal(supplierName = "", purchaseId = "") {
+  const form = document.getElementById("supplierReturnForm");
+  if (form) form.reset();
+
+  document.getElementById("supplierReturnEditId").value = "";
+  document.getElementById("supplierReturnDate").value = new Date().toISOString().split('T')[0];
+  document.getElementById("supplierReturnMode").value = "return_only";
+  document.getElementById("supplierReturnModalTitle").innerHTML = `<i class="fa-solid fa-rotate-left text-amber-600"></i> Record Supplier Return / Debit Note`;
+
+  updateSuppliersDatalist();
+
+  const retContainer = document.getElementById("returnItemsContainer");
+  if (retContainer) retContainer.innerHTML = "";
+
+  const excContainer = document.getElementById("exchangeItemsContainer");
+  if (excContainer) excContainer.innerHTML = "";
+
+  if (purchaseId) {
+    const purch = state.purchases.find(p => p.id === purchaseId);
+    if (purch) {
+      document.getElementById("supplierReturnVendor").value = purch.vendor || "";
+      if (purch.items && purch.items.length > 0) {
+        purch.items.forEach(it => {
+          addReturnItemRow(it.productId, it.qty, it.costPrice, it.gstRate);
+        });
+      } else {
+        addReturnItemRow();
+      }
+    } else {
+      addReturnItemRow();
+    }
+  } else if (supplierName) {
+    document.getElementById("supplierReturnVendor").value = supplierName;
+    addReturnItemRow();
+  } else {
+    addReturnItemRow();
+  }
+
+  toggleSupplierReturnModeUI();
+  toggleReturnSettlementUI();
+  calculateReturnTotals();
+  openModal('supplierReturnModal');
+}
+
+function openSupplierReturnForPurchase(purchaseId) {
+  openSupplierReturnModal("", purchaseId);
+}
+
+function toggleSupplierReturnModeUI() {
+  const mode = document.getElementById("supplierReturnMode")?.value || "return_only";
+  const excSection = document.getElementById("exchangeItemsSection");
+  const excTotalValContainer = document.getElementById("exchangeTotalValContainer");
+  const title = document.getElementById("supplierReturnModalTitle");
+
+  if (mode === "exchange") {
+    if (excSection) excSection.classList.remove("hidden");
+    if (excTotalValContainer) excTotalValContainer.classList.remove("hidden");
+    if (title) title.innerHTML = `<i class="fa-solid fa-rotate text-amber-600"></i> Supplier Item Exchange (માલ બદલી)`;
+    
+    // Add default exchange item if container is empty
+    const excContainer = document.getElementById("exchangeItemsContainer");
+    if (excContainer && excContainer.children.length === 0) {
+      addExchangeItemRow();
+    }
+  } else {
+    if (excSection) excSection.classList.add("hidden");
+    if (excTotalValContainer) excTotalValContainer.classList.add("hidden");
+    if (title) title.innerHTML = `<i class="fa-solid fa-rotate-left text-amber-600"></i> Record Supplier Return / Debit Note`;
+  }
+  calculateReturnTotals();
+}
+
+function toggleReturnSettlementUI() {
+  const mode = document.getElementById("returnSettlementMode")?.value || "ledger_credit";
+  const recipientGroup = document.getElementById("returnRefundRecipientGroup");
+  const accountLabel = document.getElementById("returnAccountLabel");
+
+  if (mode === 'refund_received') {
+    if (recipientGroup) recipientGroup.classList.remove("hidden");
+    if (accountLabel) accountLabel.textContent = "Refund Received In / Account *";
+  } else if (mode === 'extra_paid') {
+    if (recipientGroup) recipientGroup.classList.remove("hidden");
+    if (accountLabel) accountLabel.textContent = "Extra Money Paid By / Account *";
+  } else {
+    if (recipientGroup) recipientGroup.classList.add("hidden");
+  }
+}
+
+function addReturnItemRow(prodId = "", qty = 1, customCost = null, gstRate = 0) {
+  const container = document.getElementById("returnItemsContainer");
+  if (!container) return;
+
+  const rowIndex = "ret_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+
+  let initialCost = 0;
+  if (customCost !== null && customCost !== undefined) {
+    initialCost = customCost;
+  } else if (prodId) {
+    const prod = state.products.find(p => p.id === prodId);
+    if (prod) initialCost = prod.costPrice || 0;
+  }
+
+  const gRate = (gstRate !== null && gstRate !== undefined) ? gstRate : 0;
+
+  const row = document.createElement("div");
+  row.className = "bg-rose-50/40 p-3 rounded-xl border border-rose-200 shadow-2xs space-y-2 return-item-row";
+  row.id = rowIndex;
+
+  row.innerHTML = `
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex-grow">
+        <label class="block text-[11px] font-bold text-rose-900 mb-1">
+          <i class="fa-solid fa-box text-rose-600"></i> Returned Product (Stock Deduct -) *
+        </label>
+        <select onchange="onReturnProductSelect('${rowIndex}')" id="ret_prod_${rowIndex}" required class="input-pro py-1.5 text-xs sm:text-sm font-semibold">
+          <option value="">-- Select Product to Return --</option>
+          ${state.products.map(p => `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (Current Stock: ${p.currentStock})</option>`).join('')}
+        </select>
+      </div>
+      <div class="text-right flex-shrink-0 pt-2">
+        <div class="text-[10px] uppercase font-bold text-rose-400">Return Value</div>
+        <div class="flex items-center gap-2">
+          <span id="ret_total_${rowIndex}" class="font-mono text-sm sm:text-base font-bold text-rose-900">₹0</span>
+          <button type="button" onclick="removeReturnItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg" title="Remove Row">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2 sm:gap-3 bg-white p-2 rounded-lg border border-rose-100">
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Qty (pcs) *</label>
+        <input type="number" id="ret_qty_${rowIndex}" min="1" value="${qty}" oninput="calculateReturnTotals()" placeholder="Qty" required class="input-pro py-1.5 text-xs sm:text-sm text-center font-bold font-mono text-rose-700">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Rate (₹/pc) *</label>
+        <input type="number" id="ret_cost_${rowIndex}" min="0" step="any" value="${initialCost > 0 ? initialCost : ''}" oninput="calculateReturnTotals()" placeholder="₹ Rate" required class="input-pro py-1.5 text-xs sm:text-sm text-right font-bold font-mono">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">GST (%)</label>
+        <select id="ret_gst_${rowIndex}" onchange="calculateReturnTotals()" class="input-pro py-1.5 text-xs sm:text-sm font-bold text-indigo-700">
+          <option value="0" ${gRate == 0 ? 'selected' : ''}>0% (Nil)</option>
+          <option value="5" ${gRate == 5 ? 'selected' : ''}>5%</option>
+          <option value="12" ${gRate == 12 ? 'selected' : ''}>12%</option>
+          <option value="18" ${gRate == 18 ? 'selected' : ''}>18%</option>
+          <option value="28" ${gRate == 28 ? 'selected' : ''}>28%</option>
+        </select>
+      </div>
+    </div>
+  `;
+
+  container.appendChild(row);
+  calculateReturnTotals();
+}
+
+function removeReturnItemRow(rowIndex) {
+  const row = document.getElementById(rowIndex);
+  if (row) row.remove();
+  calculateReturnTotals();
+}
+
+function onReturnProductSelect(rowIndex) {
+  const prodId = document.getElementById(`ret_prod_${rowIndex}`)?.value;
+  const prod = state.products.find(p => p.id === prodId);
+  if (prod) {
+    const costInput = document.getElementById(`ret_cost_${rowIndex}`);
+    if (costInput) costInput.value = prod.costPrice || 0;
+  }
+  calculateReturnTotals();
+}
+
+function addExchangeItemRow(prodId = "", qty = 1, customCost = null, gstRate = 0) {
+  const container = document.getElementById("exchangeItemsContainer");
+  if (!container) return;
+
+  const rowIndex = "exc_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+
+  let initialCost = 0;
+  if (customCost !== null && customCost !== undefined) {
+    initialCost = customCost;
+  } else if (prodId) {
+    const prod = state.products.find(p => p.id === prodId);
+    if (prod) initialCost = prod.costPrice || 0;
+  }
+
+  const gRate = (gstRate !== null && gstRate !== undefined) ? gstRate : 0;
+
+  const row = document.createElement("div");
+  row.className = "bg-emerald-50/40 p-3 rounded-xl border border-emerald-200 shadow-2xs space-y-2 exchange-item-row";
+  row.id = rowIndex;
+
+  row.innerHTML = `
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex-grow">
+        <label class="block text-[11px] font-bold text-emerald-900 mb-1">
+          <i class="fa-solid fa-box text-emerald-600"></i> New Exchanged Product (Stock Added +) *
+        </label>
+        <select onchange="onExchangeProductSelect('${rowIndex}')" id="exc_prod_${rowIndex}" required class="input-pro py-1.5 text-xs sm:text-sm font-semibold">
+          <option value="">-- Select New Exchanged Product --</option>
+          ${state.products.map(p => `<option value="${p.id}" ${p.id === prodId ? 'selected' : ''}>${escapeHtml(p.name)} (Current Stock: ${p.currentStock})</option>`).join('')}
+        </select>
+      </div>
+      <div class="text-right flex-shrink-0 pt-2">
+        <div class="text-[10px] uppercase font-bold text-emerald-400">Exchange Value</div>
+        <div class="flex items-center gap-2">
+          <span id="exc_total_${rowIndex}" class="font-mono text-sm sm:text-base font-bold text-emerald-900">₹0</span>
+          <button type="button" onclick="removeExchangeItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg" title="Remove Row">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2 sm:gap-3 bg-white p-2 rounded-lg border border-emerald-100">
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Qty (pcs) *</label>
+        <input type="number" id="exc_qty_${rowIndex}" min="1" value="${qty}" oninput="calculateReturnTotals()" placeholder="Qty" required class="input-pro py-1.5 text-xs sm:text-sm text-center font-bold font-mono text-emerald-700">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Rate (₹/pc) *</label>
+        <input type="number" id="exc_cost_${rowIndex}" min="0" step="any" value="${initialCost > 0 ? initialCost : ''}" oninput="calculateReturnTotals()" placeholder="₹ Rate" required class="input-pro py-1.5 text-xs sm:text-sm text-right font-bold font-mono">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">GST (%)</label>
+        <select id="exc_gst_${rowIndex}" onchange="calculateReturnTotals()" class="input-pro py-1.5 text-xs sm:text-sm font-bold text-indigo-700">
+          <option value="0" ${gRate == 0 ? 'selected' : ''}>0% (Nil)</option>
+          <option value="5" ${gRate == 5 ? 'selected' : ''}>5%</option>
+          <option value="12" ${gRate == 12 ? 'selected' : ''}>12%</option>
+          <option value="18" ${gRate == 18 ? 'selected' : ''}>18%</option>
+          <option value="28" ${gRate == 28 ? 'selected' : ''}>28%</option>
+        </select>
+      </div>
+    </div>
+  `;
+
+  container.appendChild(row);
+  calculateReturnTotals();
+}
+
+function removeExchangeItemRow(rowIndex) {
+  const row = document.getElementById(rowIndex);
+  if (row) row.remove();
+  calculateReturnTotals();
+}
+
+function onExchangeProductSelect(rowIndex) {
+  const prodId = document.getElementById(`exc_prod_${rowIndex}`)?.value;
+  const prod = state.products.find(p => p.id === prodId);
+  if (prod) {
+    const costInput = document.getElementById(`exc_cost_${rowIndex}`);
+    if (costInput) costInput.value = prod.costPrice || 0;
+  }
+  calculateReturnTotals();
+}
+
+function calculateReturnTotals() {
+  const mode = document.getElementById("supplierReturnMode")?.value || "return_only";
+
+  let totalReturnedVal = 0;
+  document.querySelectorAll(".return-item-row").forEach(row => {
+    const id = row.id;
+    const qty = parseFloat(document.getElementById(`ret_qty_${id}`)?.value) || 0;
+    const cost = parseFloat(document.getElementById(`ret_cost_${id}`)?.value) || 0;
+    const gstPct = parseFloat(document.getElementById(`ret_gst_${id}`)?.value) || 0;
+    const taxable = qty * cost;
+    const gstAmt = Math.round(((taxable * gstPct) / 100) * 100) / 100;
+    const rowTotal = taxable + gstAmt;
+    totalReturnedVal += rowTotal;
+
+    const subEl = document.getElementById(`ret_total_${id}`);
+    if (subEl) subEl.textContent = formatCurrency(rowTotal);
+  });
+
+  let totalExchangedVal = 0;
+  if (mode === "exchange") {
+    document.querySelectorAll(".exchange-item-row").forEach(row => {
+      const id = row.id;
+      const qty = parseFloat(document.getElementById(`exc_qty_${id}`)?.value) || 0;
+      const cost = parseFloat(document.getElementById(`exc_cost_${id}`)?.value) || 0;
+      const gstPct = parseFloat(document.getElementById(`exc_gst_${id}`)?.value) || 0;
+      const taxable = qty * cost;
+      const gstAmt = Math.round(((taxable * gstPct) / 100) * 100) / 100;
+      const rowTotal = taxable + gstAmt;
+      totalExchangedVal += rowTotal;
+
+      const subEl = document.getElementById(`exc_total_${id}`);
+      if (subEl) subEl.textContent = formatCurrency(rowTotal);
+    });
+  }
+
+  const retValDisplay = document.getElementById("returnTotalValDisplay");
+  if (retValDisplay) retValDisplay.textContent = formatCurrency(totalReturnedVal);
+
+  const excValDisplay = document.getElementById("exchangeTotalValDisplay");
+  if (excValDisplay) excValDisplay.textContent = formatCurrency(totalExchangedVal);
+
+  const diff = totalReturnedVal - totalExchangedVal;
+  const netBalDisplay = document.getElementById("returnNetBalanceDisplay");
+  const netBalLabel = document.getElementById("returnNetBalanceLabel");
+
+  if (diff > 0) {
+    if (netBalLabel) netBalLabel.textContent = "Net Refund / Supplier Credit (Debit Note):";
+    if (netBalDisplay) {
+      netBalDisplay.textContent = formatCurrency(diff);
+      netBalDisplay.className = "text-xl sm:text-2xl font-bold text-emerald-700 font-mono";
+    }
+  } else if (diff < 0) {
+    if (netBalLabel) netBalLabel.textContent = "Extra Amount to Pay Supplier:";
+    if (netBalDisplay) {
+      netBalDisplay.textContent = formatCurrency(Math.abs(diff));
+      netBalDisplay.className = "text-xl sm:text-2xl font-bold text-rose-600 font-mono";
+    }
+  } else {
+    if (netBalLabel) netBalLabel.textContent = "Even Exchange (No Balance):";
+    if (netBalDisplay) {
+      netBalDisplay.textContent = formatCurrency(0);
+      netBalDisplay.className = "text-xl sm:text-2xl font-bold text-slate-900 font-mono";
+    }
+  }
+}
+
+function handleSaveSupplierReturn(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  try {
+    const editId = document.getElementById("supplierReturnEditId")?.value || "";
+    const date = document.getElementById("supplierReturnDate")?.value || new Date().toISOString().split('T')[0];
+    const vendor = document.getElementById("supplierReturnVendor")?.value.trim();
+    const mode = document.getElementById("supplierReturnMode")?.value || "return_only";
+    const settlementMode = document.getElementById("returnSettlementMode")?.value || "ledger_credit";
+    const refundRecipient = document.getElementById("returnRefundRecipient")?.value || "partner1";
+    const notes = document.getElementById("supplierReturnNotes")?.value.trim() || "";
+
+    if (!vendor) {
+      showToast("Please enter or select Supplier / Vendor Name!", true);
+      document.getElementById("supplierReturnVendor")?.focus();
+      return;
+    }
+
+    // Auto save supplier if new
+    const suppliers = getSuppliers();
+    const matched = suppliers.find(s => s.name.toLowerCase() === vendor.toLowerCase());
+    if (!matched) {
+      state.suppliers.push({
+        id: "supp_" + Date.now(),
+        name: vendor,
+        phone: "",
+        city: "",
+        gstNo: ""
+      });
+    }
+
+    // Collect Returned Items
+    const returnedItems = [];
+    let totalReturnedVal = 0;
+    document.querySelectorAll(".return-item-row").forEach(row => {
+      const id = row.id;
+      const prodId = document.getElementById(`ret_prod_${id}`)?.value;
+      const qty = parseInt(document.getElementById(`ret_qty_${id}`)?.value) || 0;
+      const costPrice = parseFloat(document.getElementById(`ret_cost_${id}`)?.value) || 0;
+      const gstRate = parseFloat(document.getElementById(`ret_gst_${id}`)?.value) || 0;
+
+      if (!prodId || qty <= 0) return;
+      const prod = state.products.find(p => p.id === prodId);
+      if (!prod) return;
+
+      const taxable = qty * costPrice;
+      const gstAmount = Math.round(((taxable * gstRate) / 100) * 100) / 100;
+      const total = taxable + gstAmount;
+      totalReturnedVal += total;
+
+      returnedItems.push({
+        productId: prod.id,
+        productName: prod.name,
+        qty,
+        costPrice,
+        gstRate,
+        gstAmount,
+        taxableAmount: taxable,
+        total
+      });
+    });
+
+    if (returnedItems.length === 0) {
+      showToast("Please select at least one item to return!", true);
+      return;
+    }
+
+    // Collect Exchanged Items (if mode === 'exchange')
+    const exchangedItems = [];
+    let totalExchangedVal = 0;
+    if (mode === "exchange") {
+      document.querySelectorAll(".exchange-item-row").forEach(row => {
+        const id = row.id;
+        const prodId = document.getElementById(`exc_prod_${id}`)?.value;
+        const qty = parseInt(document.getElementById(`exc_qty_${id}`)?.value) || 0;
+        const costPrice = parseFloat(document.getElementById(`exc_cost_${id}`)?.value) || 0;
+        const gstRate = parseFloat(document.getElementById(`exc_gst_${id}`)?.value) || 0;
+
+        if (!prodId || qty <= 0) return;
+        const prod = state.products.find(p => p.id === prodId);
+        if (!prod) return;
+
+        const taxable = qty * costPrice;
+        const gstAmount = Math.round(((taxable * gstRate) / 100) * 100) / 100;
+        const total = taxable + gstAmount;
+        totalExchangedVal += total;
+
+        exchangedItems.push({
+          productId: prod.id,
+          productName: prod.name,
+          qty,
+          costPrice,
+          gstRate,
+          gstAmount,
+          taxableAmount: taxable,
+          total
+        });
+      });
+
+      if (exchangedItems.length === 0) {
+        showToast("Please select at least one new item received in exchange!", true);
+        return;
+      }
+    }
+
+    // Rollback stock if editing existing return record
+    if (editId) {
+      const oldRec = (state.supplierReturns || []).find(r => r.id === editId);
+      if (oldRec) {
+        (oldRec.returnedItems || []).forEach(it => {
+          const prod = state.products.find(p => p.id === it.productId);
+          if (prod) prod.currentStock = (Number(prod.currentStock) || 0) + (Number(it.qty) || 0);
+        });
+        (oldRec.exchangedItems || []).forEach(it => {
+          const prod = state.products.find(p => p.id === it.productId);
+          if (prod) prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - (Number(it.qty) || 0));
+        });
+      }
+    }
+
+    // Deduct stock for returned items
+    returnedItems.forEach(it => {
+      const prod = state.products.find(p => p.id === it.productId);
+      if (prod) {
+        prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - (Number(it.qty) || 0));
+      }
+    });
+
+    // Add stock for exchanged items
+    if (mode === "exchange") {
+      exchangedItems.forEach(it => {
+        const prod = state.products.find(p => p.id === it.productId);
+        if (prod) {
+          prod.currentStock = (Number(prod.currentStock) || 0) + (Number(it.qty) || 0);
+          if (it.costPrice > 0) prod.costPrice = it.costPrice;
+        }
+      });
+    }
+
+    const netBalance = totalReturnedVal - totalExchangedVal;
+    const refNo = "PR-" + ((state.supplierReturns ? state.supplierReturns.length : 0) + 101);
+
+    if (!state.supplierReturns) state.supplierReturns = [];
+
+    if (editId) {
+      const existing = state.supplierReturns.find(r => r.id === editId);
+      if (existing) {
+        existing.date = date;
+        existing.vendor = vendor;
+        existing.mode = mode;
+        existing.returnedItems = returnedItems;
+        existing.exchangedItems = exchangedItems;
+        existing.totalReturnedVal = totalReturnedVal;
+        existing.totalExchangedVal = totalExchangedVal;
+        existing.netBalance = netBalance;
+        existing.settlementMode = settlementMode;
+        existing.refundRecipient = refundRecipient;
+        existing.notes = notes;
+        showToast(`Supplier return ${existing.refNo} updated successfully!`);
+      }
+    } else {
+      state.supplierReturns.push({
+        id: "sret_" + Date.now(),
+        refNo,
+        date,
+        vendor,
+        mode,
+        returnedItems,
+        exchangedItems,
+        totalReturnedVal,
+        totalExchangedVal,
+        netBalance,
+        settlementMode,
+        refundRecipient,
+        notes
+      });
+      showToast(`Supplier return ${refNo} recorded and stock adjusted!`);
+    }
+
+    saveState();
+    closeModal('supplierReturnModal');
+    refreshAllUI();
+  } catch (err) {
+    console.error("Error saving supplier return:", err);
+    showToast("Error saving return: " + err.message, true);
+  }
+}
+
+function renderSupplierReturnsTable() {
+  const tbody = document.getElementById("supplierReturnsTableBody");
+  if (!tbody) return;
+
+  const returns = state.supplierReturns || [];
+  if (returns.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="py-5 text-center text-slate-400">No supplier returns or exchanges recorded yet.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = returns.slice().reverse().map(r => {
+    const isExchange = r.mode === 'exchange';
+    const modeBadge = isExchange 
+      ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-rotate text-xs"></i> Exchange</span>'
+      : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200"><i class="fa-solid fa-arrow-up-from-bracket text-xs"></i> Return (Stock Out)</span>';
+
+    const retSummary = (r.returnedItems || []).map(it => `<span class="text-rose-700 font-semibold font-mono">-${it.qty}</span> ${escapeHtml(it.productName)}`).join("<br>");
+    const excSummary = isExchange && r.exchangedItems && r.exchangedItems.length > 0
+      ? r.exchangedItems.map(it => `<span class="text-emerald-700 font-semibold font-mono">+${it.qty}</span> ${escapeHtml(it.productName)}`).join("<br>")
+      : '<span class="text-slate-400 text-xs">-</span>';
+
+    let settlementText = "Ledger Debit Note";
+    let settleClass = "bg-slate-100 text-slate-700";
+    if (r.settlementMode === 'refund_received') {
+      settlementText = "Refund Received";
+      settleClass = "bg-emerald-50 text-emerald-700 border border-emerald-200";
+    } else if (r.settlementMode === 'extra_paid') {
+      settlementText = "Extra Paid";
+      settleClass = "bg-rose-50 text-rose-700 border border-rose-200";
+    } else if (r.settlementMode === 'even_exchange') {
+      settlementText = "Even Exchange";
+      settleClass = "bg-indigo-50 text-indigo-700 border border-indigo-200";
+    }
+
+    return `
+      <tr>
+        <td>
+          <span class="font-mono font-bold text-slate-900 block text-xs">${escapeHtml(r.refNo || 'PR')}</span>
+          <span class="text-[10px] text-slate-400 font-mono">${formatDate(r.date)}</span>
+        </td>
+        <td class="font-bold text-slate-800 text-xs">${escapeHtml(r.vendor || '-')}</td>
+        <td>${modeBadge}</td>
+        <td class="text-xs text-slate-700 max-w-xs">${retSummary}</td>
+        <td class="text-xs text-slate-700 max-w-xs">${excSummary}</td>
+        <td class="text-right font-mono font-bold ${r.netBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'} text-xs sm:text-sm">
+          ${formatCurrency(Math.abs(r.netBalance || r.totalReturnedVal || 0))}
+        </td>
+        <td>
+          <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold ${settleClass}">
+            ${settlementText}
+          </span>
+          ${r.notes ? `<div class="text-[10px] text-slate-400 truncate max-w-[120px]" title="${escapeHtml(r.notes)}">${escapeHtml(r.notes)}</div>` : ''}
+        </td>
+        <td class="text-center space-x-1">
+          <button onclick="deleteSupplierReturn('${r.id}')" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded" title="Delete Return">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function deleteSupplierReturn(id) {
+  const r = (state.supplierReturns || []).find(rec => rec.id === id);
+  if (!r) return;
+
+  if (confirm(`Are you sure you want to delete Supplier Return ${r.refNo}? Note: Stock will be automatically restored!`)) {
+    // Restore returned stock
+    (r.returnedItems || []).forEach(it => {
+      const prod = state.products.find(p => p.id === it.productId);
+      if (prod) prod.currentStock = (Number(prod.currentStock) || 0) + (Number(it.qty) || 0);
+    });
+
+    // Deduct exchanged stock
+    (r.exchangedItems || []).forEach(it => {
+      const prod = state.products.find(p => p.id === it.productId);
+      if (prod) prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - (Number(it.qty) || 0));
+    });
+
+    state.supplierReturns = state.supplierReturns.filter(rec => rec.id !== id);
+    saveState();
+    refreshAllUI();
+    showToast(`Supplier return ${r.refNo} deleted and stock rolled back!`);
+  }
 }
 
 // ==================== DAILY EXPENSES ====================
@@ -5351,6 +6358,7 @@ function refreshAllUI() {
   renderDispatchesTable();
   renderSalesTable();
   renderPurchasesTable();
+  renderSupplierReturnsTable();
   renderExpensesTable();
   updatePartiesDatalist();
   updateSuppliersDatalist();
