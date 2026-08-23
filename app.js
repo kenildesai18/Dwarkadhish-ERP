@@ -1375,23 +1375,23 @@ function addSkuMappingRow(sku = "", multiplier = 1, note = "") {
     <div class="flex-grow">
       <input type="text" value="${escapeHtml(sku)}" oninput="onSkuMappingCodeInput('${rowId}')" placeholder="Paste Meesho SKU / Style ID / Barcode" class="input-pro py-1 text-xs font-mono font-semibold skumap-code" required>
     </div>
-    <div class="w-36 flex-shrink-0 flex items-center gap-1">
+    <div class="w-32 flex-shrink-0 flex items-center gap-1">
       <select class="input-pro py-1 text-xs font-bold text-indigo-700 skumap-multiplier">
         <option value="1" ${multiplier == 1 ? 'selected' : ''}>Pack of 1 (1 pc)</option>
         <option value="2" ${multiplier == 2 ? 'selected' : ''}>Pack of 2 (2 pcs)</option>
         <option value="3" ${multiplier == 3 ? 'selected' : ''}>Pack of 3 (3 pcs)</option>
-        <option value="4" ${multiplier == 4 ? 'selected' : ''}>Pack of 4 (4 pcs / 4 Bags)</option>
+        <option value="4" ${multiplier == 4 ? 'selected' : ''}>Pack of 4 (4 pcs)</option>
         <option value="5" ${multiplier == 5 ? 'selected' : ''}>Pack of 5 (5 pcs)</option>
         <option value="6" ${multiplier == 6 ? 'selected' : ''}>Pack of 6 (6 pcs)</option>
-        <option value="8" ${multiplier == 8 ? 'selected' : ''}>Pack of 8 (8 pcs / 8 Bags)</option>
-        <option value="10" ${multiplier == 10 ? 'selected' : ''}>Pack of 10 (10 pcs / 10 Bags)</option>
-        <option value="12" ${multiplier == 12 ? 'selected' : ''}>Pack of 12 (12 pcs / 12 Bags)</option>
+        <option value="8" ${multiplier == 8 ? 'selected' : ''}>Pack of 8 (8 pcs)</option>
+        <option value="10" ${multiplier == 10 ? 'selected' : ''}>Pack of 10 (10 pcs)</option>
+        <option value="12" ${multiplier == 12 ? 'selected' : ''}>Pack of 12 (12 pcs)</option>
         <option value="15" ${multiplier == 15 ? 'selected' : ''}>Pack of 15 (15 pcs)</option>
         <option value="20" ${multiplier == 20 ? 'selected' : ''}>Pack of 20 (20 pcs)</option>
       </select>
     </div>
     <div class="w-28 flex-shrink-0">
-      <input type="text" value="${escapeHtml(note)}" placeholder="Note (e.g. 4 Bags + 1 Disp)" class="input-pro py-1 text-[11px] skumap-note">
+      <input type="text" value="${escapeHtml(note)}" placeholder="Note (e.g. Set of 4)" class="input-pro py-1 text-[11px] skumap-note">
     </div>
     <button type="button" onclick="removeSkuMappingRow('${rowId}')" class="text-slate-400 hover:text-rose-600 p-1 flex-shrink-0" title="Remove SKU">
       <i class="fa-solid fa-trash-can text-xs"></i>
@@ -1412,20 +1412,20 @@ function onSkuMappingCodeInput(rowId) {
   const val = codeInput.value.toLowerCase();
   let detected = null;
 
-  if (val.match(/12\s*bags?|pack\s*of\s*12|pack\s*12|12\s*pcs?|gbd12|gb12/i)) detected = 12;
-  else if (val.match(/10\s*bags?|pack\s*of\s*10|pack\s*10|10\s*pcs?|gbd10|gb10/i)) detected = 10;
-  else if (val.match(/8\s*bags?|pack\s*of\s*8|pack\s*8|8\s*pcs?|gbd08|gb8/i)) detected = 8;
-  else if (val.match(/6\s*bags?|pack\s*of\s*6|pack\s*6|6\s*pcs?|gbd06|gb6/i)) detected = 6;
-  else if (val.match(/5\s*bags?|pack\s*of\s*5|pack\s*5|5\s*pcs?|gbd05|gb5/i)) detected = 5;
-  else if (val.match(/4\s*bags?|pack\s*of\s*4|pack\s*4|4\s*pcs?|gbd04|gb4/i)) detected = 4;
-  else if (val.match(/3\s*bags?|pack\s*of\s*3|pack\s*3|3\s*pcs?|gbd03|gb3/i)) detected = 3;
-  else if (val.match(/2\s*bags?|pack\s*of\s*2|pack\s*2|2\s*pcs?|gbd02|gb2|pair/i)) detected = 2;
-  else if (val.match(/1\s*bag|pack\s*of\s*1|pack\s*1|single|1\s*pc|gbd01|gb1/i)) detected = 1;
+  if (val.match(/pack\s*of\s*12|pack\s*12|12\s*pcs?|set\s*of\s*12/i)) detected = 12;
+  else if (val.match(/pack\s*of\s*10|pack\s*10|10\s*pcs?|set\s*of\s*10/i)) detected = 10;
+  else if (val.match(/pack\s*of\s*8|pack\s*8|8\s*pcs?|set\s*of\s*8/i)) detected = 8;
+  else if (val.match(/pack\s*of\s*6|pack\s*6|6\s*pcs?|set\s*of\s*6/i)) detected = 6;
+  else if (val.match(/pack\s*of\s*5|pack\s*5|5\s*pcs?|set\s*of\s*5/i)) detected = 5;
+  else if (val.match(/pack\s*of\s*4|pack\s*4|4\s*pcs?|set\s*of\s*4/i)) detected = 4;
+  else if (val.match(/pack\s*of\s*3|pack\s*3|3\s*pcs?|set\s*of\s*3/i)) detected = 3;
+  else if (val.match(/pack\s*of\s*2|pack\s*2|2\s*pcs?|set\s*of\s*2|pair/i)) detected = 2;
+  else if (val.match(/pack\s*of\s*1|pack\s*1|single|1\s*pc/i)) detected = 1;
 
   if (detected) {
     multSelect.value = String(detected);
     if (noteInput && !noteInput.value) {
-      noteInput.value = `${detected} Bags + 1 Dispenser`;
+      noteInput.value = `Pack of ${detected}`;
     }
   }
 }
