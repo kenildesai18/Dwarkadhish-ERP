@@ -1261,6 +1261,73 @@ function renderProductsTable() {
   }).join('');
 }
 
+function addSkuMappingRow(sku = "", multiplier = 1, note = "") {
+  const container = document.getElementById("skuMappingsContainer");
+  if (!container) return;
+
+  const rowId = "skumap_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+  const row = document.createElement("div");
+  row.className = "flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-2xs sku-mapping-row";
+  row.id = rowId;
+
+  row.innerHTML = `
+    <div class="flex-grow">
+      <input type="text" value="${escapeHtml(sku)}" oninput="onSkuMappingCodeInput('${rowId}')" placeholder="Paste Meesho SKU / Style ID / Barcode" class="input-pro py-1 text-xs font-mono font-semibold skumap-code" required>
+    </div>
+    <div class="w-32 flex-shrink-0 flex items-center gap-1">
+      <select class="input-pro py-1 text-xs font-bold text-indigo-700 skumap-multiplier">
+        <option value="1" ${multiplier == 1 ? 'selected' : ''}>Pack of 1 (1 pc)</option>
+        <option value="2" ${multiplier == 2 ? 'selected' : ''}>Pack of 2 (2 pcs)</option>
+        <option value="3" ${multiplier == 3 ? 'selected' : ''}>Pack of 3 (3 pcs)</option>
+        <option value="4" ${multiplier == 4 ? 'selected' : ''}>Pack of 4 (4 pcs)</option>
+        <option value="5" ${multiplier == 5 ? 'selected' : ''}>Pack of 5 (5 pcs)</option>
+        <option value="6" ${multiplier == 6 ? 'selected' : ''}>Pack of 6 (6 pcs)</option>
+        <option value="10" ${multiplier == 10 ? 'selected' : ''}>Pack of 10 (10 pcs)</option>
+      </select>
+    </div>
+    <div class="w-24 flex-shrink-0">
+      <input type="text" value="${escapeHtml(note)}" placeholder="Note (e.g. Set 2)" class="input-pro py-1 text-[11px] skumap-note">
+    </div>
+    <button type="button" onclick="removeSkuMappingRow('${rowId}')" class="text-slate-400 hover:text-rose-600 p-1 flex-shrink-0" title="Remove SKU">
+      <i class="fa-solid fa-trash-can text-xs"></i>
+    </button>
+  `;
+
+  container.appendChild(row);
+}
+
+function onSkuMappingCodeInput(rowId) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  const codeInput = row.querySelector(".skumap-code");
+  const multSelect = row.querySelector(".skumap-multiplier");
+  const noteInput = row.querySelector(".skumap-note");
+  if (!codeInput || !multSelect) return;
+
+  const val = codeInput.value.toLowerCase();
+  let detected = null;
+
+  if (val.match(/pack\s*of\s*2|pack\s*2|set\s*of\s*2|2\s*pcs?|combo\s*of\s*2|pair/i)) detected = 2;
+  else if (val.match(/pack\s*of\s*3|pack\s*3|set\s*of\s*3|3\s*pcs?|combo\s*of\s*3/i)) detected = 3;
+  else if (val.match(/pack\s*of\s*4|pack\s*4|set\s*of\s*4|4\s*pcs?/i)) detected = 4;
+  else if (val.match(/pack\s*of\s*5|pack\s*5|set\s*of\s*5|5\s*pcs?/i)) detected = 5;
+  else if (val.match(/pack\s*of\s*6|pack\s*6|set\s*of\s*6|6\s*pcs?/i)) detected = 6;
+  else if (val.match(/pack\s*of\s*10|pack\s*10|10\s*pcs?/i)) detected = 10;
+  else if (val.match(/pack\s*of\s*1|pack\s*1|single|1\s*pc/i)) detected = 1;
+
+  if (detected) {
+    multSelect.value = String(detected);
+    if (noteInput && !noteInput.value) {
+      noteInput.value = `Pack of ${detected}`;
+    }
+  }
+}
+
+function removeSkuMappingRow(rowId) {
+  const row = document.getElementById(rowId);
+  if (row) row.remove();
+}
+
 function handleSaveProduct(e) {
   e.preventDefault();
   const editId = document.getElementById("productEditId").value;
@@ -1273,6 +1340,23 @@ function handleSaveProduct(e) {
   const wholesalePrice = parseFloat(document.getElementById("prodWholesalePrice").value) || 0;
   const openingStock = parseInt(document.getElementById("prodOpeningStock").value) || 0;
 
+  // Collect SKU & Pack Multiplier mappings
+  const mappingRows = document.querySelectorAll(".sku-mapping-row");
+  const skuMappings = [];
+  mappingRows.forEach(r => {
+    const code = r.querySelector(".skumap-code")?.value.trim();
+    const mult = parseInt(r.querySelector(".skumap-multiplier")?.value) || 1;
+    const note = r.querySelector(".skumap-note")?.value.trim() || `Pack of ${mult}`;
+    if (code) {
+      skuMappings.push({
+        id: "map_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
+        sku: code,
+        multiplier: mult,
+        note
+      });
+    }
+  });
+
   if (editId) {
     const prod = state.products.find(p => p.id === editId);
     if (prod) {
@@ -1283,6 +1367,7 @@ function handleSaveProduct(e) {
       prod.costPrice = costPrice;
       prod.retailPrice = retailPrice;
       prod.wholesalePrice = wholesalePrice;
+      prod.skuMappings = skuMappings;
       showToast("Product updated successfully!");
     }
   } else {
@@ -1297,6 +1382,7 @@ function handleSaveProduct(e) {
       openingStock: openingStock,
       currentStock: openingStock,
       minStockAlert: minStock,
+      skuMappings: skuMappings,
       purchaseBatches: openingStock > 0 ? [{
         id: "batch_open_" + Date.now(),
         purchaseId: "opening",
@@ -1334,6 +1420,17 @@ function editProduct(id) {
   document.getElementById("prodRetailPrice").value = prod.retailPrice;
   document.getElementById("prodWholesalePrice").value = prod.wholesalePrice;
   document.getElementById("openingStockGroup").classList.add("hidden");
+
+  // Load existing SKU Mappings
+  const container = document.getElementById("skuMappingsContainer");
+  if (container) {
+    container.innerHTML = "";
+    if (Array.isArray(prod.skuMappings) && prod.skuMappings.length > 0) {
+      prod.skuMappings.forEach(m => {
+        addSkuMappingRow(m.sku, m.multiplier, m.note);
+      });
+    }
+  }
 
   document.getElementById("productModalTitle").textContent = "Edit Product";
   openModal('productModal', 'edit');
@@ -1677,6 +1774,472 @@ function deleteOnlineDispatch(id) {
     saveState();
     refreshAllUI();
     showToast("Dispatch deleted and stock restored!");
+  }
+}
+
+// ==================== FAST DISPATCH BARCODE SCANNER & PACK MULTIPLIER ENGINE ====================
+
+let scannerSession = {
+  date: new Date().toISOString().split('T')[0],
+  platform: 'Meesho',
+  accountId: '',
+  accountName: '',
+  items: [] // { productId, productName, matchedSku, packLabel, multiplier, count, totalUnits }
+};
+
+let cameraStream = null;
+let cameraScanInterval = null;
+
+function playScannerAudio(isSuccess = true) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (isSuccess) {
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.12);
+    } else {
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.setValueAtTime(160, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    }
+  } catch (e) {
+    console.warn("AudioContext audio beep failed", e);
+  }
+}
+
+function findProductAndMultiplierByBarcode(rawCode) {
+  if (!rawCode) return null;
+  const cleanCode = rawCode.trim();
+  const codeLower = cleanCode.toLowerCase();
+  const codeUpper = cleanCode.toUpperCase();
+  if (!codeUpper) return null;
+
+  for (const p of (state.products || [])) {
+    const candidatePrefixes = [];
+    if (p.sku) candidatePrefixes.push(p.sku.trim().toUpperCase());
+    if (p.prefix) candidatePrefixes.push(p.prefix.trim().toUpperCase());
+    if (Array.isArray(p.skuMappings)) {
+      p.skuMappings.forEach(m => {
+        if (m.sku) candidatePrefixes.push(m.sku.trim().toUpperCase());
+      });
+    }
+
+    // 1. Direct Exact Match on Master SKU or ID
+    if ((p.sku && p.sku.trim().toLowerCase() === codeLower) || p.id.toLowerCase() === codeLower) {
+      const digitMatch = (p.sku || '').match(/0*([1-9][0-9]?)$/);
+      const mult = digitMatch ? parseInt(digitMatch[1]) : 1;
+      return { product: p, matchedSku: p.sku || p.name, multiplier: mult, label: mult > 1 ? `Pack of ${mult} (${mult} pcs)` : 'Single (1 pc)' };
+    }
+
+    // 2. Direct Exact Match on mapped listing SKUs
+    if (Array.isArray(p.skuMappings)) {
+      for (const m of p.skuMappings) {
+        if (m.sku && m.sku.trim().toLowerCase() === codeLower) {
+          const mult = parseInt(m.multiplier) || 1;
+          return { product: p, matchedSku: m.sku, multiplier: mult, label: m.note || `Pack of ${mult} (${mult} pcs)` };
+        }
+      }
+    }
+
+    // 3. SMART PREFIX + PACK NUMBER PATTERN (e.g. MMD01 -> 1pc, MMD02 -> 2pcs, MMD03 -> 3pcs, MMD04 -> 4pcs, MMD05 -> 5pcs)
+    for (const pref of candidatePrefixes) {
+      if (!pref || pref.length < 2) continue;
+
+      // Extract alphanumeric base prefix (e.g. if pref is MMD01, base is MMD)
+      const basePref = pref.replace(/[-_\s]*(?:P|PACK|PK|SET)?0*[1-9][0-9]?$/i, '');
+      const prefixesToCheck = [pref];
+      if (basePref && basePref.length >= 2 && !prefixesToCheck.includes(basePref)) {
+        prefixesToCheck.push(basePref);
+      }
+
+      for (const curBase of prefixesToCheck) {
+        const escaped = curBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
+        // Matches MMD01, MMD02, MMD05, MMD-1, MMD-2, MMD_P3, MMD-PACK-4, M1-MMD02, etc.
+        const regex = new RegExp(`(?:^|[^A-Z0-9])${escaped}[-_\\s]*(?:P|PACK|PK|SET)?[-_\\s]*0*([1-9][0-9]?)(?:[^A-Z0-9]|$)`, 'i');
+        const match = codeUpper.match(regex);
+        if (match) {
+          const qty = parseInt(match[1]) || 1;
+          return {
+            product: p,
+            matchedSku: `${curBase}${qty < 10 ? '0' + qty : qty}`,
+            multiplier: qty,
+            label: `Pack of ${qty} (${qty} pcs)`
+          };
+        }
+      }
+    }
+
+    // 4. Substring Match Fallback
+    if (p.sku && p.sku.length >= 3 && codeLower.includes(p.sku.trim().toLowerCase())) {
+      return { product: p, matchedSku: p.sku, multiplier: 1, label: 'Single (1 pc)' };
+    }
+
+    if (Array.isArray(p.skuMappings)) {
+      for (const m of p.skuMappings) {
+        if (m.sku && m.sku.length >= 3 && codeLower.includes(m.sku.trim().toLowerCase())) {
+          const mult = parseInt(m.multiplier) || 1;
+          return { product: p, matchedSku: m.sku, multiplier: mult, label: m.note || `Pack of ${mult} (${mult} pcs)` };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function openDispatchScannerModal() {
+  const today = new Date().toISOString().split('T')[0];
+  const dateInput = document.getElementById("scannerDate");
+  if (dateInput) dateInput.value = today;
+
+  updateScannerAccountsDropdown();
+
+  scannerSession = {
+    date: today,
+    platform: document.getElementById("scannerPlatform")?.value || 'Meesho',
+    accountId: document.getElementById("scannerAccount")?.value || '',
+    accountName: getSellerAccountName(document.getElementById("scannerAccount")?.value),
+    items: []
+  };
+
+  renderScannerSessionTable();
+
+  const statusText = document.getElementById("scannerStatusText");
+  if (statusText) {
+    statusText.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> Ready to scan parcels. Point your barcode gun and pull trigger.`;
+    statusText.className = "text-slate-700 font-semibold";
+  }
+
+  openModal('dispatchScannerModal');
+
+  setTimeout(() => {
+    const input = document.getElementById("scannerBarcodeGunInput");
+    if (input) {
+      input.value = "";
+      input.focus();
+    }
+  }, 200);
+}
+
+function closeDispatchScannerModal() {
+  stopCameraScanner();
+  closeModal('dispatchScannerModal');
+  refreshAllUI();
+}
+
+function updateScannerAccountsDropdown() {
+  const platform = document.getElementById("scannerPlatform")?.value || "Meesho";
+  const select = document.getElementById("scannerAccount");
+  if (!select) return;
+
+  const accounts = (state.settings.sellerAccounts || []).filter(a => a.platform === platform);
+
+  if (accounts.length === 0) {
+    select.innerHTML = `
+      <option value="${platform}_default">${platform} - Account 1 (Main)</option>
+      <option value="${platform}_acc2">${platform} - Account 2</option>
+      <option value="${platform}_acc3">${platform} - Account 3</option>
+    `;
+  } else {
+    select.innerHTML = accounts.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  }
+}
+
+function handleBarcodeGunKeydown(e) {
+  if (e.key === "Enter" || e.keyCode === 13) {
+    e.preventDefault();
+    submitManualScan();
+  }
+}
+
+function submitManualScan() {
+  const input = document.getElementById("scannerBarcodeGunInput");
+  if (!input) return;
+  const rawCode = input.value.trim();
+  if (!rawCode) return;
+
+  processScannedBarcode(rawCode);
+  input.value = "";
+  input.focus();
+}
+
+function processScannedBarcode(rawCode) {
+  const match = findProductAndMultiplierByBarcode(rawCode);
+  const statusText = document.getElementById("scannerStatusText");
+
+  if (!match) {
+    playScannerAudio(false);
+    if (statusText) {
+      statusText.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-600 mr-1"></i> <b>SKU / Barcode "${escapeHtml(rawCode)}" not found!</b> Please map this SKU under Product details.`;
+      statusText.className = "text-rose-700 font-bold animate-pulse";
+    }
+    showToast(`Unknown Barcode: "${rawCode}"!`, true);
+    return;
+  }
+
+  const prod = match.product;
+  const multiplier = match.multiplier || 1;
+
+  // Deduct multiplier units from physical inventory stock
+  prod.currentStock = Math.max(0, (Number(prod.currentStock) || 0) - multiplier);
+
+  // Add / Update item in scannerSession
+  let sessionItem = scannerSession.items.find(it => it.productId === prod.id && it.matchedSku === match.matchedSku);
+  if (sessionItem) {
+    sessionItem.count += 1;
+    sessionItem.totalUnits += multiplier;
+  } else {
+    scannerSession.items.push({
+      productId: prod.id,
+      productName: prod.name,
+      matchedSku: match.matchedSku,
+      packLabel: match.label,
+      multiplier: multiplier,
+      count: 1,
+      totalUnits: multiplier
+    });
+  }
+
+  // Update or record in state.onlineDispatches for today & platform/account
+  recordScannerDispatchInState(prod, match, multiplier);
+
+  playScannerAudio(true);
+
+  if (statusText) {
+    statusText.innerHTML = `
+      <i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i>
+      <b>${escapeHtml(prod.name)}</b> (${escapeHtml(match.label)}) ➔ 
+      <span class="text-emerald-800 font-extrabold font-mono">-${multiplier} pcs Stock Out</span> | 
+      <span class="text-slate-600 font-mono">Stock Remaining: <b>${prod.currentStock} pcs</b></span>
+    `;
+    statusText.className = "text-emerald-900 font-semibold";
+  }
+
+  renderScannerSessionTable();
+  saveState();
+}
+
+function recordScannerDispatchInState(prod, match, multiplier) {
+  const date = document.getElementById("scannerDate")?.value || new Date().toISOString().split('T')[0];
+  const platform = document.getElementById("scannerPlatform")?.value || "Meesho";
+  const accountSelect = document.getElementById("scannerAccount");
+  const accountId = accountSelect?.value || `${platform}_default`;
+  const accountName = accountSelect?.options[accountSelect?.selectedIndex]?.text || platform;
+
+  if (!state.onlineDispatches) state.onlineDispatches = [];
+
+  // Find if a dispatch entry already exists for today, platform and account
+  let dispatchEntry = state.onlineDispatches.find(d => d.date === date && d.platform === platform && d.accountId === accountId);
+
+  if (dispatchEntry) {
+    if (!Array.isArray(dispatchEntry.items)) dispatchEntry.items = [];
+    let dispItem = dispatchEntry.items.find(it => it.productId === prod.id);
+    if (dispItem) {
+      dispItem.qty = (Number(dispItem.qty) || 0) + multiplier;
+    } else {
+      dispatchEntry.items.push({
+        productId: prod.id,
+        productName: prod.name,
+        sku: match.matchedSku,
+        costPrice: prod.costPrice || 0,
+        retailPrice: prod.retailPrice || 0,
+        qty: multiplier
+      });
+    }
+    dispatchEntry.totalUnits = dispatchEntry.items.reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
+  } else {
+    dispatchEntry = {
+      id: "disp_" + Date.now(),
+      date,
+      platform,
+      accountId,
+      accountName,
+      items: [{
+        productId: prod.id,
+        productName: prod.name,
+        sku: match.matchedSku,
+        costPrice: prod.costPrice || 0,
+        retailPrice: prod.retailPrice || 0,
+        qty: multiplier
+      }],
+      totalUnits: multiplier,
+      notes: "Scanned via Barcode Scanner"
+    };
+    state.onlineDispatches.push(dispatchEntry);
+  }
+}
+
+function undoScannerSessionItem(index) {
+  const item = scannerSession.items[index];
+  if (!item) return;
+
+  const prod = state.products.find(p => p.id === item.productId);
+  if (prod) {
+    // Restore stock by multiplier
+    prod.currentStock = (Number(prod.currentStock) || 0) + item.multiplier;
+  }
+
+  // Also remove units from onlineDispatches
+  const date = document.getElementById("scannerDate")?.value || new Date().toISOString().split('T')[0];
+  const platform = document.getElementById("scannerPlatform")?.value || "Meesho";
+  const accountId = document.getElementById("scannerAccount")?.value;
+
+  const dispatchEntry = (state.onlineDispatches || []).find(d => d.date === date && d.platform === platform && d.accountId === accountId);
+  if (dispatchEntry && Array.isArray(dispatchEntry.items)) {
+    const dispItem = dispatchEntry.items.find(it => it.productId === item.productId);
+    if (dispItem) {
+      dispItem.qty = Math.max(0, (Number(dispItem.qty) || 0) - item.multiplier);
+      if (dispItem.qty === 0) {
+        dispatchEntry.items = dispatchEntry.items.filter(it => it.productId !== item.productId);
+      }
+      dispatchEntry.totalUnits = dispatchEntry.items.reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
+    }
+  }
+
+  if (item.count > 1) {
+    item.count -= 1;
+    item.totalUnits -= item.multiplier;
+  } else {
+    scannerSession.items.splice(index, 1);
+  }
+
+  renderScannerSessionTable();
+  saveState();
+  showToast("Scan undone! 1 package stock restored.");
+}
+
+function renderScannerSessionTable() {
+  const tbody = document.getElementById("scannerSessionTableBody");
+  if (!tbody) return;
+
+  const totalSessionUnits = scannerSession.items.reduce((acc, it) => acc + it.totalUnits, 0);
+  const totalOrders = scannerSession.items.reduce((acc, it) => acc + it.count, 0);
+
+  const badgeEl = document.getElementById("scannerSessionUnitBadge");
+  if (badgeEl) badgeEl.textContent = `Session: ${totalOrders} pkgs (${totalSessionUnits} pcs)`;
+
+  const totalEl = document.getElementById("scannerBatchTotalCount");
+  if (totalEl) totalEl.textContent = `Total Orders: ${totalOrders} | Total Units: ${totalSessionUnits} pcs`;
+
+  if (scannerSession.items.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-slate-400">No parcels scanned yet in this session. Point scanner at a shipping label.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = scannerSession.items.map((it, idx) => {
+    const prod = state.products.find(p => p.id === it.productId);
+    const curStock = prod ? prod.currentStock : 0;
+
+    return `
+      <tr class="hover:bg-slate-50">
+        <td class="font-bold text-slate-900 text-xs">${escapeHtml(it.productName)}</td>
+        <td class="font-mono text-slate-600 text-xs">${escapeHtml(it.matchedSku)}</td>
+        <td class="text-center">
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+            ${escapeHtml(it.packLabel)}
+          </span>
+        </td>
+        <td class="text-right font-mono font-bold text-slate-800">${it.count}</td>
+        <td class="text-right font-mono font-extrabold text-indigo-900 text-sm bg-indigo-50/50">${it.totalUnits} pcs</td>
+        <td class="text-right font-mono font-bold text-emerald-700">${curStock} pcs</td>
+        <td class="text-center">
+          <button onclick="undoScannerSessionItem(${idx})" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded" title="Undo / Minus 1 Scan">
+            <i class="fa-solid fa-rotate-left text-xs"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function clearScannerSession() {
+  if (confirm("Reset current scanner session display? (Note: Already saved dispatches remain in log)")) {
+    scannerSession.items = [];
+    renderScannerSessionTable();
+  }
+}
+
+function completeScannerSession() {
+  closeDispatchScannerModal();
+  showToast("Dispatch scanning session completed! All inventory updated.");
+}
+
+// Camera Scanner Implementation using MediaDevices API & BarcodeDetector
+async function toggleCameraScanner() {
+  const container = document.getElementById("scannerCameraContainer");
+  const btnText = document.getElementById("cameraBtnText");
+
+  if (!container.classList.contains("hidden")) {
+    stopCameraScanner();
+    return;
+  }
+
+  try {
+    container.classList.remove("hidden");
+    if (btnText) btnText.textContent = "Stop Camera";
+
+    const video = document.getElementById("scannerVideoElement");
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
+    video.srcObject = cameraStream;
+    await video.play();
+
+    if ('BarcodeDetector' in window) {
+      const barcodeDetector = new BarcodeDetector({
+        formats: ['code_128', 'ean_13', 'qr_code', 'upc_a', 'data_matrix', 'code_39']
+      });
+
+      cameraScanInterval = setInterval(async () => {
+        if (!video.videoWidth) return;
+        try {
+          const barcodes = await barcodeDetector.detect(video);
+          if (barcodes.length > 0) {
+            const rawValue = barcodes[0].rawValue;
+            if (rawValue) {
+              processScannedBarcode(rawValue);
+            }
+          }
+        } catch (err) {
+          // ignore frame error
+        }
+      }, 500);
+    } else {
+      showToast("Camera active. For fastest scanning, USB barcode gun is recommended!");
+    }
+  } catch (err) {
+    console.error("Camera access error:", err);
+    showToast("Unable to access camera: " + err.message, true);
+    stopCameraScanner();
+  }
+}
+
+function stopCameraScanner() {
+  const container = document.getElementById("scannerCameraContainer");
+  const btnText = document.getElementById("cameraBtnText");
+  if (container) container.classList.add("hidden");
+  if (btnText) btnText.textContent = "Use Camera Scanner";
+
+  if (cameraScanInterval) {
+    clearInterval(cameraScanInterval);
+    cameraScanInterval = null;
+  }
+
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
   }
 }
 
