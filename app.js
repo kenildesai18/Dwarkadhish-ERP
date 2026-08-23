@@ -1009,10 +1009,13 @@ function rebuildProductBatchesFromHistory() {
           const grossRate = Number(it.costPrice) || 0;
           const discAmt = Number(it.discountAmount) || 0;
           const discPct = Number(it.discountPercent) || 0;
+          const gstRate = Number(it.gstRate) || 0;
           const grossTotal = qty * grossRate;
-          const netTotal = Math.max(0, grossTotal - discAmt);
-          // Exact Landed Net Cost per piece (e.g. ₹10 minus 10% discount = ₹9.00)!
-          const netCost = Math.round((netTotal / qty) * 100) / 100;
+          const taxable = Math.max(0, grossTotal - discAmt);
+          const gstAmt = it.gstAmount !== undefined ? Number(it.gstAmount) : Math.round(((taxable * gstRate) / 100) * 100) / 100;
+          const finalTotalWithGst = taxable + gstAmt;
+          // Exact Landed Net Cost per piece INCLUDING GST (e.g. ₹11 + 18% GST = ₹12.98)!
+          const netLandedCost = Math.round((finalTotalWithGst / qty) * 100) / 100;
 
           inwardBatches.push({
             id: `batch_${purch.id}_${itIdx}`,
@@ -1025,8 +1028,10 @@ function rebuildProductBatchesFromHistory() {
             grossRate: grossRate,
             discountPercent: discPct,
             discountAmount: discAmt,
-            costPrice: netCost,
-            netCostPrice: netCost
+            gstRate: gstRate,
+            gstAmount: gstAmt,
+            costPrice: netLandedCost,
+            netCostPrice: netLandedCost
           });
         }
       });
@@ -1046,6 +1051,8 @@ function rebuildProductBatchesFromHistory() {
         grossRate: Number(p.costPrice) || 0,
         discountPercent: 0,
         discountAmount: 0,
+        gstRate: 0,
+        gstAmount: 0,
         costPrice: Number(p.costPrice) || 0,
         netCostPrice: Number(p.costPrice) || 0
       });
@@ -1095,7 +1102,7 @@ function rebuildProductBatchesFromHistory() {
     if (activeBatches.length > 0) {
       p.weightedAvgCost = Math.round((totalValuation / totalRemaining) * 100) / 100;
       p.latestCost = inwardBatches[inwardBatches.length - 1].netCostPrice;
-      p.costPrice = p.latestCost; // Reflects net landed cost (after discount)
+      p.costPrice = p.latestCost; // Reflects net landed cost with GST and discount!
     }
   });
 }
@@ -1126,7 +1133,7 @@ function openBatchBreakdownModal(prodId) {
   if (!tbody) return;
 
   if (batches.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">No purchase batches found for this product.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="text-center py-6 text-slate-400">No purchase batches found for this product.</td></tr>`;
   } else {
     tbody.innerHTML = batches.map(b => {
       let statusBadge = "bg-emerald-50 text-emerald-700 border border-emerald-200";
@@ -1144,6 +1151,10 @@ function openBatchBreakdownModal(prodId) {
         ? `${b.discountPercent ? `${b.discountPercent}% ` : ''}(-₹${b.discountAmount})`
         : '-';
 
+      const gstText = b.gstAmount > 0
+        ? `${b.gstRate}% (+₹${b.gstAmount})`
+        : (b.gstRate ? `${b.gstRate}%` : '-');
+
       return `
         <tr class="hover:bg-slate-50">
           <td class="font-mono text-slate-600">${formatDate(b.date)}</td>
@@ -1154,7 +1165,8 @@ function openBatchBreakdownModal(prodId) {
           <td class="text-right font-mono text-slate-700">${b.qty}</td>
           <td class="text-right font-mono text-slate-500">${formatCurrency(b.grossRate)}</td>
           <td class="text-right font-mono text-rose-600 text-xs">${discText}</td>
-          <td class="text-right font-mono font-bold text-emerald-700 text-sm bg-emerald-50/50" title="Effective Landed Price">${formatCurrency(b.netCostPrice)}</td>
+          <td class="text-right font-mono text-indigo-700 text-xs">${gstText}</td>
+          <td class="text-right font-mono font-bold text-emerald-700 text-sm bg-emerald-50/50" title="Effective Landed Price (Incl. GST)">${formatCurrency(b.netCostPrice)}</td>
           <td class="text-right font-mono font-extrabold text-indigo-900 text-sm">${b.remainingQty} pcs</td>
           <td class="text-right font-mono font-bold text-slate-900">${formatCurrency(b.remainingQty * b.netCostPrice)}</td>
           <td class="text-center">
@@ -2537,9 +2549,8 @@ function editSale(id) {
 
   const container = document.getElementById("saleItemsContainer");
   container.innerHTML = "";
-
   (sale.items || []).forEach(it => {
-    addSaleItemRow(it.productId, it.qty, it.price, it.discountPercent, it.discountAmount);
+    addSaleItemRow(it.productId, it.qty, it.price, it.discountPercent, it.discountAmount, it.gstRate);
   });
 
   calculateSaleTotal();
@@ -2548,7 +2559,7 @@ function editSale(id) {
   openModal('saleModal', 'edit');
 }
 
-function addSaleItemRow(prodId = "", qty = 1, customPrice = null, discPercent = null, discAmount = null) {
+function addSaleItemRow(prodId = "", qty = 1, customPrice = null, discPercent = null, discAmount = null, gstRate = 0) {
   const container = document.getElementById("saleItemsContainer");
   if (!container) return;
 
@@ -2567,6 +2578,7 @@ function addSaleItemRow(prodId = "", qty = 1, customPrice = null, discPercent = 
 
   const dPct = (discPercent !== null && discPercent !== undefined && discPercent > 0) ? discPercent : "";
   const dAmt = (discAmount !== null && discAmount !== undefined && discAmount > 0) ? discAmount : "";
+  const gRate = (gstRate !== null && gstRate !== undefined) ? gstRate : 0;
 
   const row = document.createElement("div");
   row.className = "bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2.5 sale-item-row hover:border-indigo-400 transition-all";
@@ -2594,7 +2606,7 @@ function addSaleItemRow(prodId = "", qty = 1, customPrice = null, discPercent = 
         </select>
       </div>
       <div class="text-right flex-shrink-0 pt-3">
-        <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Item Total</div>
+        <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Item Total (Incl. GST)</div>
         <div class="flex items-center gap-2">
           <span id="sale_subtotal_${rowIndex}" class="font-mono text-sm sm:text-base font-bold text-emerald-700">₹0</span>
           <button type="button" onclick="removeSaleItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors" title="Remove Product">
@@ -2604,8 +2616,8 @@ function addSaleItemRow(prodId = "", qty = 1, customPrice = null, discPercent = 
       </div>
     </div>
 
-    <!-- Bottom: 4 Spacious Input Boxes with Top Labels -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+    <!-- Bottom: 5 Spacious Input Boxes with Top Labels -->
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
       <div>
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Qty (pcs) *</label>
         <input type="number" id="sale_qty_${rowIndex}" min="1" value="${qty}" oninput="onSaleRowQtyOrPriceChange('${rowIndex}')" placeholder="Qty" required class="input-pro py-1.5 text-xs sm:text-sm text-center font-bold font-mono">
@@ -2621,6 +2633,16 @@ function addSaleItemRow(prodId = "", qty = 1, customPrice = null, discPercent = 
       <div>
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Discount (₹)</label>
         <input type="number" id="sale_disc_amt_${rowIndex}" min="0" step="any" value="${dAmt}" oninput="onSaleRowDiscAmountChange('${rowIndex}')" placeholder="₹0.00" class="input-pro py-1.5 text-xs sm:text-sm text-right font-mono font-bold text-rose-600">
+      </div>
+      <div class="col-span-2 sm:col-span-1">
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">GST Rate (%)</label>
+        <select id="sale_gst_${rowIndex}" onchange="onSaleRowQtyOrPriceChange('${rowIndex}')" class="input-pro py-1.5 text-xs sm:text-sm font-bold text-indigo-700">
+          <option value="0" ${gRate == 0 ? 'selected' : ''}>0% (Nil)</option>
+          <option value="5" ${gRate == 5 ? 'selected' : ''}>5%</option>
+          <option value="12" ${gRate == 12 ? 'selected' : ''}>12%</option>
+          <option value="18" ${gRate == 18 ? 'selected' : ''}>18%</option>
+          <option value="28" ${gRate == 28 ? 'selected' : ''}>28%</option>
+        </select>
       </div>
     </div>
   `;
@@ -2684,7 +2706,7 @@ function onSaleRowDiscPercentChange(rowIndex) {
   } else {
     if (amtInput) amtInput.value = "";
   }
-  calculateSaleTotal();
+  onSaleRowQtyOrPriceChange(rowIndex);
 }
 
 function onSaleRowDiscAmountChange(rowIndex) {
@@ -2706,7 +2728,7 @@ function onSaleRowDiscAmountChange(rowIndex) {
   } else {
     if (pctInput) pctInput.value = "";
   }
-  calculateSaleTotal();
+  onSaleRowQtyOrPriceChange(rowIndex);
 }
 
 function onSaleRowQtyOrPriceChange(rowIndex) {
@@ -2734,6 +2756,22 @@ function onSaleRowQtyOrPriceChange(rowIndex) {
       if (pctInput) pctInput.value = "";
     }
   }
+
+  const discAmt = parseFloat(document.getElementById(`sale_disc_amt_${rowIndex}`)?.value) || 0;
+  const taxable = Math.max(0, gross - discAmt);
+  const gstPct = parseFloat(document.getElementById(`sale_gst_${rowIndex}`)?.value) || 0;
+  const gstAmt = Math.round(((taxable * gstPct) / 100) * 100) / 100;
+  const rowNetTotal = taxable + gstAmt;
+
+  const subEl = document.getElementById(`sale_subtotal_${rowIndex}`);
+  if (subEl) {
+    if (gstAmt > 0) {
+      subEl.innerHTML = `<span>${formatCurrency(rowNetTotal)}</span> <span class="text-[10px] text-slate-500 font-normal block font-sans">Taxable: ${formatCurrency(taxable)} + GST: ${formatCurrency(gstAmt)}</span>`;
+    } else {
+      subEl.textContent = formatCurrency(rowNetTotal);
+    }
+  }
+
   calculateSaleTotal();
 }
 
@@ -2741,6 +2779,8 @@ function calculateSaleTotal() {
   const rows = document.querySelectorAll(".sale-item-row");
   let totalGross = 0;
   let totalDiscounts = 0;
+  let totalTaxable = 0;
+  let totalGst = 0;
   let netGrandTotal = 0;
   let totalEstimatedCost = 0;
 
@@ -2755,16 +2795,20 @@ function calculateSaleTotal() {
     const discAmt = parseFloat(document.getElementById(`sale_disc_amt_${id}`)?.value) || 0;
     totalDiscounts += discAmt;
 
-    const rowNetTotal = Math.max(0, gross - discAmt);
+    const taxable = Math.max(0, gross - discAmt);
+    totalTaxable += taxable;
+
+    const gstPct = parseFloat(document.getElementById(`sale_gst_${id}`)?.value) || 0;
+    const gstAmt = Math.round(((taxable * gstPct) / 100) * 100) / 100;
+    totalGst += gstAmt;
+
+    const rowNetTotal = taxable + gstAmt;
     netGrandTotal += rowNetTotal;
 
     const prod = state.products.find(p => p.id === prodId);
     if (prod) {
       totalEstimatedCost += (qty * (Number(prod.costPrice) || 0));
     }
-
-    const subEl = document.getElementById(`sale_subtotal_${id}`);
-    if (subEl) subEl.textContent = formatCurrency(rowNetTotal);
   });
 
   const grossEl = document.getElementById("saleGrossDisplay");
@@ -2772,6 +2816,9 @@ function calculateSaleTotal() {
 
   const discEl = document.getElementById("saleTotalDiscountDisplay");
   if (discEl) discEl.textContent = `-${formatCurrency(totalDiscounts)}`;
+
+  const gstEl = document.getElementById("saleTotalGstDisplay");
+  if (gstEl) gstEl.textContent = `+${formatCurrency(totalGst)}`;
 
   const dTotal = document.getElementById("saleTotalDisplay");
   if (dTotal) dTotal.textContent = formatCurrency(netGrandTotal);
@@ -2791,6 +2838,9 @@ function calculateSaleTotal() {
     if (recvGroup) recvGroup.classList.remove("hidden");
   } else if (status === 'Pending') {
     if (recvGroup) recvGroup.classList.add("hidden");
+  } else if (status === 'Partial') {
+    const paidAmt = parseFloat(paidInput?.value) || 0;
+    if (paidAmt > 0 && recvGroup) recvGroup.classList.remove("hidden");
   }
 }
 
@@ -2808,11 +2858,7 @@ function toggleSalePaidAmount() {
     if (recvGroup) recvGroup.classList.add("hidden");
   } else if (status === 'Partial') {
     const paidAmt = parseFloat(paidInput?.value) || 0;
-    if (paidAmt > 0) {
-      if (recvGroup) recvGroup.classList.remove("hidden");
-    } else {
-      if (recvGroup) recvGroup.classList.add("hidden");
-    }
+    if (paidAmt > 0 && recvGroup) recvGroup.classList.remove("hidden");
   }
 }
 
@@ -2886,6 +2932,8 @@ function handleSaveSale(e) {
     const items = [];
     let totalGross = 0;
     let totalDiscounts = 0;
+    let totalTaxable = 0;
+    let totalGst = 0;
     let netGrandTotal = 0;
 
     rows.forEach(row => {
@@ -2895,6 +2943,7 @@ function handleSaveSale(e) {
       const price = parseFloat(document.getElementById(`sale_price_${id}`)?.value) || 0;
       const discountPercent = parseFloat(document.getElementById(`sale_disc_pct_${id}`)?.value) || 0;
       const discountAmount = parseFloat(document.getElementById(`sale_disc_amt_${id}`)?.value) || 0;
+      const gstRate = parseFloat(document.getElementById(`sale_gst_${id}`)?.value) || 0;
 
       if (!prodId || qty <= 0) return;
 
@@ -2902,9 +2951,14 @@ function handleSaveSale(e) {
       if (!prod) return;
 
       const gross = qty * price;
-      const rowTotal = Math.max(0, gross - discountAmount);
+      const taxable = Math.max(0, gross - discountAmount);
+      const gstAmount = Math.round(((taxable * gstRate) / 100) * 100) / 100;
+      const rowTotal = taxable + gstAmount;
+
       totalGross += gross;
       totalDiscounts += discountAmount;
+      totalTaxable += taxable;
+      totalGst += gstAmount;
       netGrandTotal += rowTotal;
 
       items.push({
@@ -2916,6 +2970,9 @@ function handleSaveSale(e) {
         costPrice: prod.costPrice || 0,
         discountPercent,
         discountAmount,
+        taxableAmount: taxable,
+        gstRate,
+        gstAmount,
         grossTotal: gross,
         total: rowTotal
       });
@@ -2963,6 +3020,8 @@ function handleSaveSale(e) {
         existing.items = items;
         existing.subtotal = totalGross;
         existing.discountAmount = totalDiscounts;
+        existing.taxableAmount = totalTaxable;
+        existing.gstAmount = totalGst;
         existing.totalAmount = netGrandTotal;
         existing.paymentStatus = paymentStatus;
         existing.paidAmount = paidAmount;
@@ -2986,6 +3045,8 @@ function handleSaveSale(e) {
         items,
         subtotal: totalGross,
         discountAmount: totalDiscounts,
+        taxableAmount: totalTaxable,
+        gstAmount: totalGst,
         totalAmount: netGrandTotal,
         paymentStatus,
         paidAmount,
@@ -3252,6 +3313,7 @@ function viewInvoiceReceipt(id) {
           <th class="py-1.5 px-2 text-center">Qty</th>
           <th class="py-1.5 px-2 text-right">Rate</th>
           <th class="py-1.5 px-2 text-right">Disc</th>
+          <th class="py-1.5 px-2 text-right">GST</th>
           <th class="py-1.5 px-2 text-right">Total</th>
         </tr>
       </thead>
@@ -3262,6 +3324,7 @@ function viewInvoiceReceipt(id) {
             <td class="py-1.5 px-2 text-center font-mono">${it.qty}</td>
             <td class="py-1.5 px-2 text-right font-mono">${formatCurrency(it.price)}</td>
             <td class="py-1.5 px-2 text-right font-mono text-rose-600">${(it.discountAmount > 0) ? `-${formatCurrency(it.discountAmount)}` : '-'}</td>
+            <td class="py-1.5 px-2 text-right font-mono text-indigo-700">${(it.gstAmount > 0) ? `+${formatCurrency(it.gstAmount)} <span class="text-[9px] text-slate-400">(${it.gstRate}%)</span>` : '-'}</td>
             <td class="py-1.5 px-2 text-right font-mono font-bold">${formatCurrency(it.total)}</td>
           </tr>
         `).join('')}
@@ -3279,8 +3342,18 @@ function viewInvoiceReceipt(id) {
           <span class="font-mono">-${formatCurrency(sale.discountAmount)}</span>
         </div>
       ` : ''}
-      <div class="flex justify-between font-bold text-slate-900 text-sm">
-        <span>Net Total Amount:</span>
+      ${sale.gstAmount > 0 ? `
+        <div class="flex justify-between text-slate-600">
+          <span>Taxable Subtotal:</span>
+          <span class="font-mono">${formatCurrency(sale.taxableAmount || (total - sale.gstAmount))}</span>
+        </div>
+        <div class="flex justify-between text-indigo-700 font-semibold">
+          <span>Total GST (Tax):</span>
+          <span class="font-mono">+${formatCurrency(sale.gstAmount)}</span>
+        </div>
+      ` : ''}
+      <div class="flex justify-between font-bold text-slate-900 text-sm pt-0.5 border-t border-slate-100">
+        <span>Net Bill Total:</span>
         <span class="font-mono">${formatCurrency(total)}</span>
       </div>
       <div class="flex justify-between text-slate-600">
@@ -3994,14 +4067,14 @@ function editPurchase(id) {
   container.innerHTML = "";
 
   (purch.items || []).forEach(it => {
-    addPurchaseItemRow(it.productId, it.qty, it.costPrice, it.discountPercent, it.discountAmount);
+    addPurchaseItemRow(it.productId, it.qty, it.costPrice, it.discountPercent, it.discountAmount, it.gstRate);
   });
 
   calculatePurchaseTotal();
   openModal('purchaseModal', 'edit');
 }
 
-function addPurchaseItemRow(prodId = "", qty = 10, customCost = null, discPercent = null, discAmount = null) {
+function addPurchaseItemRow(prodId = "", qty = 10, customCost = null, discPercent = null, discAmount = null, gstRate = 0) {
   const container = document.getElementById("purchaseItemsContainer");
   if (!container) return;
 
@@ -4017,6 +4090,7 @@ function addPurchaseItemRow(prodId = "", qty = 10, customCost = null, discPercen
 
   const dPct = (discPercent !== null && discPercent !== undefined && discPercent > 0) ? discPercent : "";
   const dAmt = (discAmount !== null && discAmount !== undefined && discAmount > 0) ? discAmount : "";
+  const gRate = (gstRate !== null && gstRate !== undefined) ? gstRate : 0;
 
   const row = document.createElement("div");
   row.className = "bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2.5 purchase-item-row hover:border-indigo-400 transition-all";
@@ -4035,7 +4109,7 @@ function addPurchaseItemRow(prodId = "", qty = 10, customCost = null, discPercen
         </select>
       </div>
       <div class="text-right flex-shrink-0 pt-3">
-        <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Item Total</div>
+        <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Item Total (Incl. GST)</div>
         <div class="flex items-center gap-2">
           <span id="purch_subtotal_${rowIndex}" class="font-mono text-sm sm:text-base font-bold text-slate-900">₹0</span>
           <button type="button" onclick="removePurchaseItemRow('${rowIndex}')" class="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors" title="Remove Item">
@@ -4045,8 +4119,8 @@ function addPurchaseItemRow(prodId = "", qty = 10, customCost = null, discPercen
       </div>
     </div>
 
-    <!-- Bottom: 4 Spacious Input Boxes with Top Labels -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+    <!-- Bottom: 5 Spacious Input Boxes with Top Labels -->
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
       <div>
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Qty (pcs) *</label>
         <input type="number" id="purch_qty_${rowIndex}" min="1" value="${qty}" oninput="onPurchaseRowQtyOrCostChange('${rowIndex}')" placeholder="Qty" required class="input-pro py-1.5 text-xs sm:text-sm text-center font-bold font-mono">
@@ -4061,7 +4135,17 @@ function addPurchaseItemRow(prodId = "", qty = 10, customCost = null, discPercen
       </div>
       <div>
         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Discount (₹)</label>
-        <input type="number" id="purch_disc_amt_${rowIndex}" min="0" step="any" value="${dAmt}" oninput="onPurchaseRowDiscAmountChange('${rowIndex}')" placeholder="₹0.00" class="input-pro py-1.5 text-xs sm:text-sm text-right font-mono font-bold text-emerald-600">
+        <input type="number" id="purch_disc_amt_${rowIndex}" min="0" step="any" value="${dAmt}" oninput="onPurchaseRowDiscAmountChange('${rowIndex}')" placeholder="₹0.00" class="input-pro py-1.5 text-xs sm:text-sm text-right font-mono font-bold text-rose-600">
+      </div>
+      <div class="col-span-2 sm:col-span-1">
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">GST Rate (%)</label>
+        <select id="purch_gst_${rowIndex}" onchange="onPurchaseRowQtyOrCostChange('${rowIndex}')" class="input-pro py-1.5 text-xs sm:text-sm font-bold text-indigo-700">
+          <option value="0" ${gRate == 0 ? 'selected' : ''}>0% (Nil)</option>
+          <option value="5" ${gRate == 5 ? 'selected' : ''}>5%</option>
+          <option value="12" ${gRate == 12 ? 'selected' : ''}>12%</option>
+          <option value="18" ${gRate == 18 ? 'selected' : ''}>18%</option>
+          <option value="28" ${gRate == 28 ? 'selected' : ''}>28%</option>
+        </select>
       </div>
     </div>
   `;
@@ -4104,7 +4188,7 @@ function onPurchaseRowDiscPercentChange(rowIndex) {
   } else {
     if (amtInput) amtInput.value = "";
   }
-  calculatePurchaseTotal();
+  onPurchaseRowQtyOrCostChange(rowIndex);
 }
 
 function onPurchaseRowDiscAmountChange(rowIndex) {
@@ -4126,7 +4210,7 @@ function onPurchaseRowDiscAmountChange(rowIndex) {
   } else {
     if (pctInput) pctInput.value = "";
   }
-  calculatePurchaseTotal();
+  onPurchaseRowQtyOrCostChange(rowIndex);
 }
 
 function onPurchaseRowQtyOrCostChange(rowIndex) {
@@ -4154,6 +4238,23 @@ function onPurchaseRowQtyOrCostChange(rowIndex) {
       if (pctInput) pctInput.value = "";
     }
   }
+
+  const discAmt = parseFloat(document.getElementById(`purch_disc_amt_${rowIndex}`)?.value) || 0;
+  const taxable = Math.max(0, gross - discAmt);
+  const gstPct = parseFloat(document.getElementById(`purch_gst_${rowIndex}`)?.value) || 0;
+  const gstAmt = Math.round(((taxable * gstPct) / 100) * 100) / 100;
+  const rowNetTotal = taxable + gstAmt;
+  const landedPerPc = qty > 0 ? (Math.round((rowNetTotal / qty) * 100) / 100) : 0;
+
+  const subEl = document.getElementById(`purch_subtotal_${rowIndex}`);
+  if (subEl) {
+    if (gstAmt > 0) {
+      subEl.innerHTML = `<span>${formatCurrency(rowNetTotal)}</span> <span class="text-[10px] text-emerald-700 font-semibold block font-sans">Landed: ${formatCurrency(landedPerPc)}/pc (Incl. GST)</span>`;
+    } else {
+      subEl.innerHTML = `<span>${formatCurrency(rowNetTotal)}</span> <span class="text-[10px] text-slate-500 font-semibold block font-sans">Cost: ${formatCurrency(landedPerPc)}/pc</span>`;
+    }
+  }
+
   calculatePurchaseTotal();
 }
 
@@ -4161,6 +4262,8 @@ function calculatePurchaseTotal() {
   const rows = document.querySelectorAll(".purchase-item-row");
   let totalGross = 0;
   let totalDiscounts = 0;
+  let totalTaxable = 0;
+  let totalGst = 0;
   let netGrandTotal = 0;
 
   rows.forEach(row => {
@@ -4173,11 +4276,15 @@ function calculatePurchaseTotal() {
     const discAmt = parseFloat(document.getElementById(`purch_disc_amt_${id}`)?.value) || 0;
     totalDiscounts += discAmt;
 
-    const rowNetTotal = Math.max(0, gross - discAmt);
-    netGrandTotal += rowNetTotal;
+    const taxable = Math.max(0, gross - discAmt);
+    totalTaxable += taxable;
 
-    const subEl = document.getElementById(`purch_subtotal_${id}`);
-    if (subEl) subEl.textContent = formatCurrency(rowNetTotal);
+    const gstPct = parseFloat(document.getElementById(`purch_gst_${id}`)?.value) || 0;
+    const gstAmt = Math.round(((taxable * gstPct) / 100) * 100) / 100;
+    totalGst += gstAmt;
+
+    const rowNetTotal = taxable + gstAmt;
+    netGrandTotal += rowNetTotal;
   });
 
   const grossEl = document.getElementById("purchaseGrossDisplay");
@@ -4185,6 +4292,9 @@ function calculatePurchaseTotal() {
 
   const discEl = document.getElementById("purchaseTotalDiscountDisplay");
   if (discEl) discEl.textContent = `-${formatCurrency(totalDiscounts)}`;
+
+  const gstEl = document.getElementById("purchaseTotalGstDisplay");
+  if (gstEl) gstEl.textContent = `+${formatCurrency(totalGst)}`;
 
   const dTotal = document.getElementById("purchaseTotalDisplay");
   if (dTotal) dTotal.textContent = formatCurrency(netGrandTotal);
@@ -4255,6 +4365,8 @@ function handleSavePurchase(e) {
     const items = [];
     let totalGross = 0;
     let totalDiscounts = 0;
+    let totalTaxable = 0;
+    let totalGst = 0;
     let netGrandTotal = 0;
     const shouldUpdateMasterCost = document.getElementById("purchaseUpdateMasterCost") ? document.getElementById("purchaseUpdateMasterCost").checked : true;
 
@@ -4265,6 +4377,7 @@ function handleSavePurchase(e) {
       const costPrice = parseFloat(document.getElementById(`purch_cost_${id}`)?.value) || 0;
       const discountPercent = parseFloat(document.getElementById(`purch_disc_pct_${id}`)?.value) || 0;
       const discountAmount = parseFloat(document.getElementById(`purch_disc_amt_${id}`)?.value) || 0;
+      const gstRate = parseFloat(document.getElementById(`purch_gst_${id}`)?.value) || 0;
 
       if (!prodId || qty <= 0) return;
 
@@ -4272,12 +4385,18 @@ function handleSavePurchase(e) {
       if (!prod) return;
 
       const gross = qty * costPrice;
-      const rowTotal = Math.max(0, gross - discountAmount);
+      const taxable = Math.max(0, gross - discountAmount);
+      const gstAmount = Math.round(((taxable * gstRate) / 100) * 100) / 100;
+      const rowTotal = taxable + gstAmount;
+
       totalGross += gross;
       totalDiscounts += discountAmount;
+      totalTaxable += taxable;
+      totalGst += gstAmount;
       netGrandTotal += rowTotal;
 
-      const netCostPrice = qty > 0 ? (Math.round((rowTotal / qty) * 100) / 100) : costPrice;
+      // Net Landed Cost per piece INCLUDING GST and after discounts!
+      const netCostPrice = qty > 0 ? (Math.round((rowTotal / qty) * 100) / 100) : (costPrice + (costPrice * (gstRate/100)));
 
       items.push({
         productId: prod.id,
@@ -4286,6 +4405,9 @@ function handleSavePurchase(e) {
         costPrice,
         discountPercent,
         discountAmount,
+        taxableAmount: taxable,
+        gstRate,
+        gstAmount,
         netCostPrice,
         grossTotal: gross,
         total: rowTotal
@@ -4293,7 +4415,7 @@ function handleSavePurchase(e) {
 
       prod.currentStock = (Number(prod.currentStock) || 0) + qty;
       if (shouldUpdateMasterCost && netCostPrice > 0) {
-        prod.costPrice = netCostPrice;
+        prod.costPrice = netCostPrice; // Updates master product cost with GST-inclusive landed price!
       }
     });
 
@@ -4328,6 +4450,8 @@ function handleSavePurchase(e) {
         existing.items = items;
         existing.subtotal = totalGross;
         existing.discountAmount = totalDiscounts;
+        existing.taxableAmount = totalTaxable;
+        existing.gstAmount = totalGst;
         existing.totalAmount = netGrandTotal;
         existing.paymentStatus = paymentStatus;
         existing.paidAmount = paidAmount;
@@ -4347,6 +4471,8 @@ function handleSavePurchase(e) {
         items,
         subtotal: totalGross,
         discountAmount: totalDiscounts,
+        taxableAmount: totalTaxable,
+        gstAmount: totalGst,
         totalAmount: netGrandTotal,
         paymentStatus,
         paidAmount,
