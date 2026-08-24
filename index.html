@@ -370,6 +370,33 @@
 
       </div>
 
+      <!-- Quick Khata & Outstanding Balances Banner on Dashboard -->
+      <div class="pro-card p-4 sm:p-5 bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 border-l-4 border-l-emerald-400">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">
+              <i class="fa-solid fa-book-bookmark mr-1"></i> Khata & Outstanding Balances (ખાતાવહી)
+            </span>
+            <span class="text-xs text-slate-300">Party Receivables • Supplier Payables • 1-Click FIFO Multi-Bill Settlement</span>
+          </div>
+          <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            Wholesale Parties & Supplier Accounts Ledger
+          </h3>
+          <p class="text-xs text-slate-300">
+            View total pending money from wholesale customers, supplier debit notes, and record lump-sum payments.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button onclick="switchTab('khata'); switchKhataSubTab('parties');" class="btn-solid-emerald text-xs sm:text-sm py-2 px-4 whitespace-nowrap font-bold shadow-md">
+            <i class="fa-solid fa-users mr-1"></i> Parties Khata
+          </button>
+          <button onclick="switchTab('khata'); switchKhataSubTab('suppliers');" class="btn-solid-primary bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm py-2 px-4 whitespace-nowrap font-bold shadow-md">
+            <i class="fa-solid fa-truck-field mr-1"></i> Suppliers Khata
+          </button>
+        </div>
+      </div>
+
       <!-- Quick Multi-Accounts E-Commerce Summary Banner -->
       <div class="pro-card p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
         <div class="space-y-1">
@@ -3018,6 +3045,6 @@
   </div>
 
   <!-- Application Logic -->
-  <script src="app.js?v=2026_khata_balances_v29"></script>
+  <script src="app.js?v=2026_khata_balances_v30"></script>
 </body>
 </html>
