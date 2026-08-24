@@ -6501,13 +6501,14 @@ function renderKhataTables() {
 
   // Factor in supplier returns/debit notes that reduce supplier payable
   (state.supplierReturns || []).forEach(sr => {
-    const name = (sr.supplierName || '').trim();
+    const name = (sr.vendor || sr.supplierName || '').trim();
     if (!name) return;
     const key = name.toLowerCase();
     if (suppliersMap.has(key)) {
       const sup = suppliersMap.get(key);
-      const retVal = Number(sr.netReturnVal) || 0;
-      if (sr.settlementType === 'Debit Note (Deduct from Future Bill)') {
+      const retVal = Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || Number(sr.netReturnVal) || 0);
+      const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
+      if (isDebitNote && retVal > 0) {
         sup.totalReturns += retVal;
         sup.totalPayable = Math.max(0, sup.totalPayable - retVal);
       }
@@ -6813,6 +6814,19 @@ function openSupplierLumpSumPayModal(rawVendorName) {
 
     const totalDue = unpaidPurchases.reduce((acc, x) => acc + x.due, 0);
 
+    let totalDebitNotes = 0;
+    (state.supplierReturns || []).forEach(sr => {
+      const name = (sr.vendor || sr.supplierName || '').trim();
+      if (name.toLowerCase() === vendorName.toLowerCase()) {
+        const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
+        if (isDebitNote) {
+          totalDebitNotes += Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || 0);
+        }
+      }
+    });
+
+    const netPayable = Math.max(0, totalDue - totalDebitNotes);
+
     const nameInput = document.getElementById("supplierLumpSumVendorName");
     const dispEl = document.getElementById("supplierLumpSumDisplayName");
     const dueEl = document.getElementById("supplierLumpSumTotalDueDisplay");
@@ -6822,18 +6836,22 @@ function openSupplierLumpSumPayModal(rawVendorName) {
 
     if (nameInput) nameInput.value = vendorName;
     if (dispEl) dispEl.textContent = vendorName;
-    if (dueEl) dueEl.textContent = formatCurrency(totalDue);
-    if (amtInput) amtInput.value = totalDue > 0 ? totalDue : "";
+    if (dueEl) dueEl.textContent = formatCurrency(netPayable);
+    if (amtInput) amtInput.value = netPayable > 0 ? netPayable : "";
     if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
     if (notesInput) notesInput.value = "";
 
-    const breakdownText = unpaidPurchases.length > 0
+    let breakdownText = unpaidPurchases.length > 0
       ? unpaidPurchases.map(x => `Bill #${x.purchase.billNo} (${formatDate(x.purchase.date)}): Due ${formatCurrency(x.due)}`).join(' | ')
       : "No pending unpaid purchase bills found.";
 
+    if (totalDebitNotes > 0) {
+      breakdownText += ` | <span class="text-emerald-700 font-bold">Debit Notes: -${formatCurrency(totalDebitNotes)}</span>`;
+    }
+
     const billsContainer = document.getElementById("supplierLumpSumBillsSummaryText");
     if (billsContainer) {
-      billsContainer.innerHTML = `<span class="font-semibold text-rose-900">Unpaid Purchase Bills (${unpaidPurchases.length}):</span> ${escapeHtml(breakdownText)}`;
+      billsContainer.innerHTML = `<span class="font-semibold text-rose-900">Pending Bills (${unpaidPurchases.length}):</span> ${breakdownText}`;
     }
 
     openModal('supplierLumpSumPayModal');
@@ -7079,61 +7097,85 @@ function viewSupplierStatement(rawVendorName) {
   if (subtitle) subtitle.textContent = `Statement of Purchases, Payments & Returns`;
 
   const purchases = (state.purchases || [])
-    .filter(p => (p.vendor || '').trim().toLowerCase() === vendorName.trim().toLowerCase())
-    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    .filter(p => (p.vendor || '').trim().toLowerCase() === vendorName.trim().toLowerCase());
 
-  let totalPurchased = 0;
-  let totalPaid = 0;
-  let runningBal = 0;
-
-  const rows = [];
+  const allEvents = [];
 
   purchases.forEach(p => {
     const total = Number(p.totalAmount) || 0;
     const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
-    
-    totalPurchased += total;
-    runningBal += total;
-
-    // Purchase Row
-    rows.push({
+    allEvents.push({
       date: p.date,
       type: 'Purchase Bill',
       ref: p.billNo,
       desc: p.items ? p.items.map(it => `${it.productName} (${it.qty} pcs)`).join(', ') : 'Inventory Purchase',
       purchaseAmt: total,
-      paidAmt: 0,
-      balance: runningBal
+      paidAmt: 0
     });
 
-    // Payments
     if (Array.isArray(p.paymentHistory) && p.paymentHistory.length > 0) {
       p.paymentHistory.forEach(ph => {
-        totalPaid += Number(ph.amount) || 0;
-        runningBal -= Number(ph.amount) || 0;
-        rows.push({
+        allEvents.push({
           date: ph.date || p.date,
           type: 'Supplier Payment',
           ref: `Pay-${p.billNo}`,
           desc: ph.notes || `Paid to supplier (${ph.method || 'Online/Cash'})`,
           purchaseAmt: 0,
-          paidAmt: Number(ph.amount) || 0,
-          balance: runningBal
+          paidAmt: Number(ph.amount) || 0
         });
       });
     } else if (paid > 0) {
-      totalPaid += paid;
-      runningBal -= paid;
-      rows.push({
+      allEvents.push({
         date: p.date,
         type: 'Supplier Payment',
         ref: `Pay-${p.billNo}`,
         desc: `Paid on purchase date`,
         purchaseAmt: 0,
-        paidAmt: paid,
-        balance: runningBal
+        paidAmt: paid
       });
     }
+  });
+
+  (state.supplierReturns || []).forEach(sr => {
+    const name = (sr.vendor || sr.supplierName || '').trim();
+    if (name.toLowerCase() === vendorName.toLowerCase()) {
+      const retVal = Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || 0);
+      const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
+      if (isDebitNote && retVal > 0) {
+        const itemDesc = (sr.returnedItems || []).map(it => `${it.productName || 'Item'} (${it.qty} pcs)`).join(', ') || 'Goods Returned';
+        allEvents.push({
+          date: sr.date,
+          type: 'Debit Note / Return',
+          ref: sr.refNo || 'PR-Ret',
+          desc: `Returned goods to supplier: ${itemDesc}`,
+          purchaseAmt: 0,
+          paidAmt: retVal
+        });
+      }
+    }
+  });
+
+  allEvents.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  let totalPurchased = 0;
+  let totalPaid = 0;
+  let runningBal = 0;
+  const rows = [];
+
+  allEvents.forEach(ev => {
+    totalPurchased += ev.purchaseAmt;
+    totalPaid += ev.paidAmt;
+    runningBal += ev.purchaseAmt - ev.paidAmt;
+
+    rows.push({
+      date: ev.date,
+      type: ev.type,
+      ref: ev.ref,
+      desc: ev.desc,
+      purchaseAmt: ev.purchaseAmt,
+      paidAmt: ev.paidAmt,
+      balance: Math.max(0, runningBal)
+    });
   });
 
   const netPayable = Math.max(0, runningBal);
