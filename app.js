@@ -6564,6 +6564,7 @@ function renderKhataTables() {
     } else {
       partiesTbody.innerHTML = filteredParties.map(p => {
         const safeName = escapeHtml(p.name);
+        const encodedName = encodeURIComponent(p.name || '');
         return `
           <tr class="hover:bg-slate-50 transition-colors">
             <td>
@@ -6580,7 +6581,7 @@ function renderKhataTables() {
             </td>
             <td class="text-center space-x-1.5 whitespace-nowrap">
               ${p.totalDue > 0 ? `
-                <button onclick="openPartyLumpSumCollectModal('${safeName}')" class="btn-solid-primary text-[11px] py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs">
+                <button type="button" onclick="openPartyLumpSumCollectModal('${encodedName}')" class="btn-solid-primary text-[11px] py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs cursor-pointer">
                   <i class="fa-solid fa-hand-holding-dollar mr-1"></i> Collect
                 </button>
               ` : `
@@ -6588,7 +6589,7 @@ function renderKhataTables() {
                   <i class="fa-solid fa-check mr-1"></i> All Paid
                 </span>
               `}
-              <button onclick="viewCustomerStatement('${safeName}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs" title="View Statement">
+              <button type="button" onclick="viewCustomerStatement('${encodedName}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Statement">
                 <i class="fa-solid fa-file-invoice mr-0.5"></i> Statement
               </button>
             </td>
@@ -6614,6 +6615,7 @@ function renderKhataTables() {
     } else {
       suppliersTbody.innerHTML = filteredSuppliers.map(s => {
         const safeName = escapeHtml(s.name);
+        const encodedSupName = encodeURIComponent(s.name || '');
         return `
           <tr class="hover:bg-slate-50 transition-colors">
             <td>
@@ -6631,7 +6633,7 @@ function renderKhataTables() {
             </td>
             <td class="text-center space-x-1.5 whitespace-nowrap">
               ${s.totalPayable > 0 ? `
-                <button onclick="openSupplierLumpSumPayModal('${safeName}')" class="btn-solid-primary text-[11px] py-1 px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs">
+                <button type="button" onclick="openSupplierLumpSumPayModal('${encodedSupName}')" class="btn-solid-primary text-[11px] py-1 px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs cursor-pointer">
                   <i class="fa-solid fa-money-bill-wave mr-1"></i> Pay
                 </button>
               ` : `
@@ -6639,7 +6641,7 @@ function renderKhataTables() {
                   <i class="fa-solid fa-check mr-1"></i> Settled
                 </span>
               `}
-              <button onclick="viewSupplierStatement('${safeName}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs" title="View Statement">
+              <button type="button" onclick="viewSupplierStatement('${encodedSupName}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Statement">
                 <i class="fa-solid fa-file-invoice mr-0.5"></i> Statement
               </button>
             </td>
@@ -6651,353 +6653,429 @@ function renderKhataTables() {
 }
 
 // 1. Lump-Sum Payment Collection from Wholesale Party (FIFO across unpaid bills)
-function openPartyLumpSumCollectModal(customerName) {
-  const p1 = state.settings.partner1Name || "Kenil";
-  const p2 = state.settings.partner2Name || "Alpesh";
-  const p1Lbl = document.getElementById("lumpSumP1Label");
-  const p2Lbl = document.getElementById("lumpSumP2Label");
-  if (p1Lbl) p1Lbl.textContent = `${p1} (Partner 1)`;
-  if (p2Lbl) p2Lbl.textContent = `${p2} (Partner 2)`;
+function openPartyLumpSumCollectModal(rawCustomerName) {
+  try {
+    let customerName = rawCustomerName || "";
+    try {
+      if (typeof customerName === 'string' && customerName.includes('%')) {
+        customerName = decodeURIComponent(customerName);
+      }
+    } catch(e) {}
 
-  const unpaidSales = (state.sales || [])
-    .filter(s => (s.customerName || '').trim().toLowerCase() === customerName.trim().toLowerCase())
-    .map(s => {
-      const total = Number(s.totalAmount) || 0;
-      const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
-      const due = Math.max(0, total - paid);
-      return { sale: s, total, paid, due };
-    })
-    .filter(x => x.due > 0);
+    const p1 = state.settings.partner1Name || "Kenil";
+    const p2 = state.settings.partner2Name || "Alpesh";
+    const p1Lbl = document.getElementById("lumpSumP1Label");
+    const p2Lbl = document.getElementById("lumpSumP2Label");
+    if (p1Lbl) p1Lbl.textContent = `${p1} (Partner 1)`;
+    if (p2Lbl) p2Lbl.textContent = `${p2} (Partner 2)`;
 
-  const totalDue = unpaidSales.reduce((acc, x) => acc + x.due, 0);
+    const unpaidSales = (state.sales || [])
+      .filter(s => (s.customerName || '').trim().toLowerCase() === customerName.trim().toLowerCase())
+      .map(s => {
+        const total = Number(s.totalAmount) || 0;
+        const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
+        const due = Math.max(0, total - paid);
+        return { sale: s, total, paid, due };
+      })
+      .filter(x => x.due > 0);
 
-  document.getElementById("lumpSumCustomerName").value = customerName;
-  document.getElementById("lumpSumPartyDisplayName").textContent = customerName;
-  document.getElementById("lumpSumTotalDueDisplay").textContent = formatCurrency(totalDue);
-  document.getElementById("lumpSumAmount").value = totalDue;
-  document.getElementById("lumpSumDate").value = new Date().toISOString().split('T')[0];
-  document.getElementById("lumpSumNotes").value = "";
+    const totalDue = unpaidSales.reduce((acc, x) => acc + x.due, 0);
 
-  const breakdownText = unpaidSales.map(x => `Bill #${x.sale.invoiceNo} (${formatDate(x.sale.date)}): Due ${formatCurrency(x.due)}`).join(' | ');
-  const billsContainer = document.getElementById("lumpSumBillsSummaryText");
-  if (billsContainer) {
-    billsContainer.innerHTML = `<span class="font-semibold text-indigo-900">Unpaid Bills (${unpaidSales.length}):</span> ${escapeHtml(breakdownText)}`;
+    const nameInput = document.getElementById("lumpSumCustomerName");
+    const dispEl = document.getElementById("lumpSumPartyDisplayName");
+    const dueEl = document.getElementById("lumpSumTotalDueDisplay");
+    const amtInput = document.getElementById("lumpSumAmount");
+    const dateInput = document.getElementById("lumpSumDate");
+    const notesInput = document.getElementById("lumpSumNotes");
+
+    if (nameInput) nameInput.value = customerName;
+    if (dispEl) dispEl.textContent = customerName;
+    if (dueEl) dueEl.textContent = formatCurrency(totalDue);
+    if (amtInput) amtInput.value = totalDue > 0 ? totalDue : "";
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+    if (notesInput) notesInput.value = "";
+
+    const breakdownText = unpaidSales.length > 0
+      ? unpaidSales.map(x => `Bill #${x.sale.invoiceNo} (${formatDate(x.sale.date)}): Due ${formatCurrency(x.due)}`).join(' | ')
+      : "No pending unpaid bills found.";
+
+    const billsContainer = document.getElementById("lumpSumBillsSummaryText");
+    if (billsContainer) {
+      billsContainer.innerHTML = `<span class="font-semibold text-indigo-900">Unpaid Bills (${unpaidSales.length}):</span> ${escapeHtml(breakdownText)}`;
+    }
+
+    openModal('partyLumpSumCollectModal');
+  } catch (err) {
+    console.error("Error opening party lump sum modal:", err);
+    showToast("Error opening modal: " + err.message, true);
   }
-
-  openModal('partyLumpSumCollectModal');
 }
 
 function handleSavePartyLumpSumCollect(e) {
-  e.preventDefault();
-  const customerName = document.getElementById("lumpSumCustomerName").value.trim();
-  const amount = parseFloat(document.getElementById("lumpSumAmount").value) || 0;
-  const date = document.getElementById("lumpSumDate").value;
-  const receivedBy = document.querySelector('input[name="lumpSumReceivedBy"]:checked')?.value || "partner1";
-  const method = document.getElementById("lumpSumMethod")?.value || "Google Pay / UPI";
-  const notes = document.getElementById("lumpSumNotes").value.trim() || "";
+  if (e && e.preventDefault) e.preventDefault();
 
-  if (amount <= 0) {
-    showToast("Please enter a valid received amount!", true);
-    return;
-  }
+  try {
+    let customerName = document.getElementById("lumpSumCustomerName")?.value.trim() || "";
+    const amount = parseFloat(document.getElementById("lumpSumAmount")?.value) || 0;
+    const date = document.getElementById("lumpSumDate")?.value || new Date().toISOString().split('T')[0];
+    const receivedBy = document.querySelector('input[name="lumpSumReceivedBy"]:checked')?.value || "partner1";
+    const method = document.getElementById("lumpSumMethod")?.value || "Google Pay / UPI";
+    const notes = document.getElementById("lumpSumNotes")?.value.trim() || "";
 
-  const p1 = state.settings.partner1Name || "Kenil";
-  const p2 = state.settings.partner2Name || "Alpesh";
-  const receiverLabel = receivedBy === 'partner1' ? p1 : (receivedBy === 'partner2' ? p2 : 'Business Account');
-
-  // Find all unpaid sales for this customer sorted chronologically (FIFO - oldest date first)
-  const customerSales = (state.sales || [])
-    .filter(s => (s.customerName || '').trim().toLowerCase() === customerName.toLowerCase())
-    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-
-  let remaining = amount;
-  const settledBills = [];
-
-  customerSales.forEach(s => {
-    if (remaining <= 0) return;
-
-    const total = Number(s.totalAmount) || 0;
-    const currentPaid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
-    const due = Math.max(0, total - currentPaid);
-
-    if (due > 0) {
-      const applyAmt = Math.min(remaining, due);
-      const newPaid = currentPaid + applyAmt;
-      s.paidAmount = newPaid;
-
-      if (newPaid >= total) {
-        s.paymentStatus = 'Paid';
-        s.paidAmount = total;
-      } else {
-        s.paymentStatus = 'Partial';
-      }
-
-      s.receivedBy = receivedBy; // Updates partner who received this payment
-
-      if (!s.paymentHistory) s.paymentHistory = [];
-      s.paymentHistory.push({
-        date,
-        amount: applyAmt,
-        receivedBy,
-        method,
-        notes: notes ? `Lump-sum collection: ${notes}` : `Lump-sum receipt (${method})`
-      });
-
-      remaining -= applyAmt;
-      settledBills.push(`${s.invoiceNo} (₹${applyAmt})`);
+    if (amount <= 0) {
+      showToast("Please enter a valid received amount!", true);
+      return;
     }
-  });
 
-  saveState();
-  closeModal('partyLumpSumCollectModal');
-  refreshAllUI();
-  showToast(`Recorded ₹${amount} received from ${customerName} in ${receiverLabel}! Settled: ${settledBills.join(', ')}`);
+    const p1 = state.settings.partner1Name || "Kenil";
+    const p2 = state.settings.partner2Name || "Alpesh";
+    const receiverLabel = receivedBy === 'partner1' ? p1 : (receivedBy === 'partner2' ? p2 : 'Business Account');
+
+    // Find all unpaid sales for this customer sorted chronologically (FIFO - oldest date first)
+    const customerSales = (state.sales || [])
+      .filter(s => (s.customerName || '').trim().toLowerCase() === customerName.toLowerCase())
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    let remaining = amount;
+    const settledBills = [];
+
+    customerSales.forEach(s => {
+      if (remaining <= 0) return;
+
+      const total = Number(s.totalAmount) || 0;
+      const currentPaid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
+      const due = Math.max(0, total - currentPaid);
+
+      if (due > 0) {
+        const applyAmt = Math.min(remaining, due);
+        const newPaid = currentPaid + applyAmt;
+        s.paidAmount = newPaid;
+
+        if (newPaid >= total) {
+          s.paymentStatus = 'Paid';
+          s.paidAmount = total;
+        } else {
+          s.paymentStatus = 'Partial';
+        }
+
+        s.receivedBy = receivedBy; // Updates partner who received this payment
+
+        if (!s.paymentHistory) s.paymentHistory = [];
+        s.paymentHistory.push({
+          date,
+          amount: applyAmt,
+          receivedBy,
+          method,
+          notes: notes ? `Lump-sum collection: ${notes}` : `Lump-sum receipt (${method})`
+        });
+
+        remaining -= applyAmt;
+        settledBills.push(`${s.invoiceNo} (₹${applyAmt})`);
+      }
+    });
+
+    saveState();
+    closeModal('partyLumpSumCollectModal');
+    refreshAllUI();
+    showToast(`Recorded ₹${amount} received from ${customerName} in ${receiverLabel}! Settled: ${settledBills.join(', ')}`);
+  } catch (err) {
+    console.error("Error saving party lump sum collection:", err);
+    showToast("Error saving: " + err.message, true);
+  }
 }
 
 // 2. Lump-Sum Payment to Supplier / Vendor (FIFO across unpaid purchase bills)
-function openSupplierLumpSumPayModal(vendorName) {
-  const p1 = state.settings.partner1Name || "Kenil";
-  const p2 = state.settings.partner2Name || "Alpesh";
-  const p1Lbl = document.getElementById("supplierLumpSumP1Label");
-  const p2Lbl = document.getElementById("supplierLumpSumP2Label");
-  if (p1Lbl) p1Lbl.textContent = `${p1} (Partner 1)`;
-  if (p2Lbl) p2Lbl.textContent = `${p2} (Partner 2)`;
+function openSupplierLumpSumPayModal(rawVendorName) {
+  try {
+    let vendorName = rawVendorName || "";
+    try {
+      if (typeof vendorName === 'string' && vendorName.includes('%')) {
+        vendorName = decodeURIComponent(vendorName);
+      }
+    } catch(e) {}
 
-  const unpaidPurchases = (state.purchases || [])
-    .filter(p => (p.vendor || '').trim().toLowerCase() === vendorName.trim().toLowerCase())
-    .map(p => {
-      const total = Number(p.totalAmount) || 0;
-      const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
-      const due = Math.max(0, total - paid);
-      return { purchase: p, total, paid, due };
-    })
-    .filter(x => x.due > 0);
+    const p1 = state.settings.partner1Name || "Kenil";
+    const p2 = state.settings.partner2Name || "Alpesh";
+    const p1Lbl = document.getElementById("supplierLumpSumP1Label");
+    const p2Lbl = document.getElementById("supplierLumpSumP2Label");
+    if (p1Lbl) p1Lbl.textContent = `${p1} (Partner 1)`;
+    if (p2Lbl) p2Lbl.textContent = `${p2} (Partner 2)`;
 
-  const totalDue = unpaidPurchases.reduce((acc, x) => acc + x.due, 0);
+    const unpaidPurchases = (state.purchases || [])
+      .filter(p => (p.vendor || '').trim().toLowerCase() === vendorName.trim().toLowerCase())
+      .map(p => {
+        const total = Number(p.totalAmount) || 0;
+        const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
+        const due = Math.max(0, total - paid);
+        return { purchase: p, total, paid, due };
+      })
+      .filter(x => x.due > 0);
 
-  document.getElementById("supplierLumpSumVendorName").value = vendorName;
-  document.getElementById("supplierLumpSumDisplayName").textContent = vendorName;
-  document.getElementById("supplierLumpSumTotalDueDisplay").textContent = formatCurrency(totalDue);
-  document.getElementById("supplierLumpSumAmount").value = totalDue;
-  document.getElementById("supplierLumpSumDate").value = new Date().toISOString().split('T')[0];
-  document.getElementById("supplierLumpSumNotes").value = "";
+    const totalDue = unpaidPurchases.reduce((acc, x) => acc + x.due, 0);
 
-  const breakdownText = unpaidPurchases.map(x => `Bill #${x.purchase.billNo} (${formatDate(x.purchase.date)}): Due ${formatCurrency(x.due)}`).join(' | ');
-  const billsContainer = document.getElementById("supplierLumpSumBillsSummaryText");
-  if (billsContainer) {
-    billsContainer.innerHTML = `<span class="font-semibold text-rose-900">Unpaid Purchase Bills (${unpaidPurchases.length}):</span> ${escapeHtml(breakdownText)}`;
+    const nameInput = document.getElementById("supplierLumpSumVendorName");
+    const dispEl = document.getElementById("supplierLumpSumDisplayName");
+    const dueEl = document.getElementById("supplierLumpSumTotalDueDisplay");
+    const amtInput = document.getElementById("supplierLumpSumAmount");
+    const dateInput = document.getElementById("supplierLumpSumDate");
+    const notesInput = document.getElementById("supplierLumpSumNotes");
+
+    if (nameInput) nameInput.value = vendorName;
+    if (dispEl) dispEl.textContent = vendorName;
+    if (dueEl) dueEl.textContent = formatCurrency(totalDue);
+    if (amtInput) amtInput.value = totalDue > 0 ? totalDue : "";
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+    if (notesInput) notesInput.value = "";
+
+    const breakdownText = unpaidPurchases.length > 0
+      ? unpaidPurchases.map(x => `Bill #${x.purchase.billNo} (${formatDate(x.purchase.date)}): Due ${formatCurrency(x.due)}`).join(' | ')
+      : "No pending unpaid purchase bills found.";
+
+    const billsContainer = document.getElementById("supplierLumpSumBillsSummaryText");
+    if (billsContainer) {
+      billsContainer.innerHTML = `<span class="font-semibold text-rose-900">Unpaid Purchase Bills (${unpaidPurchases.length}):</span> ${escapeHtml(breakdownText)}`;
+    }
+
+    openModal('supplierLumpSumPayModal');
+  } catch (err) {
+    console.error("Error opening supplier lump sum modal:", err);
+    showToast("Error opening modal: " + err.message, true);
   }
-
-  openModal('supplierLumpSumPayModal');
 }
 
 function handleSaveSupplierLumpSumPay(e) {
-  e.preventDefault();
-  const vendorName = document.getElementById("supplierLumpSumVendorName").value.trim();
-  const amount = parseFloat(document.getElementById("supplierLumpSumAmount").value) || 0;
-  const date = document.getElementById("supplierLumpSumDate").value;
-  const paidBy = document.querySelector('input[name="supplierLumpSumPaidBy"]:checked')?.value || "partner1";
-  const method = document.getElementById("supplierLumpSumMethod")?.value || "Google Pay / UPI";
-  const notes = document.getElementById("supplierLumpSumNotes").value.trim() || "";
+  if (e && e.preventDefault) e.preventDefault();
 
-  if (amount <= 0) {
-    showToast("Please enter a valid payment amount!", true);
-    return;
-  }
+  try {
+    let vendorName = document.getElementById("supplierLumpSumVendorName")?.value.trim() || "";
+    const amount = parseFloat(document.getElementById("supplierLumpSumAmount")?.value) || 0;
+    const date = document.getElementById("supplierLumpSumDate")?.value || new Date().toISOString().split('T')[0];
+    const paidBy = document.querySelector('input[name="supplierLumpSumPaidBy"]:checked')?.value || "partner1";
+    const method = document.getElementById("supplierLumpSumMethod")?.value || "Google Pay / UPI";
+    const notes = document.getElementById("supplierLumpSumNotes")?.value.trim() || "";
 
-  const p1 = state.settings.partner1Name || "Kenil";
-  const p2 = state.settings.partner2Name || "Alpesh";
-  const payerLabel = paidBy === 'partner1' ? p1 : (paidBy === 'partner2' ? p2 : 'Business Account');
-
-  // Find all unpaid purchases for this supplier sorted chronologically (FIFO)
-  const vendorPurchases = (state.purchases || [])
-    .filter(p => (p.vendor || '').trim().toLowerCase() === vendorName.toLowerCase())
-    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-
-  let remaining = amount;
-  const settledPurchases = [];
-
-  vendorPurchases.forEach(p => {
-    if (remaining <= 0) return;
-
-    const total = Number(p.totalAmount) || 0;
-    const currentPaid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
-    const due = Math.max(0, total - currentPaid);
-
-    if (due > 0) {
-      const applyAmt = Math.min(remaining, due);
-      const newPaid = currentPaid + applyAmt;
-      p.paidAmount = newPaid;
-
-      if (newPaid >= total) {
-        p.paymentStatus = 'Paid';
-        p.paidAmount = total;
-      } else {
-        p.paymentStatus = 'Partial';
-      }
-
-      p.paidBy = paidBy; // Updates partner who paid this bill out of pocket
-
-      if (!p.paymentHistory) p.paymentHistory = [];
-      p.paymentHistory.push({
-        date,
-        amount: applyAmt,
-        paidBy,
-        method,
-        notes: notes ? `Lump-sum payment: ${notes}` : `Lump-sum payment (${method})`
-      });
-
-      remaining -= applyAmt;
-      settledPurchases.push(`${p.billNo} (₹${applyAmt})`);
+    if (amount <= 0) {
+      showToast("Please enter a valid payment amount!", true);
+      return;
     }
-  });
 
-  saveState();
-  closeModal('supplierLumpSumPayModal');
-  refreshAllUI();
-  showToast(`Recorded ₹${amount} paid to ${vendorName} by ${payerLabel}! Settled: ${settledPurchases.join(', ')}`);
+    const p1 = state.settings.partner1Name || "Kenil";
+    const p2 = state.settings.partner2Name || "Alpesh";
+    const payerLabel = paidBy === 'partner1' ? p1 : (paidBy === 'partner2' ? p2 : 'Business Account');
+
+    // Find all unpaid purchases for this supplier sorted chronologically (FIFO)
+    const vendorPurchases = (state.purchases || [])
+      .filter(p => (p.vendor || '').trim().toLowerCase() === vendorName.toLowerCase())
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    let remaining = amount;
+    const settledPurchases = [];
+
+    vendorPurchases.forEach(p => {
+      if (remaining <= 0) return;
+
+      const total = Number(p.totalAmount) || 0;
+      const currentPaid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
+      const due = Math.max(0, total - currentPaid);
+
+      if (due > 0) {
+        const applyAmt = Math.min(remaining, due);
+        const newPaid = currentPaid + applyAmt;
+        p.paidAmount = newPaid;
+
+        if (newPaid >= total) {
+          p.paymentStatus = 'Paid';
+          p.paidAmount = total;
+        } else {
+          p.paymentStatus = 'Partial';
+        }
+
+        p.paidBy = paidBy; // Updates partner who paid this bill out of pocket
+
+        if (!p.paymentHistory) p.paymentHistory = [];
+        p.paymentHistory.push({
+          date,
+          amount: applyAmt,
+          paidBy,
+          method,
+          notes: notes ? `Lump-sum payment: ${notes}` : `Lump-sum payment (${method})`
+        });
+
+        remaining -= applyAmt;
+        settledPurchases.push(`${p.billNo} (₹${applyAmt})`);
+      }
+    });
+
+    saveState();
+    closeModal('supplierLumpSumPayModal');
+    refreshAllUI();
+    showToast(`Recorded ₹${amount} paid to ${vendorName} by ${payerLabel}! Settled: ${settledPurchases.join(', ')}`);
+  } catch (err) {
+    console.error("Error saving supplier lump sum payment:", err);
+    showToast("Error saving: " + err.message, true);
+  }
 }
 
 // 3. Complete Ledger Statement for Customer
-function viewCustomerStatement(customerName) {
-  const content = document.getElementById("statementPrintContent");
-  const title = document.getElementById("statementModalTitle");
-  const subtitle = document.getElementById("statementModalSubtitle");
-  const bizName = state.settings.bizName || "Dwarkadhish Enterprise";
+function viewCustomerStatement(rawCustomerName) {
+  try {
+    let customerName = rawCustomerName || "";
+    try {
+      if (typeof customerName === 'string' && customerName.includes('%')) {
+        customerName = decodeURIComponent(customerName);
+      }
+    } catch(e) {}
 
-  if (title) title.innerHTML = `<i class="fa-solid fa-address-book text-indigo-600"></i> Wholesale Customer Ledger: ${escapeHtml(customerName)}`;
-  if (subtitle) subtitle.textContent = `Statement of Accounts & Transaction History`;
+    const content = document.getElementById("statementPrintContent");
+    const title = document.getElementById("statementModalTitle");
+    const subtitle = document.getElementById("statementModalSubtitle");
+    const bizName = state.settings.bizName || "Dwarkadhish Enterprise";
 
-  const partySales = (state.sales || [])
-    .filter(s => (s.customerName || '').trim().toLowerCase() === customerName.trim().toLowerCase())
-    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (title) title.innerHTML = `<i class="fa-solid fa-address-book text-indigo-600"></i> Wholesale Customer Ledger: ${escapeHtml(customerName)}`;
+    if (subtitle) subtitle.textContent = `Statement of Accounts & Transaction History`;
 
-  let totalBilled = 0;
-  let totalPaid = 0;
-  let runningBal = 0;
+    const partySales = (state.sales || [])
+      .filter(s => (s.customerName || '').trim().toLowerCase() === customerName.trim().toLowerCase())
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
-  const rows = [];
+    let totalBilled = 0;
+    let totalPaid = 0;
+    let runningBal = 0;
 
-  partySales.forEach(s => {
-    const total = Number(s.totalAmount) || 0;
-    const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
-    
-    totalBilled += total;
-    runningBal += total;
+    const rows = [];
 
-    // 1. Debit Row for Invoice
-    rows.push({
-      date: s.date,
-      type: 'Invoice',
-      ref: s.invoiceNo,
-      desc: s.items ? s.items.map(it => `${it.productName} (${it.qty} pcs)`).join(', ') : 'Wholesale Goods',
-      debit: total,
-      credit: 0,
-      balance: runningBal
-    });
+    partySales.forEach(s => {
+      const total = Number(s.totalAmount) || 0;
+      const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
+      
+      totalBilled += total;
+      runningBal += total;
 
-    // 2. Credit Row(s) for Payments
-    if (Array.isArray(s.paymentHistory) && s.paymentHistory.length > 0) {
-      s.paymentHistory.forEach(ph => {
-        totalPaid += Number(ph.amount) || 0;
-        runningBal -= Number(ph.amount) || 0;
-        rows.push({
-          date: ph.date || s.date,
-          type: 'Payment Receipt',
-          ref: `Recv-${s.invoiceNo}`,
-          desc: ph.notes || `Payment received (${ph.method || 'Cash/Online'})`,
-          debit: 0,
-          credit: Number(ph.amount) || 0,
-          balance: runningBal
-        });
-      });
-    } else if (paid > 0) {
-      totalPaid += paid;
-      runningBal -= paid;
+      // 1. Debit Row for Invoice
       rows.push({
         date: s.date,
-        type: 'Payment Receipt',
-        ref: `Recv-${s.invoiceNo}`,
-        desc: `Payment received at billing`,
-        debit: 0,
-        credit: paid,
+        type: 'Invoice',
+        ref: s.invoiceNo,
+        desc: s.items ? s.items.map(it => `${it.productName} (${it.qty} pcs)`).join(', ') : 'Wholesale Goods',
+        debit: total,
+        credit: 0,
         balance: runningBal
       });
-    }
-  });
 
-  const netPending = Math.max(0, runningBal);
+      // 2. Credit Row(s) for Payments
+      if (Array.isArray(s.paymentHistory) && s.paymentHistory.length > 0) {
+        s.paymentHistory.forEach(ph => {
+          totalPaid += Number(ph.amount) || 0;
+          runningBal -= Number(ph.amount) || 0;
+          rows.push({
+            date: ph.date || s.date,
+            type: 'Payment Receipt',
+            ref: `Recv-${s.invoiceNo}`,
+            desc: ph.notes || `Payment received (${ph.method || 'Cash/Online'})`,
+            debit: 0,
+            credit: Number(ph.amount) || 0,
+            balance: runningBal
+          });
+        });
+      } else if (paid > 0) {
+        totalPaid += paid;
+        runningBal -= paid;
+        rows.push({
+          date: s.date,
+          type: 'Payment Receipt',
+          ref: `Recv-${s.invoiceNo}`,
+          desc: `Payment received at billing`,
+          debit: 0,
+          credit: paid,
+          balance: runningBal
+        });
+      }
+    });
 
-  content.innerHTML = `
-    <div class="text-center pb-3 border-b border-slate-200 flex flex-col items-center">
-      <div class="w-14 h-14 rounded-full overflow-hidden border border-slate-200 mb-1 flex items-center justify-center bg-white">
-        <img src="logo.jpg" alt="Dwarkadhish Enterprise" class="w-full h-full object-cover">
+    const netPending = Math.max(0, runningBal);
+
+    content.innerHTML = `
+      <div class="text-center pb-3 border-b border-slate-200 flex flex-col items-center">
+        <div class="w-14 h-14 rounded-full overflow-hidden border border-slate-200 mb-1 flex items-center justify-center bg-white">
+          <img src="logo.jpg" alt="Dwarkadhish Enterprise" class="w-full h-full object-cover">
+        </div>
+        <h2 class="text-base font-bold text-slate-900">${escapeHtml(bizName)}</h2>
+        <p class="text-xs text-slate-500">Customer Account Statement / ખાતાવહી</p>
       </div>
-      <h2 class="text-base font-bold text-slate-900">${escapeHtml(bizName)}</h2>
-      <p class="text-xs text-slate-500">Customer Account Statement / ખાતાવહી</p>
-    </div>
 
-    <div class="grid grid-cols-2 text-xs py-2 gap-2 border-b border-slate-100">
-      <div>
-        <p><span class="text-slate-500">Customer:</span> <b class="text-slate-900 text-sm">${escapeHtml(customerName)}</b></p>
-        <p><span class="text-slate-500">Statement Date:</span> <b>${formatDate(new Date().toISOString().split('T')[0])}</b></p>
+      <div class="grid grid-cols-2 text-xs py-2 gap-2 border-b border-slate-100">
+        <div>
+          <p><span class="text-slate-500">Customer:</span> <b class="text-slate-900 text-sm">${escapeHtml(customerName)}</b></p>
+          <p><span class="text-slate-500">Statement Date:</span> <b>${formatDate(new Date().toISOString().split('T')[0])}</b></p>
+        </div>
+        <div class="text-right">
+          <p><span class="text-slate-500">Total Billed:</span> <b class="font-mono text-slate-900">${formatCurrency(totalBilled)}</b></p>
+          <p><span class="text-slate-500">Total Received:</span> <b class="font-mono text-emerald-700">${formatCurrency(totalPaid)}</b></p>
+          <p class="text-sm font-extrabold ${netPending > 0 ? 'text-rose-600' : 'text-emerald-700'}">
+            Net Outstanding Due: ${formatCurrency(netPending)}
+          </p>
+        </div>
       </div>
-      <div class="text-right">
-        <p><span class="text-slate-500">Total Billed:</span> <b class="font-mono text-slate-900">${formatCurrency(totalBilled)}</b></p>
-        <p><span class="text-slate-500">Total Received:</span> <b class="font-mono text-emerald-700">${formatCurrency(totalPaid)}</b></p>
-        <p class="text-sm font-extrabold ${netPending > 0 ? 'text-rose-600' : 'text-emerald-700'}">
-          Net Outstanding Due: ${formatCurrency(netPending)}
-        </p>
-      </div>
-    </div>
 
-    <div class="overflow-x-auto">
-      <table class="w-full text-xs text-left border-collapse">
-        <thead>
-          <tr class="bg-slate-50 text-slate-600 border-b border-slate-200">
-            <th class="py-2 px-2">Date</th>
-            <th class="py-2 px-2">Type / Ref #</th>
-            <th class="py-2 px-2">Particulars / Description</th>
-            <th class="py-2 px-2 text-right">Debit (Bill ₹)</th>
-            <th class="py-2 px-2 text-right">Credit (Paid ₹)</th>
-            <th class="py-2 px-2 text-right">Balance Due (₹)</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 font-mono">
-          ${rows.map(r => `
-            <tr>
-              <td class="py-2 px-2 text-slate-600">${formatDate(r.date)}</td>
-              <td class="py-2 px-2 font-bold text-slate-800">${escapeHtml(r.ref)} <span class="text-[10px] block font-normal text-slate-400">${r.type}</span></td>
-              <td class="py-2 px-2 font-sans text-slate-600 text-[11px] max-w-xs">${escapeHtml(r.desc)}</td>
-              <td class="py-2 px-2 text-right font-bold text-slate-900">${r.debit > 0 ? formatCurrency(r.debit) : '-'}</td>
-              <td class="py-2 px-2 text-right font-bold text-emerald-700">${r.credit > 0 ? formatCurrency(r.credit) : '-'}</td>
-              <td class="py-2 px-2 text-right font-extrabold ${r.balance > 0 ? 'text-rose-600' : 'text-emerald-700'}">${formatCurrency(r.balance)}</td>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 text-slate-600 border-b border-slate-200">
+              <th class="py-2 px-2">Date</th>
+              <th class="py-2 px-2">Type / Ref #</th>
+              <th class="py-2 px-2">Particulars / Description</th>
+              <th class="py-2 px-2 text-right">Debit (Bill ₹)</th>
+              <th class="py-2 px-2 text-right">Credit (Paid ₹)</th>
+              <th class="py-2 px-2 text-right">Balance Due (₹)</th>
             </tr>
-          `).join('')}
-        </tbody>
-        <tfoot>
-          <tr class="bg-slate-50 font-bold border-t-2 border-slate-300 font-mono">
-            <td colspan="3" class="py-2 px-2 text-right font-sans">Total:</td>
-            <td class="py-2 px-2 text-right text-slate-900">${formatCurrency(totalBilled)}</td>
-            <td class="py-2 px-2 text-right text-emerald-700">${formatCurrency(totalPaid)}</td>
-            <td class="py-2 px-2 text-right text-rose-600 font-extrabold">${formatCurrency(netPending)}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  `;
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-mono">
+            ${rows.map(r => `
+              <tr>
+                <td class="py-2 px-2 text-slate-600">${formatDate(r.date)}</td>
+                <td class="py-2 px-2 font-bold text-slate-800">${escapeHtml(r.ref)} <span class="text-[10px] block font-normal text-slate-400">${r.type}</span></td>
+                <td class="py-2 px-2 font-sans text-slate-600 text-[11px] max-w-xs">${escapeHtml(r.desc)}</td>
+                <td class="py-2 px-2 text-right font-bold text-slate-900">${r.debit > 0 ? formatCurrency(r.debit) : '-'}</td>
+                <td class="py-2 px-2 text-right font-bold text-emerald-700">${r.credit > 0 ? formatCurrency(r.credit) : '-'}</td>
+                <td class="py-2 px-2 text-right font-extrabold ${r.balance > 0 ? 'text-rose-600' : 'text-emerald-700'}">${formatCurrency(r.balance)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr class="bg-slate-50 font-bold border-t-2 border-slate-300 font-mono">
+              <td colspan="3" class="py-2 px-2 text-right font-sans">Total:</td>
+              <td class="py-2 px-2 text-right text-slate-900">${formatCurrency(totalBilled)}</td>
+              <td class="py-2 px-2 text-right text-emerald-700">${formatCurrency(totalPaid)}</td>
+              <td class="py-2 px-2 text-right text-rose-600 font-extrabold">${formatCurrency(netPending)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
 
-  openModal('statementModal');
+    openModal('statementModal');
+  } catch (err) {
+    console.error("Error generating customer statement:", err);
+    showToast("Error generating statement: " + err.message, true);
+  }
 }
 
 // 4. Complete Ledger Statement for Supplier
-function viewSupplierStatement(vendorName) {
-  const content = document.getElementById("statementPrintContent");
-  const title = document.getElementById("statementModalTitle");
-  const subtitle = document.getElementById("statementModalSubtitle");
-  const bizName = state.settings.bizName || "Dwarkadhish Enterprise";
+function viewSupplierStatement(rawVendorName) {
+  try {
+    let vendorName = rawVendorName || "";
+    try {
+      if (typeof vendorName === 'string' && vendorName.includes('%')) {
+        vendorName = decodeURIComponent(vendorName);
+      }
+    } catch(e) {}
 
-  if (title) title.innerHTML = `<i class="fa-solid fa-truck-field text-rose-600"></i> Supplier Statement: ${escapeHtml(vendorName)}`;
+    const content = document.getElementById("statementPrintContent");
+    const title = document.getElementById("statementModalTitle");
+    const subtitle = document.getElementById("statementModalSubtitle");
+    const bizName = state.settings.bizName || "Dwarkadhish Enterprise";
+
+    if (title) title.innerHTML = `<i class="fa-solid fa-truck-field text-rose-600"></i> Supplier Statement: ${escapeHtml(vendorName)}`;
   if (subtitle) subtitle.textContent = `Statement of Purchases, Payments & Returns`;
 
   const purchases = (state.purchases || [])
@@ -7119,7 +7197,11 @@ function viewSupplierStatement(vendorName) {
     </div>
   `;
 
-  openModal('statementModal');
+    openModal('statementModal');
+  } catch (err) {
+    console.error("Error generating supplier statement:", err);
+    showToast("Error generating statement: " + err.message, true);
+  }
 }
 
 function refreshAllUI() {
