@@ -1057,6 +1057,10 @@
               <span class="font-semibold">Wholesale Money In A/c:</span>
               <span class="font-bold font-mono" id="cardP1WholesaleRecv">₹0</span>
             </div>
+            <div class="flex justify-between py-1 border-b border-slate-50 text-cyan-700 bg-cyan-50/60 px-1 rounded">
+              <span class="font-semibold">Online Payouts In A/c:</span>
+              <span class="font-bold font-mono" id="cardP1OnlinePayouts">₹0</span>
+            </div>
             <div class="flex justify-between py-1 border-b border-slate-50 text-amber-700 bg-amber-50/60 px-1 rounded">
               <span class="font-semibold">Personal Drawings:</span>
               <span class="font-bold font-mono" id="cardP1Drawings">₹0</span>
@@ -1098,6 +1102,10 @@
             <div class="flex justify-between py-1 border-b border-slate-50 text-emerald-700 bg-emerald-50/60 px-1 rounded">
               <span class="font-semibold">Wholesale Money In A/c:</span>
               <span class="font-bold font-mono" id="cardP2WholesaleRecv">₹0</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-50 text-cyan-700 bg-cyan-50/60 px-1 rounded">
+              <span class="font-semibold">Online Payouts In A/c:</span>
+              <span class="font-bold font-mono" id="cardP2OnlinePayouts">₹0</span>
             </div>
             <div class="flex justify-between py-1 border-b border-slate-50 text-amber-700 bg-amber-50/60 px-1 rounded">
               <span class="font-semibold">Personal Drawings:</span>
@@ -1278,9 +1286,13 @@
               <i class="fa-solid fa-plus"></i> New Account
             </button>
           </div>
-          <select id="payoutAccountId" required class="input-pro font-semibold">
+          <select id="payoutAccountId" onchange="onPayoutAccountChanged()" required class="input-pro font-semibold">
             <!-- Dynamically populated -->
           </select>
+          <div id="payoutPartnerIndicator" class="mt-1 text-[11px] text-slate-500 flex items-center gap-1.5 font-medium">
+            <span>Bank settlement credited to:</span>
+            <span id="payoutPartnerBadge" class="font-bold px-2 py-0.5 rounded text-xs bg-indigo-50 text-indigo-700 border border-indigo-200">Kenil & Family</span>
+          </div>
         </div>
 
         <div>
@@ -1329,19 +1341,26 @@
         <!-- Add Account Box -->
         <form id="newSellerAccountForm" onsubmit="handleAddNewSellerAccount(event)" class="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5">
           <h4 class="text-xs font-bold text-slate-800">Add New Seller Account</h4>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Platform *</label>
               <select id="newAccountPlatform" required class="input-pro py-1 text-xs font-bold">
-                <option value="Amazon">Amazon</option>
                 <option value="Meesho">Meesho</option>
+                <option value="Amazon">Amazon</option>
                 <option value="Flipkart">Flipkart</option>
                 <option value="Other">Other / Custom</option>
               </select>
             </div>
             <div>
               <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Account Name / ID *</label>
-              <input type="text" id="newAccountName" required placeholder="e.g. Amazon - ID 6" class="input-pro py-1 text-xs">
+              <input type="text" id="newAccountName" required placeholder="e.g. Meesho - Om Sai" class="input-pro py-1 text-xs">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Bank Holder / Partner *</label>
+              <select id="newAccountPartner" required class="input-pro py-1 text-xs font-bold text-indigo-700">
+                <option value="partner1" id="optNewAccP1">Kenil & Family (Partner 1)</option>
+                <option value="partner2" id="optNewAccP2">Alpesh & Family (Partner 2)</option>
+              </select>
             </div>
           </div>
           <button type="submit" class="btn-solid-primary text-xs py-1.5 px-3 w-full">

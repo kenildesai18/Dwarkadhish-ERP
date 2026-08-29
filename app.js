@@ -420,6 +420,11 @@ function updatePartnerLabelsInUI() {
   if (saleRecv) saleRecv.innerHTML = partnerOptions;
   if (ccRecv) ccRecv.innerHTML = partnerOptions;
 
+  const optNewAccP1 = document.getElementById("optNewAccP1");
+  const optNewAccP2 = document.getElementById("optNewAccP2");
+  if (optNewAccP1) optNewAccP1.textContent = `${p1} & Family (Partner 1)`;
+  if (optNewAccP2) optNewAccP2.textContent = `${p2} & Family (Partner 2)`;
+
   const setBiz = document.getElementById("settingBizName");
   const setP1 = document.getElementById("settingP1Name");
   const setP2 = document.getElementById("settingP2Name");
@@ -817,7 +822,25 @@ function calculatePartnerBalances() {
       if (sr.refundRecipient === 'partner1') p1WholesaleRecv += refAmt;
       else if (sr.refundRecipient === 'partner2') p2WholesaleRecv += refAmt;
     }
-  });  // 5. Personal Drawings
+  });
+
+  // 4c. Online Marketplace Bank Payouts Received in Partner's Bank Accounts
+  let p1OnlinePayoutsRecv = 0;
+  let p2OnlinePayoutsRecv = 0;
+  const sellerAccs = getSellerAccounts();
+  const accOwnerMap = {};
+  sellerAccs.forEach(a => {
+    accOwnerMap[a.id] = a.linkedPartner || 'partner1';
+  });
+
+  (state.onlinePayouts || []).forEach(op => {
+    const amt = Number(op.bankAmount) || 0;
+    const recipient = op.receivedBy || accOwnerMap[op.accountId] || 'partner1';
+    if (recipient === 'partner1') p1OnlinePayoutsRecv += amt;
+    else if (recipient === 'partner2') p2OnlinePayoutsRecv += amt;
+  });
+
+  // 5. Personal Drawings
   let p1Drawings = 0;
   let p2Drawings = 0;
   state.partnerTransactions.filter(t => t.type === 'drawing').forEach(d => {
@@ -840,8 +863,8 @@ function calculatePartnerBalances() {
     }
   });
 
-  const p1TotalPaid = (p1Purchases + p1Expenses + p1Capital + p1SettlementAdj) - (p1WholesaleRecv + p1Drawings);
-  const p2TotalPaid = (p2Purchases + p2Expenses + p2Capital + p2SettlementAdj) - (p2WholesaleRecv + p2Drawings);
+  const p1TotalPaid = (p1Purchases + p1Expenses + p1Capital + p1SettlementAdj) - (p1WholesaleRecv + p1OnlinePayoutsRecv + p1Drawings);
+  const p2TotalPaid = (p2Purchases + p2Expenses + p2Capital + p2SettlementAdj) - (p2WholesaleRecv + p2OnlinePayoutsRecv + p2Drawings);
   const totalCombinedPaid = p1TotalPaid + p2TotalPaid;
 
   const p1ExpectedShare = totalCombinedPaid * r1;
@@ -857,6 +880,7 @@ function calculatePartnerBalances() {
   const cP1Exp = document.getElementById("cardP1Expenses");
   const cP1Cap = document.getElementById("cardP1Capital");
   const cP1Ws = document.getElementById("cardP1WholesaleRecv");
+  const cP1Op = document.getElementById("cardP1OnlinePayouts");
   const cP1Draw = document.getElementById("cardP1Drawings");
   const cP1Set = document.getElementById("cardP1Settlements");
   const cP1Grand = document.getElementById("cardP1GrandTotal");
@@ -865,6 +889,7 @@ function calculatePartnerBalances() {
   if (cP1Exp) cP1Exp.textContent = formatCurrency(p1Expenses);
   if (cP1Cap) cP1Cap.textContent = formatCurrency(p1Capital);
   if (cP1Ws) cP1Ws.textContent = formatCurrency(p1WholesaleRecv);
+  if (cP1Op) cP1Op.textContent = formatCurrency(p1OnlinePayoutsRecv);
   if (cP1Draw) cP1Draw.textContent = formatCurrency(p1Drawings);
   if (cP1Set) cP1Set.textContent = (p1SettlementAdj >= 0 ? "+" : "") + formatCurrency(p1SettlementAdj);
   if (cP1Grand) cP1Grand.textContent = formatCurrency(p1TotalPaid);
@@ -873,6 +898,7 @@ function calculatePartnerBalances() {
   const cP2Exp = document.getElementById("cardP2Expenses");
   const cP2Cap = document.getElementById("cardP2Capital");
   const cP2Ws = document.getElementById("cardP2WholesaleRecv");
+  const cP2Op = document.getElementById("cardP2OnlinePayouts");
   const cP2Draw = document.getElementById("cardP2Drawings");
   const cP2Set = document.getElementById("cardP2Settlements");
   const cP2Grand = document.getElementById("cardP2GrandTotal");
@@ -881,6 +907,7 @@ function calculatePartnerBalances() {
   if (cP2Exp) cP2Exp.textContent = formatCurrency(p2Expenses);
   if (cP2Cap) cP2Cap.textContent = formatCurrency(p2Capital);
   if (cP2Ws) cP2Ws.textContent = formatCurrency(p2WholesaleRecv);
+  if (cP2Op) cP2Op.textContent = formatCurrency(p2OnlinePayoutsRecv);
   if (cP2Draw) cP2Draw.textContent = formatCurrency(p2Drawings);
   if (cP2Set) cP2Set.textContent = (p2SettlementAdj >= 0 ? "+" : "") + formatCurrency(p2SettlementAdj);
   if (cP2Grand) cP2Grand.textContent = formatCurrency(p2TotalPaid);
@@ -3823,20 +3850,41 @@ function updatePayoutAccountsDropdown() {
   const select = document.getElementById("payoutAccountId");
   if (!select) return;
 
+  const p1 = state.settings.partner1Name || "Kenil";
+  const p2 = state.settings.partner2Name || "Alpesh";
   const accs = getSellerAccounts().filter(a => a.platform === platform || (platform === 'Other' && a.platform !== 'Meesho' && a.platform !== 'Amazon' && a.platform !== 'Flipkart'));
 
   if (accs.length === 0) {
     select.innerHTML = `<option value="">-- No ${platform} accounts yet. Click "+ New Account" --</option>`;
+    onPayoutAccountChanged();
     return;
   }
 
-  select.innerHTML = accs.map(a => `
-    <option value="${a.id}">${escapeHtml(a.name)}</option>
-  `).join('');
+  select.innerHTML = accs.map(a => {
+    const isP2 = a.linkedPartner === 'partner2';
+    const tag = isP2 ? ` [${p2} & Family]` : ` [${p1} & Family]`;
+    return `<option value="${a.id}">${escapeHtml(a.name)}${tag}</option>`;
+  }).join('');
+
+  onPayoutAccountChanged();
+}
+
+function onPayoutAccountChanged() {
+  const accId = document.getElementById("payoutAccountId")?.value;
+  const badge = document.getElementById("payoutPartnerBadge");
+  if (!badge) return;
+  const acc = getSellerAccounts().find(a => a.id === accId);
+  const p1 = state.settings.partner1Name || "Kenil (You)";
+  const p2 = state.settings.partner2Name || "Alpesh";
+  const isP2 = acc && acc.linkedPartner === 'partner2';
+  badge.textContent = isP2 ? `${p2} & Family (Partner 2)` : `${p1} & Family (Partner 1)`;
+  badge.className = isP2
+    ? "font-bold px-2 py-0.5 rounded text-xs bg-purple-50 text-purple-700 border border-purple-200"
+    : "font-bold px-2 py-0.5 rounded text-xs bg-indigo-50 text-indigo-700 border border-indigo-200";
 }
 
 function quickAddNewSellerAccount() {
-  const currentPlatform = document.getElementById("payoutPlatform")?.value || "Amazon";
+  const currentPlatform = document.getElementById("payoutPlatform")?.value || "Meesho";
   const existingCount = getSellerAccounts().filter(a => a.platform === currentPlatform).length;
   const defaultName = `${currentPlatform} - ID ${existingCount + 1}`;
   const accName = prompt(`Enter new seller account name for ${currentPlatform}:`, defaultName);
@@ -3847,13 +3895,16 @@ function quickAddNewSellerAccount() {
     state.settings.sellerAccounts.push({
       id: newId,
       platform: currentPlatform,
-      name: accName.trim()
+      name: accName.trim(),
+      linkedPartner: 'partner1'
     });
     saveState();
     updatePayoutAccountsDropdown();
     const select = document.getElementById("payoutAccountId");
     if (select) select.value = newId;
+    onPayoutAccountChanged();
     renderOnlinePayouts();
+    calculatePartnerBalances();
     showToast(`New account "${accName.trim()}" added to ${currentPlatform}!`);
   }
 }
@@ -3862,6 +3913,7 @@ function handleAddNewSellerAccount(e) {
   e.preventDefault();
   const platform = document.getElementById("newAccountPlatform").value;
   const name = document.getElementById("newAccountName").value.trim();
+  const linkedPartner = document.getElementById("newAccountPartner")?.value || "partner1";
   if (!name) return;
 
   if (!state.settings.sellerAccounts) state.settings.sellerAccounts = [];
@@ -3869,14 +3921,29 @@ function handleAddNewSellerAccount(e) {
   state.settings.sellerAccounts.push({
     id: newId,
     platform,
-    name
+    name,
+    linkedPartner
   });
   saveState();
   document.getElementById("newAccountName").value = "";
   renderSellerAccountsManager();
   renderOnlinePayouts();
   updatePayoutAccountsDropdown();
+  calculatePartnerBalances();
   showToast(`Account "${name}" added successfully!`);
+}
+
+function toggleAccountPartner(id) {
+  const acc = getSellerAccounts().find(a => a.id === id);
+  if (!acc) return;
+  acc.linkedPartner = acc.linkedPartner === 'partner2' ? 'partner1' : 'partner2';
+  saveState();
+  renderSellerAccountsManager();
+  renderOnlinePayouts();
+  updatePayoutAccountsDropdown();
+  calculatePartnerBalances();
+  const pName = acc.linkedPartner === 'partner2' ? (state.settings.partner2Name || "Alpesh") : (state.settings.partner1Name || "Kenil");
+  showToast(`Account "${acc.name}" linked to ${pName} & Family!`);
 }
 
 function deleteSellerAccount(id) {
@@ -3889,6 +3956,7 @@ function deleteSellerAccount(id) {
     renderSellerAccountsManager();
     renderOnlinePayouts();
     updatePayoutAccountsDropdown();
+    calculatePartnerBalances();
     showToast(`Account "${acc.name}" removed.`);
   }
 }
@@ -3918,6 +3986,9 @@ function renderSellerAccountsManager() {
     return;
   }
 
+  const p1 = state.settings.partner1Name || "Kenil (You)";
+  const p2 = state.settings.partner2Name || "Alpesh";
+
   // Group by platform
   const groups = {};
   accs.forEach(a => {
@@ -3932,24 +4003,39 @@ function renderSellerAccountsManager() {
     else if (platform === "Flipkart") badgeClass = "bg-blue-100 text-blue-800";
 
     html += `
-      <div class="p-2.5 bg-white border border-slate-200 rounded-lg space-y-1.5 shadow-sm">
+      <div class="p-2.5 bg-white border border-slate-200 rounded-lg space-y-2 shadow-sm">
         <div class="flex items-center justify-between pb-1 border-b border-slate-100">
           <span class="text-xs font-bold px-2 py-0.5 rounded ${badgeClass}">${escapeHtml(platform)} (${groups[platform].length} Accounts)</span>
         </div>
-        <div class="space-y-1">
-          ${groups[platform].map(a => `
-            <div class="flex items-center justify-between p-1.5 rounded hover:bg-slate-50 text-xs">
-              <span class="font-semibold text-slate-800">${escapeHtml(a.name)}</span>
+        <div class="space-y-1.5">
+          ${groups[platform].map(a => {
+            const isP2 = a.linkedPartner === 'partner2';
+            const partnerBadge = isP2
+              ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200"><i class="fa-solid fa-user-check text-[9px]"></i> ${escapeHtml(p2)} & Family</span>`
+              : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200"><i class="fa-solid fa-user-check text-[9px]"></i> ${escapeHtml(p1)} & Family</span>`;
+            return `
+            <div class="flex items-center justify-between p-2 rounded hover:bg-slate-50 border border-slate-100 text-xs">
+              <div class="space-y-1">
+                <div class="font-bold text-slate-800">${escapeHtml(a.name)}</div>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] text-slate-400 font-medium">Credited To:</span>
+                  ${partnerBadge}
+                </div>
+              </div>
               <div class="flex items-center gap-1">
-                <button type="button" onclick="renameSellerAccount('${a.id}')" class="p-1 text-slate-400 hover:text-amber-600 rounded" title="Rename Account">
+                <button type="button" onclick="toggleAccountPartner('${a.id}')" class="px-2 py-1 text-[11px] font-bold text-slate-600 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 border border-slate-200 rounded transition-colors" title="Switch Partner / Family">
+                  <i class="fa-solid fa-arrows-rotate mr-1"></i>Switch
+                </button>
+                <button type="button" onclick="renameSellerAccount('${a.id}')" class="p-1.5 text-slate-400 hover:text-amber-600 rounded hover:bg-amber-50" title="Rename Account">
                   <i class="fa-solid fa-pen-to-square"></i>
                 </button>
-                <button type="button" onclick="deleteSellerAccount('${a.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded" title="Delete Account">
+                <button type="button" onclick="deleteSellerAccount('${a.id}')" class="p-1.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50" title="Delete Account">
                   <i class="fa-solid fa-trash-can"></i>
                 </button>
               </div>
             </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       </div>
     `;
@@ -3975,6 +4061,9 @@ function handleSavePayout(e) {
     return;
   }
 
+  const acc = getSellerAccounts().find(a => a.id === accountId);
+  const receivedBy = acc ? (acc.linkedPartner || "partner1") : "partner1";
+
   if (!state.onlinePayouts) state.onlinePayouts = [];
 
   if (editId) {
@@ -3987,6 +4076,7 @@ function handleSavePayout(e) {
       existing.unitsDispatched = unitsDispatched;
       existing.approxCost = approxCost;
       existing.notes = notes;
+      existing.receivedBy = receivedBy;
       showToast("Bank payout updated!");
     }
   } else {
@@ -3998,6 +4088,7 @@ function handleSavePayout(e) {
       bankAmount,
       unitsDispatched,
       approxCost,
+      receivedBy,
       notes
     });
     showToast("Bank payout saved successfully!");
@@ -4014,14 +4105,25 @@ function renderOnlinePayouts() {
   const accs = getSellerAccounts();
   const accountTotals = {};
   const platformTotals = { Meesho: 0, Amazon: 0, Flipkart: 0, Other: 0 };
+  const p1 = state.settings.partner1Name || "Kenil (You)";
+  const p2 = state.settings.partner2Name || "Alpesh";
+  let p1PayoutsTotal = 0;
+  let p2PayoutsTotal = 0;
+  let totalOnlinePayouts = 0;
 
   accs.forEach(a => {
     accountTotals[a.id] = 0;
     if (!platformTotals[a.platform]) platformTotals[a.platform] = 0;
   });
 
+  const accMap = {};
+  accs.forEach(a => {
+    accMap[a.id] = a.linkedPartner || 'partner1';
+  });
+
   state.onlinePayouts.forEach(op => {
     const amt = Number(op.bankAmount) || 0;
+    totalOnlinePayouts += amt;
     const plat = op.platform || "Other";
     if (platformTotals[plat] !== undefined) platformTotals[plat] += amt;
     else platformTotals[plat] = (platformTotals[plat] || 0) + amt;
@@ -4029,6 +4131,10 @@ function renderOnlinePayouts() {
     if (accountTotals[op.accountId] !== undefined) {
       accountTotals[op.accountId] += amt;
     }
+
+    const recipient = op.receivedBy || accMap[op.accountId] || 'partner1';
+    if (recipient === 'partner2') p2PayoutsTotal += amt;
+    else p1PayoutsTotal += amt;
   });
 
   // Render Dynamic Platform Cards Container
@@ -4058,7 +4164,36 @@ function renderOnlinePayouts() {
         if (!platforms.includes(a.platform)) platforms.push(a.platform);
       });
 
-      container.innerHTML = platforms.map(plat => {
+      // 1. Partner Family Summary Card
+      let partnerFamilyCardHtml = `
+        <div class="pro-card p-4 space-y-2 border-l-4 border-l-emerald-500 bg-gradient-to-br from-white to-emerald-50/20">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">
+                <i class="fa-solid fa-users"></i>
+              </span>
+              <h4 class="font-bold text-slate-900 text-xs sm:text-sm">Bank Accounts Summary</h4>
+            </div>
+            <span class="text-xs font-bold font-mono text-emerald-800">${formatCurrency(totalOnlinePayouts)}</span>
+          </div>
+          <div class="space-y-1 text-xs text-slate-600 pt-1">
+            <div class="flex justify-between py-0.5 border-b border-slate-100">
+              <span class="font-semibold text-indigo-700 flex items-center gap-1">
+                <i class="fa-solid fa-building-columns text-[10px]"></i> ${escapeHtml(p1)} & Family:
+              </span>
+              <b class="font-mono text-indigo-900">${formatCurrency(p1PayoutsTotal)}</b>
+            </div>
+            <div class="flex justify-between py-0.5 border-b border-slate-100">
+              <span class="font-semibold text-purple-700 flex items-center gap-1">
+                <i class="fa-solid fa-building-columns text-[10px]"></i> ${escapeHtml(p2)} & Family:
+              </span>
+              <b class="font-mono text-purple-900">${formatCurrency(p2PayoutsTotal)}</b>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const platformCardsHtml = platforms.map(plat => {
         let platBorder = "border-l-purple-500";
         let platBadge = "bg-purple-100 text-purple-700";
         let platLetter = plat.charAt(0).toUpperCase();
@@ -4090,16 +4225,22 @@ function renderOnlinePayouts() {
               <span class="text-xs font-bold font-mono text-slate-900">${formatCurrency(total)}</span>
             </div>
             <div class="space-y-1 text-xs text-slate-600 pt-1">
-              ${platAccs.map(a => `
+              ${platAccs.map(a => {
+                const isP2 = a.linkedPartner === 'partner2';
+                const pTag = isP2 ? `<span class="text-[9px] text-purple-700 font-bold ml-1">(${escapeHtml(p2)})</span>` : `<span class="text-[9px] text-indigo-700 font-bold ml-1">(${escapeHtml(p1)})</span>`;
+                return `
                 <div class="flex justify-between py-0.5 border-b border-slate-100">
-                  <span class="truncate pr-2">${escapeHtml(a.name)}:</span>
+                  <span class="truncate pr-2">${escapeHtml(a.name)}${pTag}:</span>
                   <b class="font-mono text-slate-800 flex-shrink-0">${formatCurrency(accountTotals[a.id] || 0)}</b>
                 </div>
-              `).join('')}
+                `;
+              }).join('')}
             </div>
           </div>
         `;
       }).join('');
+
+      container.innerHTML = partnerFamilyCardHtml + platformCardsHtml;
     }
   }
 
@@ -4114,9 +4255,14 @@ function renderOnlinePayouts() {
 
   tbody.innerHTML = state.onlinePayouts.slice().reverse().map(op => {
     const accName = getSellerAccountName(op.accountId);
+    const acc = accs.find(a => a.id === op.accountId);
     const bank = Number(op.bankAmount) || 0;
     const cost = Number(op.approxCost) || 0;
     const margin = bank - cost;
+
+    const isP2 = (op.receivedBy || (acc ? acc.linkedPartner : 'partner1')) === 'partner2';
+    const partnerLabel = isP2 ? p2 : p1;
+    const pBadgeClass = isP2 ? "bg-purple-100 text-purple-700 border-purple-200" : "bg-indigo-100 text-indigo-700 border-indigo-200";
 
     let badgeClass = "bg-purple-50 text-purple-700 border-purple-200";
     if (op.platform === 'Amazon') badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
@@ -4130,7 +4276,12 @@ function renderOnlinePayouts() {
             ${escapeHtml(op.platform)}
           </span>
         </td>
-        <td class="font-bold text-slate-800">${escapeHtml(accName)}</td>
+        <td>
+          <div class="font-bold text-slate-800">${escapeHtml(accName)}</div>
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${pBadgeClass} mt-0.5">
+            <i class="fa-solid fa-building-columns mr-1 text-[9px]"></i>${escapeHtml(partnerLabel)} & Family
+          </span>
+        </td>
         <td class="text-right font-mono font-extrabold text-emerald-700 text-sm">${formatCurrency(bank)}</td>
         <td class="text-slate-600 text-xs">${op.unitsDispatched ? `${op.unitsDispatched} units` : '-'} ${cost > 0 ? `(${formatCurrency(cost)})` : ''}</td>
         <td class="font-mono font-bold ${margin >= 0 ? 'text-indigo-700' : 'text-rose-600'} text-xs">
