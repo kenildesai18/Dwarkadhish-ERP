@@ -796,6 +796,7 @@ function calculatePartnerBalances() {
   let p1WholesaleRecv = 0;
   let p2WholesaleRecv = 0;
   state.sales.forEach(s => {
+    if (s.paymentStatus === 'Pending' && (Number(s.paidAmount) || 0) === 0) return;
     if (s.paymentHistory && Array.isArray(s.paymentHistory) && s.paymentHistory.length > 0) {
       s.paymentHistory.forEach(ph => {
         const amt = Number(ph.amount) || 0;
@@ -3304,6 +3305,11 @@ function handleSaveSale(e) {
         existing.paidAmount = paidAmount;
         existing.receivedBy = receivedBy;
         existing.notes = notes;
+        if (paymentStatus === 'Pending' || paidAmount === 0) {
+          existing.paymentHistory = [];
+        } else if (!existing.paymentHistory || existing.paymentHistory.length === 0) {
+          existing.paymentHistory = [{ date, amount: paidAmount, receivedBy, notes }];
+        }
         showToast(`Wholesale Bill ${existing.invoiceNo} updated successfully!`);
       }
     } else {
@@ -4875,6 +4881,11 @@ function handleSavePurchase(e) {
         existing.paymentStatus = paymentStatus;
         existing.paidAmount = paidAmount;
         existing.notes = notes;
+        if (paymentStatus === 'Pending' || paidAmount === 0) {
+          existing.paymentHistory = [];
+        } else if (!existing.paymentHistory || existing.paymentHistory.length === 0) {
+          existing.paymentHistory = [{ date, amount: paidAmount, paidBy, notes }];
+        }
         showToast(`Purchase bill ${existing.billNo} updated successfully!`);
       }
     } else {
