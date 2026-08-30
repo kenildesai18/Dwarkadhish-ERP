@@ -3607,16 +3607,18 @@ function renderSalesTable() {
             </button>
           ` : ''}
         </td>
-        <td class="text-center space-x-1">
-          <button onclick="viewInvoiceReceipt('${s.id}')" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Print Bill Receipt">
-            <i class="fa-solid fa-print"></i>
-          </button>
-          <button onclick="${isScrap ? `openScrapSaleModal('${s.id}')` : `editSale('${s.id}')`}" class="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded" title="Edit">
-            <i class="fa-solid fa-pen-to-square"></i>
-          </button>
-          <button onclick="deleteSale('${s.id}')" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded" title="Delete">
-            <i class="fa-solid fa-trash-can"></i>
-          </button>
+        <td class="text-center whitespace-nowrap sticky right-0 bg-white/95 backdrop-blur z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.06)] px-2 py-2">
+          <div class="inline-flex items-center gap-1">
+            <button type="button" onclick="viewInvoiceReceipt('${s.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded-lg text-xs transition-colors shadow-2xs cursor-pointer" title="Print Bill Receipt">
+              <i class="fa-solid fa-print"></i>
+            </button>
+            <button type="button" onclick="${isScrap ? `openScrapSaleModal('${s.id}')` : `editSale('${s.id}')`}" class="p-1.5 text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg text-xs transition-colors shadow-2xs cursor-pointer" title="Edit">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button type="button" onclick="deleteSale('${s.id}')" class="p-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg text-xs transition-colors shadow-2xs cursor-pointer" title="Delete Sale / Scrap Lot">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
         </td>
       </tr>
     `;

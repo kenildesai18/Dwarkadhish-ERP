@@ -593,42 +593,49 @@
     <!-- ==================== 3. WHOLESALE REGISTER & BILLS (B2B) ==================== -->
     <section id="view-sales" class="hidden space-y-4 sm:space-y-5">
       
-      <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
-          <div class="relative w-full sm:w-60">
-            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
-            <input type="text" id="salesSearchInput" oninput="renderSalesTable()" placeholder="Search bill, party, city..." class="input-pro pl-8">
+      <!-- Top Action Bar & Filters -->
+      <div class="pro-card p-3.5 sm:p-4 space-y-3">
+        <!-- Row 1: Action Buttons -->
+        <div class="flex flex-wrap items-center justify-between gap-2.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="openModal('saleModal', 'wholesale')" class="btn-solid-primary text-xs sm:text-sm py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+              <i class="fa-solid fa-plus"></i> New Wholesale Bill
+            </button>
+            <button onclick="openScrapSaleModal()" class="btn-solid-amber text-xs sm:text-sm py-2 px-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+              <i class="fa-solid fa-recycle"></i> + Defect / Scrap Lot Sale
+            </button>
           </div>
-          <select id="salesFilterPayment" onchange="renderSalesTable()" class="input-pro w-full sm:w-40">
-            <option value="all">All Payment Status</option>
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="switchTab('khata'); switchKhataSubTab('recv_log');" class="btn-outline text-xs sm:text-sm py-2 px-3 text-emerald-700 hover:bg-emerald-50 border-emerald-300 font-bold rounded-lg flex items-center gap-1.5 shadow-2xs">
+              <i class="fa-solid fa-arrow-down-left"></i> Received Payments
+            </button>
+            <button onclick="switchTab('khata'); switchKhataSubTab('parties');" class="btn-outline text-xs sm:text-sm py-2 px-3 text-indigo-700 hover:bg-indigo-50 border-indigo-300 font-bold rounded-lg flex items-center gap-1.5 shadow-2xs">
+              <i class="fa-solid fa-book-bookmark"></i> Parties Khata
+            </button>
+            <button onclick="openPartiesManageModal()" class="btn-outline text-xs sm:text-sm py-2 px-3 text-slate-700 hover:bg-slate-50 border-slate-300 font-semibold rounded-lg flex items-center gap-1.5 shadow-2xs">
+              <i class="fa-solid fa-address-book text-indigo-600"></i> Parties Directory
+            </button>
+          </div>
+        </div>
+
+        <!-- Row 2: Search & Filter Toolbar -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+          <div class="relative flex-grow sm:w-80">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+            <input type="text" id="salesSearchInput" oninput="renderSalesTable()" placeholder="Search bill #, LOT #, party, item, city..." class="input-pro pl-8">
+          </div>
+          <select id="salesFilterPayment" onchange="renderSalesTable()" class="input-pro w-full sm:w-48 font-semibold">
+            <option value="all">All Bills & Scrap Lots</option>
             <option value="Paid">Fully Paid Only</option>
             <option value="Partial">Partial Due Only</option>
             <option value="Pending">Pending Due Only</option>
           </select>
         </div>
-
-        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <button onclick="switchTab('khata'); switchKhataSubTab('recv_log');" class="btn-solid-emerald text-xs sm:text-sm py-2 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
-            <i class="fa-solid fa-arrow-down-left"></i> Received Payment History
-          </button>
-          <button onclick="switchTab('khata'); switchKhataSubTab('parties');" class="btn-solid-primary text-xs sm:text-sm py-2 px-3.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
-            <i class="fa-solid fa-book-bookmark"></i> Parties Balances
-          </button>
-          <button onclick="openScrapSaleModal()" class="btn-solid-amber text-xs sm:text-sm py-2 px-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
-            <i class="fa-solid fa-recycle"></i> + Defect / Scrap Lot Sale
-          </button>
-          <button onclick="openPartiesManageModal()" class="btn-outline text-xs sm:text-sm py-2 px-3.5 flex items-center gap-1.5 shadow-sm">
-            <i class="fa-solid fa-address-book text-indigo-600"></i> Parties Directory
-          </button>
-          <button onclick="openModal('saleModal', 'wholesale')" class="btn-solid-primary text-xs sm:text-sm py-2 px-4 w-full sm:w-auto">
-            <i class="fa-solid fa-plus"></i> New Wholesale Bill
-          </button>
-        </div>
       </div>
 
       <!-- Wholesale Bills Table -->
       <div class="pro-card overflow-hidden">
-        <div class="overflow-x-auto scrollbar-none">
+        <div class="overflow-x-auto">
           <table class="pro-table">
             <thead>
               <tr>
@@ -640,7 +647,7 @@
                 <th class="text-right">Paid / Balance (₹)</th>
                 <th class="text-right">Profit Made (₹)</th>
                 <th class="text-center">Status</th>
-                <th class="text-center">Actions</th>
+                <th class="text-center sticky right-0 bg-slate-50/95 backdrop-blur z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.06)]">Actions</th>
               </tr>
             </thead>
             <tbody id="salesTableBody">
