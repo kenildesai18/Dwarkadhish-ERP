@@ -933,9 +933,9 @@
               <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
               <input type="text" id="khataSearchInput" oninput="renderKhataTables()" placeholder="Search party, supplier, bill #, date..." class="input-pro pl-8">
             </div>
-            <select id="khataFilterDue" onchange="renderKhataTables()" class="input-pro w-full sm:w-48">
-              <option value="due_only">With Due Balances Only</option>
-              <option value="all">All Accounts / All History</option>
+            <select id="khataFilterDue" onchange="renderKhataTables()" class="input-pro w-full sm:w-48 font-semibold">
+              <option value="all" selected>All Accounts (બધા ખાતાઓ)</option>
+              <option value="due_only">With Due Balances Only (બાકી વાળા)</option>
             </select>
           </div>
         </div>
@@ -944,10 +944,15 @@
       <!-- 1. Wholesale Parties Khata Table Section -->
       <div id="khataPartiesSection" class="pro-card overflow-hidden">
         <div class="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <h4 class="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-2">
-            <i class="fa-solid fa-address-book text-indigo-600"></i> Wholesale Customer Ledger & Balances
-          </h4>
-          <span class="text-xs text-slate-500 font-medium">સામટી રકમ જમા કરવા માટે "+ Collect Payment" દબાવો</span>
+          <div>
+            <h4 class="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-address-book text-indigo-600"></i> Wholesale Customer Ledger & Balances
+            </h4>
+            <span class="text-xs text-slate-500 font-medium">સામટી રકમ જમા કરવા માટે "+ Collect Payment" દબાવો</span>
+          </div>
+          <button onclick="openPartyLumpSumCollectModal('')" class="btn-solid-primary text-xs py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-plus"></i> Collect Payment
+          </button>
         </div>
         <div class="overflow-x-auto scrollbar-none">
           <table class="pro-table">
@@ -973,10 +978,15 @@
       <!-- 2. Suppliers Khata Table Section (Hidden by default) -->
       <div id="khataSuppliersSection" class="pro-card overflow-hidden hidden">
         <div class="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <h4 class="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-2">
-            <i class="fa-solid fa-truck-field text-rose-600"></i> Supplier & Vendor Outstanding Payables
-          </h4>
-          <span class="text-xs text-slate-500 font-medium">સપ્લાયરને સામટી રકમ ચૂકવવા માટે "+ Pay Supplier" દબાવો</span>
+          <div>
+            <h4 class="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-truck-field text-rose-600"></i> Supplier & Vendor Outstanding Payables
+            </h4>
+            <span class="text-xs text-slate-500 font-medium">સપ્લાયરને ચૂકવણી કરવા માટે "+ Pay Supplier" દબાવો</span>
+          </div>
+          <button onclick="openSupplierLumpSumPayModal('')" class="btn-solid-primary text-xs py-1.5 px-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-plus"></i> Pay Supplier
+          </button>
         </div>
         <div class="overflow-x-auto scrollbar-none">
           <table class="pro-table">

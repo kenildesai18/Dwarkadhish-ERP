@@ -6791,6 +6791,9 @@ function renderKhataTables() {
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <i class="fa-solid fa-check mr-1"></i> All Paid
                 </span>
+                <button type="button" onclick="openPartyLumpSumCollectModal('${encodedName}')" class="btn-solid-primary text-[11px] py-1 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs cursor-pointer" title="Collect Payment">
+                  <i class="fa-solid fa-plus mr-0.5"></i> Collect
+                </button>
               `}
               <button type="button" onclick="viewCustomerStatement('${encodedName}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Statement">
                 <i class="fa-solid fa-file-invoice mr-0.5"></i> Statement
@@ -6843,6 +6846,9 @@ function renderKhataTables() {
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <i class="fa-solid fa-check mr-1"></i> Settled
                 </span>
+                <button type="button" onclick="openSupplierLumpSumPayModal('${encodedSupName}')" class="btn-solid-primary text-[11px] py-1 px-2 bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs cursor-pointer" title="Pay Supplier / Advance">
+                  <i class="fa-solid fa-plus mr-0.5"></i> Pay
+                </button>
               `}
               <button type="button" onclick="viewSupplierStatement('${encodedSupName}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Statement">
                 <i class="fa-solid fa-file-invoice mr-0.5"></i> Statement
