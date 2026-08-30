@@ -316,6 +316,7 @@ function loadState() {
     state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
   }
   rebuildProductBatchesFromHistory();
+  reconcileSupplierReturnsAndBills();
 }
 
 function saveState() {
@@ -5079,6 +5080,68 @@ function handleSavePurchase(e) {
   }
 }
 
+function reconcileSupplierReturnsAndBills() {
+  if (!state.purchases || state.purchases.length === 0) return;
+  if (!state.supplierReturns) state.supplierReturns = [];
+
+  // Group total available debit notes (returns) by vendor
+  const vendorDebits = {};
+  (state.supplierReturns || []).forEach(sr => {
+    const vKey = (sr.vendor || sr.supplierName || '').trim().toLowerCase();
+    if (!vKey) return;
+    const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
+    if (isDebitNote) {
+      const val = Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || 0);
+      vendorDebits[vKey] = (vendorDebits[vKey] || 0) + val;
+    }
+  });
+
+  // For each vendor with debit notes, automatically allocate return credits to unpaid purchase bills
+  Object.keys(vendorDebits).forEach(vKey => {
+    let availableDebit = vendorDebits[vKey];
+
+    const vendorPurchases = state.purchases
+      .filter(p => (p.vendor || '').trim().toLowerCase() === vKey)
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    vendorPurchases.forEach(p => {
+      const total = Number(p.totalAmount) || 0;
+
+      // Extract direct cash paid by partner
+      let directCash = 0;
+      if (Array.isArray(p.paymentHistory) && p.paymentHistory.length > 0) {
+        directCash = p.paymentHistory.reduce((sum, ph) => sum + (Number(ph.amount) || 0), 0);
+      } else if (p.paidAmount !== undefined) {
+        directCash = Number(p.paidAmount) - (Number(p.debitNoteAdjusted) || 0);
+        if (directCash < 0) directCash = 0;
+        if (directCash > total) directCash = total;
+      } else {
+        directCash = (p.paymentStatus === 'Paid' ? total : 0);
+      }
+
+      const due = Math.max(0, total - directCash);
+      if (due > 0 && availableDebit > 0) {
+        const applyDebit = Math.min(availableDebit, due);
+        p.debitNoteAdjusted = applyDebit;
+        p.paidAmount = directCash + applyDebit;
+
+        if (p.paidAmount >= total) {
+          p.paymentStatus = 'Paid';
+          p.paidAmount = total;
+        } else {
+          p.paymentStatus = 'Partial';
+        }
+
+        availableDebit -= applyDebit;
+      } else if (due === 0) {
+        p.debitNoteAdjusted = 0;
+        p.paidAmount = total;
+        p.paymentStatus = 'Paid';
+      }
+    });
+  });
+}
+
 function renderPurchasesTable() {
   const tbody = document.getElementById("purchasesTableBody");
   if (!tbody) return;
@@ -5109,6 +5172,18 @@ function renderPurchasesTable() {
       statusText = `Due: ${formatCurrency(pending)}`;
     }
 
+    const debAdj = Number(p.debitNoteAdjusted) || 0;
+    const cashPaid = Math.max(0, paid - debAdj);
+
+    let payerDisplay = `<span class="text-xs text-slate-400 font-medium">Unpaid (Credit)</span>`;
+    if (cashPaid > 0 && debAdj > 0) {
+      payerDisplay = `<span class="badge-status badge-neutral font-medium">${escapeHtml(payerName)} (₹${cashPaid}) + <span class="text-emerald-700 font-bold">Return (₹${debAdj})</span></span>`;
+    } else if (debAdj > 0 && cashPaid === 0) {
+      payerDisplay = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-rotate-left text-[10px]"></i> Return Debit (₹${debAdj})</span>`;
+    } else if (paid > 0) {
+      payerDisplay = `<span class="badge-status badge-neutral font-medium">${escapeHtml(payerName)} (₹${paid})</span>`;
+    }
+
     return `
       <tr>
         <td>
@@ -5118,11 +5193,11 @@ function renderPurchasesTable() {
         <td class="font-bold text-slate-900">${escapeHtml(p.vendor)}</td>
         <td class="text-slate-600 max-w-xs truncate" title="${escapeHtml(itemsSummary)}">${escapeHtml(itemsSummary)}</td>
         <td>
-          ${paid > 0 ? `<span class="badge-status badge-neutral font-medium">${escapeHtml(payerName)} (₹${paid})</span>` : `<span class="text-xs text-slate-400 font-medium">Unpaid (Credit)</span>`}
+          ${payerDisplay}
         </td>
         <td class="text-right">
           <span class="font-bold text-slate-900 block font-mono">${formatCurrency(total)}</span>
-          ${pending > 0 ? `<span class="text-[10px] text-rose-600 font-bold block font-mono">Due: ${formatCurrency(pending)}</span>` : `<span class="text-[10px] text-emerald-600 block">Paid</span>`}
+          ${pending > 0 ? `<span class="text-[10px] text-rose-600 font-bold block font-mono">Due: ${formatCurrency(pending)}</span>` : `<span class="text-[10px] text-emerald-600 font-bold block">Paid</span>`}
         </td>
         <td class="text-center space-x-1">
           ${pending > 0 ? `
@@ -6501,8 +6576,8 @@ function switchKhataSubTab(subTab) {
   const secRecvLog = document.getElementById("khataRecvLogSection");
   const secPayLog = document.getElementById("khataPayLogSection");
 
-  const activeBtnClass = "py-1.5 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-sm bg-white text-slate-900 border border-slate-200 whitespace-nowrap";
-  const inactiveBtnClass = "py-1.5 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 whitespace-nowrap";
+  const activeBtnClass = "py-2 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-sm bg-white text-slate-900 border border-slate-200 whitespace-nowrap";
+  const inactiveBtnClass = "py-2 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 whitespace-nowrap";
 
   if (btnParties) btnParties.className = (subTab === 'parties') ? activeBtnClass : inactiveBtnClass;
   if (btnSuppliers) btnSuppliers.className = (subTab === 'suppliers') ? activeBtnClass : inactiveBtnClass;
@@ -7586,6 +7661,7 @@ function viewSupplierStatement(rawVendorName) {
 }
 
 function refreshAllUI() {
+  reconcileSupplierReturnsAndBills();
   renderDashboard();
   renderOnlinePayouts();
   renderProductsTable();

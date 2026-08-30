@@ -902,34 +902,42 @@
 
       </div>
 
-      <!-- Sub-Tab Switcher: Wholesale Parties vs Suppliers vs Received Log vs Paid Log -->
-      <div class="pro-card p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
-          <div class="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200 gap-1 flex-wrap sm:flex-nowrap">
-            <button onclick="switchKhataSubTab('parties')" id="khata-subtab-parties" class="py-1.5 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-sm bg-white text-slate-900 border border-slate-200 whitespace-nowrap">
+      <!-- Sub-Tab Switcher & Filter Toolbar -->
+      <div class="pro-card p-3 sm:p-4 space-y-3">
+        <!-- Top Row: 4 Full-Featured Sub-Tabs with horizontal touch scroll -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <div class="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200 gap-1 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+            <button onclick="switchKhataSubTab('parties')" id="khata-subtab-parties" class="py-2 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-sm bg-white text-slate-900 border border-slate-200 whitespace-nowrap">
               <i class="fa-solid fa-users text-indigo-600 mr-1.5"></i> Wholesale Parties (ગ્રાહકો)
             </button>
-            <button onclick="switchKhataSubTab('suppliers')" id="khata-subtab-suppliers" class="py-1.5 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 whitespace-nowrap">
+            <button onclick="switchKhataSubTab('suppliers')" id="khata-subtab-suppliers" class="py-2 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 whitespace-nowrap">
               <i class="fa-solid fa-truck-field text-rose-600 mr-1.5"></i> Suppliers & Vendors (વેપારીઓ)
             </button>
-            <button onclick="switchKhataSubTab('recv_log')" id="khata-subtab-recv_log" class="py-1.5 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 whitespace-nowrap">
+            <button onclick="switchKhataSubTab('recv_log')" id="khata-subtab-recv_log" class="py-2 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 whitespace-nowrap">
               <i class="fa-solid fa-arrow-down-left text-emerald-600 mr-1.5"></i> Wholesale Received Log (આવેલ પેમેન્ટ)
             </button>
-            <button onclick="switchKhataSubTab('pay_log')" id="khata-subtab-pay_log" class="py-1.5 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 whitespace-nowrap">
+            <button onclick="switchKhataSubTab('pay_log')" id="khata-subtab-pay_log" class="py-2 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 whitespace-nowrap">
               <i class="fa-solid fa-arrow-up-right text-rose-600 mr-1.5"></i> Supplier Payments Log (કરેલ પેમેન્ટ)
             </button>
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <div class="relative w-full sm:w-64">
-            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
-            <input type="text" id="khataSearchInput" oninput="renderKhataTables()" placeholder="Search party, supplier, ref, date..." class="input-pro pl-8">
+        <!-- Bottom Row: Search & Filters Toolbar -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+          <div class="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+            <i class="fa-solid fa-filter text-slate-400"></i>
+            <span>Filter & Search Records</span>
           </div>
-          <select id="khataFilterDue" onchange="renderKhataTables()" class="input-pro w-full sm:w-44">
-            <option value="due_only">With Due Balances Only</option>
-            <option value="all">All Accounts / All History</option>
-          </select>
+          <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+            <div class="relative flex-grow sm:w-72">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+              <input type="text" id="khataSearchInput" oninput="renderKhataTables()" placeholder="Search party, supplier, bill #, date..." class="input-pro pl-8">
+            </div>
+            <select id="khataFilterDue" onchange="renderKhataTables()" class="input-pro w-full sm:w-48">
+              <option value="due_only">With Due Balances Only</option>
+              <option value="all">All Accounts / All History</option>
+            </select>
+          </div>
         </div>
       </div>
 
