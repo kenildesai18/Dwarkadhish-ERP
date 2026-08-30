@@ -5081,65 +5081,8 @@ function handleSavePurchase(e) {
 }
 
 function reconcileSupplierReturnsAndBills() {
-  if (!state.purchases || state.purchases.length === 0) return;
-  if (!state.supplierReturns) state.supplierReturns = [];
-
-  // Group total available debit notes (returns) by vendor
-  const vendorDebits = {};
-  (state.supplierReturns || []).forEach(sr => {
-    const vKey = (sr.vendor || sr.supplierName || '').trim().toLowerCase();
-    if (!vKey) return;
-    const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
-    if (isDebitNote) {
-      const val = Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || 0);
-      vendorDebits[vKey] = (vendorDebits[vKey] || 0) + val;
-    }
-  });
-
-  // For each vendor with debit notes, automatically allocate return credits to unpaid purchase bills
-  Object.keys(vendorDebits).forEach(vKey => {
-    let availableDebit = vendorDebits[vKey];
-
-    const vendorPurchases = state.purchases
-      .filter(p => (p.vendor || '').trim().toLowerCase() === vKey)
-      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-
-    vendorPurchases.forEach(p => {
-      const total = Number(p.totalAmount) || 0;
-
-      // Extract direct cash paid by partner
-      let directCash = 0;
-      if (Array.isArray(p.paymentHistory) && p.paymentHistory.length > 0) {
-        directCash = p.paymentHistory.reduce((sum, ph) => sum + (Number(ph.amount) || 0), 0);
-      } else if (p.paidAmount !== undefined) {
-        directCash = Number(p.paidAmount) - (Number(p.debitNoteAdjusted) || 0);
-        if (directCash < 0) directCash = 0;
-        if (directCash > total) directCash = total;
-      } else {
-        directCash = (p.paymentStatus === 'Paid' ? total : 0);
-      }
-
-      const due = Math.max(0, total - directCash);
-      if (due > 0 && availableDebit > 0) {
-        const applyDebit = Math.min(availableDebit, due);
-        p.debitNoteAdjusted = applyDebit;
-        p.paidAmount = directCash + applyDebit;
-
-        if (p.paidAmount >= total) {
-          p.paymentStatus = 'Paid';
-          p.paidAmount = total;
-        } else {
-          p.paymentStatus = 'Partial';
-        }
-
-        availableDebit -= applyDebit;
-      } else if (due === 0) {
-        p.debitNoteAdjusted = 0;
-        p.paidAmount = total;
-        p.paymentStatus = 'Paid';
-      }
-    });
-  });
+  // Purchases retain their user-specified payment status (Paid, Pending, or Partial)
+  // Lump-sum payments and debit note adjustments are handled explicitly via handleSaveSupplierLumpSumPay
 }
 
 function renderPurchasesTable() {
@@ -6692,13 +6635,13 @@ function renderKhataTables() {
     }
     const sup = suppliersMap.get(key);
     const total = Number(p.totalAmount) || 0;
+    const debAdj = Number(p.debitNoteAdjusted) || 0;
     const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
-    const due = Math.max(0, total - paid);
+    const directCashPaid = Math.max(0, paid - debAdj);
 
     sup.purchases.push(p);
     sup.totalPurchased += total;
-    sup.totalPaid += paid;
-    sup.totalPayable += due;
+    sup.totalPaid += directCashPaid;
   });
 
   // Factor in supplier returns/debit notes that reduce supplier payable
@@ -6712,9 +6655,13 @@ function renderKhataTables() {
       const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
       if (isDebitNote && retVal > 0) {
         sup.totalReturns += retVal;
-        sup.totalPayable = Math.max(0, sup.totalPayable - retVal);
       }
     }
+  });
+
+  // Calculate final net payable for each supplier
+  suppliersMap.forEach(sup => {
+    sup.totalPayable = Math.max(0, Math.round((sup.totalPurchased - sup.totalPaid - sup.totalReturns) * 100) / 100);
   });
 
   const suppliersList = Array.from(suppliersMap.values());
