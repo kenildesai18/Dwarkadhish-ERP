@@ -354,7 +354,12 @@ function switchTab(tabId) {
   const targetSection = document.getElementById(`view-${tabId}`);
   const targetTab = document.getElementById(`tab-${tabId}`);
   if (targetSection) targetSection.classList.remove("hidden");
-  if (targetTab) targetTab.classList.add("active");
+  if (targetTab) {
+    targetTab.classList.add("active");
+    try {
+      targetTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    } catch(e) {}
+  }
 
   refreshAllUI();
 }

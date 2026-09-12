@@ -223,6 +223,11 @@
 
           <!-- Right: Actions -->
           <div class="flex items-center space-x-1.5 sm:space-x-2 flex-shrink-0">
+            <button onclick="openModal('expenseModal')" class="btn-solid-rose text-xs sm:text-sm py-1.5 px-2.5 sm:px-3.5 flex items-center gap-1.5 shadow-sm font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer" title="Add Daily Expense (દૈનિક ખર્ચ ઉમેરો)">
+              <i class="fa-solid fa-receipt"></i>
+              <span class="inline">+ Daily Expense</span>
+            </button>
+
             <button onclick="openModal('settingsModal')" class="btn-outline text-xs sm:text-sm py-1.5 px-2.5 sm:px-3.5" title="Store Settings">
               <i class="fa-solid fa-gear text-slate-500"></i>
               <span class="hidden sm:inline">Settings</span>
@@ -247,50 +252,60 @@
       </div>
 
     <!-- ==================== NAVIGATION TABS BAR (TOUCH SCROLLABLE) ==================== -->
-    <div class="bg-white border-t border-slate-200 shadow-sm">
+    <div class="bg-white border-t border-slate-200 shadow-sm relative">
       <div class="max-w-[1440px] mx-auto px-2 sm:px-6 lg:px-8">
-        <div class="flex space-x-1.5 overflow-x-auto py-2 scrollbar-none" id="navTabs">
-          <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-tab-item active">
-            <i class="fa-solid fa-chart-pie text-xs"></i>
-            <span>Dashboard</span>
+        <div class="flex items-center">
+          <button type="button" onclick="document.getElementById('navTabs').scrollBy({left: -200, behavior: 'smooth'})" class="p-1.5 text-slate-400 hover:text-slate-700 sm:hidden flex-shrink-0" title="Scroll Tabs Left">
+            <i class="fa-solid fa-chevron-left text-xs"></i>
           </button>
-          <button onclick="switchTab('payouts')" id="tab-payouts" class="nav-tab-item">
-            <i class="fa-solid fa-building-columns text-xs text-indigo-600"></i>
-            <span>Online Payouts</span>
-          </button>
-          <button onclick="switchTab('sales')" id="tab-sales" class="nav-tab-item">
-            <i class="fa-solid fa-truck-ramp-box text-xs text-purple-600"></i>
-            <span>Wholesale Bills (B2B)</span>
-          </button>
-          <button onclick="switchTab('products')" id="tab-products" class="nav-tab-item">
-            <i class="fa-solid fa-boxes-stacked text-xs"></i>
-            <span>Inventory & Stock</span>
-            <span id="lowStockBadge" class="hidden ml-1 px-1.5 py-0.2 text-[10px] bg-rose-500 text-white rounded-full font-bold">0</span>
-          </button>
-          <button onclick="switchTab('purchases')" id="tab-purchases" class="nav-tab-item">
-            <i class="fa-solid fa-cart-shopping text-xs"></i>
-            <span>Purchases & Bills</span>
-          </button>
-          <button onclick="switchTab('khata')" id="tab-khata" class="nav-tab-item">
-            <i class="fa-solid fa-book-bookmark text-xs text-rose-600"></i>
-            <span>Khata / Balances (બાકી હિસાબ)</span>
-          </button>
-          <button onclick="switchTab('saree')" id="tab-saree" class="nav-tab-item">
-            <i class="fa-solid fa-shirt text-xs text-pink-600"></i>
-            <span>Saree & Kurti Hub (સાડી & કુર્તી)</span>
-            <span id="sareePendingBadge" class="hidden ml-1 px-1.5 py-0.2 text-[10px] bg-pink-600 text-white rounded-full font-bold">0</span>
-          </button>
-          <button onclick="switchTab('expenses')" id="tab-expenses" class="nav-tab-item">
-            <i class="fa-solid fa-receipt text-xs"></i>
-            <span>Daily Expenses</span>
-          </button>
-          <button onclick="switchTab('partners')" id="tab-partners" class="nav-tab-item">
-            <i class="fa-solid fa-handshake text-xs"></i>
-            <span>2-Partner Ledger</span>
-          </button>
-          <button onclick="switchTab('reports')" id="tab-reports" class="nav-tab-item">
-            <i class="fa-solid fa-file-excel text-xs"></i>
-            <span>Reports</span>
+
+          <div class="flex space-x-1.5 overflow-x-auto py-2 scroll-smooth flex-grow" id="navTabs" style="scrollbar-width: thin;">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-tab-item active">
+              <i class="fa-solid fa-chart-pie text-xs"></i>
+              <span>Dashboard</span>
+            </button>
+            <button onclick="switchTab('payouts')" id="tab-payouts" class="nav-tab-item">
+              <i class="fa-solid fa-building-columns text-xs text-indigo-600"></i>
+              <span>Online Payouts</span>
+            </button>
+            <button onclick="switchTab('sales')" id="tab-sales" class="nav-tab-item">
+              <i class="fa-solid fa-truck-ramp-box text-xs text-purple-600"></i>
+              <span>Wholesale (B2B)</span>
+            </button>
+            <button onclick="switchTab('products')" id="tab-products" class="nav-tab-item">
+              <i class="fa-solid fa-boxes-stacked text-xs text-blue-600"></i>
+              <span>Inventory</span>
+              <span id="lowStockBadge" class="hidden ml-1 px-1.5 py-0.2 text-[10px] bg-rose-500 text-white rounded-full font-bold">0</span>
+            </button>
+            <button onclick="switchTab('purchases')" id="tab-purchases" class="nav-tab-item">
+              <i class="fa-solid fa-cart-shopping text-xs text-emerald-600"></i>
+              <span>Purchases</span>
+            </button>
+            <button onclick="switchTab('khata')" id="tab-khata" class="nav-tab-item">
+              <i class="fa-solid fa-book-bookmark text-xs text-rose-600"></i>
+              <span>Khata (ખાતાવહી)</span>
+            </button>
+            <button onclick="switchTab('saree')" id="tab-saree" class="nav-tab-item">
+              <i class="fa-solid fa-shirt text-xs text-pink-600"></i>
+              <span>Saree Hub</span>
+              <span id="sareePendingBadge" class="hidden ml-1 px-1.5 py-0.2 text-[10px] bg-pink-600 text-white rounded-full font-bold">0</span>
+            </button>
+            <button onclick="switchTab('expenses')" id="tab-expenses" class="nav-tab-item bg-amber-50/80 border border-amber-200 text-amber-900 font-bold hover:bg-amber-100 shadow-xs">
+              <i class="fa-solid fa-receipt text-xs text-amber-600"></i>
+              <span>Daily Expenses (ખર્ચ)</span>
+            </button>
+            <button onclick="switchTab('partners')" id="tab-partners" class="nav-tab-item">
+              <i class="fa-solid fa-handshake text-xs text-indigo-600"></i>
+              <span>Partner Ledger</span>
+            </button>
+            <button onclick="switchTab('reports')" id="tab-reports" class="nav-tab-item">
+              <i class="fa-solid fa-file-excel text-xs text-teal-600"></i>
+              <span>Reports</span>
+            </button>
+          </div>
+
+          <button type="button" onclick="document.getElementById('navTabs').scrollBy({left: 200, behavior: 'smooth'})" class="p-1.5 text-slate-400 hover:text-slate-700 sm:hidden flex-shrink-0" title="Scroll Tabs Right">
+            <i class="fa-solid fa-chevron-right text-xs"></i>
           </button>
         </div>
       </div>
@@ -358,20 +373,25 @@
         </div>
 
         <!-- Total Expenses -->
-        <div class="pro-card p-4 sm:p-5 flex flex-col justify-between space-y-2 border-l-4 border-l-rose-500">
+        <div onclick="switchTab('expenses')" class="pro-card p-4 sm:p-5 flex flex-col justify-between space-y-2 border-l-4 border-l-rose-500 cursor-pointer hover:shadow-md transition-all group" title="Click to view Daily Expenses (દૈનિક ખર્ચ જુઓ)">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Expenses</span>
-            <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center icon-box-3d">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider group-hover:text-rose-600 transition-colors">Total Expenses (દૈનિક ખર્ચ)</span>
+            <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center icon-box-3d group-hover:bg-rose-100 transition-colors">
               <i class="fa-solid fa-receipt text-sm"></i>
             </div>
           </div>
           <div>
             <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono tracking-tight" id="dashTotalExpenses">₹0</h3>
           </div>
-          <p class="text-[11px] text-slate-500 flex items-center gap-1.5 pt-1 border-t border-slate-100">
-            <span class="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0"></span>
-            This Month: <span id="dashMonthExpenses" class="font-bold text-slate-800 font-mono">₹0</span>
-          </p>
+          <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+            <span class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0"></span>
+              Month: <span id="dashMonthExpenses" class="font-bold text-slate-800 font-mono">₹0</span>
+            </span>
+            <button type="button" onclick="event.stopPropagation(); openModal('expenseModal');" class="text-[11px] font-bold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 px-2 py-0.5 rounded transition-all flex items-center gap-1 shadow-2xs" title="Add New Expense">
+              <i class="fa-solid fa-plus text-[9px]"></i> + Add Expense
+            </button>
+          </div>
         </div>
 
       </div>
