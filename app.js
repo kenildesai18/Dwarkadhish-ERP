@@ -7332,6 +7332,79 @@ function renderKhataTables() {
 }
 
 // 1. Lump-Sum Payment Collection from Wholesale Party (FIFO across unpaid bills)
+function populatePartyLumpSumSelect(selectedCustomer) {
+  const select = document.getElementById("partyLumpSumCustomerSelect");
+  if (!select) return;
+
+  const customersSet = new Set();
+  (state.sales || []).forEach(s => { 
+    const c = (s.customerName || s.partyName || '').trim();
+    if (c) customersSet.add(c);
+  });
+  (state.customers || []).forEach(c => { if (c.name && c.name.trim()) customersSet.add(c.name.trim()); });
+  (state.customerAdvances || []).forEach(ca => { if (ca.customerName && ca.customerName.trim()) customersSet.add(ca.customerName.trim()); });
+  (state.customerPayments || []).forEach(cp => { if (cp.customerName && cp.customerName.trim()) customersSet.add(cp.customerName.trim()); });
+
+  const sortedCust = Array.from(customersSet).sort((a, b) => a.localeCompare(b));
+
+  let html = `<option value="">-- ગ્રાહક / પાર્ટી પસંદ કરો (Select Customer) --</option>`;
+  sortedCust.forEach(c => {
+    const isSel = (c.toLowerCase() === (selectedCustomer || '').toLowerCase()) ? 'selected' : '';
+    html += `<option value="${escapeHtml(c)}" ${isSel}>${escapeHtml(c)}</option>`;
+  });
+  select.innerHTML = html;
+}
+
+function onPartyLumpSumCustomerChanged(customerName) {
+  updatePartyLumpSumModalDetails(customerName);
+}
+
+function updatePartyLumpSumModalDetails(customerName) {
+  customerName = (customerName || '').trim();
+  const nameInput = document.getElementById("lumpSumCustomerName");
+  const select = document.getElementById("partyLumpSumCustomerSelect");
+  const dispEl = document.getElementById("lumpSumPartyDisplayName");
+  const dueEl = document.getElementById("lumpSumTotalDueDisplay");
+  const amtInput = document.getElementById("lumpSumAmount");
+  const billsContainer = document.getElementById("lumpSumBillsSummaryText");
+
+  if (nameInput) nameInput.value = customerName;
+  if (select && select.value !== customerName) select.value = customerName;
+  if (dispEl) dispEl.textContent = customerName || "-";
+
+  if (!customerName) {
+    if (dueEl) dueEl.textContent = "₹0";
+    if (amtInput) amtInput.value = "";
+    if (billsContainer) billsContainer.innerHTML = `<span class="text-slate-400">કૃપા કરીને ઉપરથી ગ્રાહક (Party) પસંદ કરો.</span>`;
+    return;
+  }
+
+  const unpaidSales = (state.sales || [])
+    .filter(s => (s.customerName || '').trim().toLowerCase() === customerName.toLowerCase())
+    .map(s => {
+      const total = Number(s.totalAmount) || 0;
+      const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
+      const due = Math.max(0, total - paid);
+      return { sale: s, total, paid, due };
+    })
+    .filter(x => x.due > 0);
+
+  const totalDue = unpaidSales.reduce((acc, x) => acc + x.due, 0);
+
+  if (dueEl) dueEl.textContent = formatCurrency(totalDue);
+  if (amtInput) {
+    amtInput.value = totalDue > 0 ? totalDue : "";
+  }
+
+  const breakdownText = unpaidSales.length > 0
+    ? unpaidSales.map(x => `Bill #${x.sale.invoiceNo} (${formatDate(x.sale.date)}): Due ${formatCurrency(x.due)}`).join(' | ')
+    : "No pending unpaid bills found.";
+
+  if (billsContainer) {
+    billsContainer.innerHTML = `<span class="font-semibold text-indigo-900">Unpaid Bills (${unpaidSales.length}):</span> ${escapeHtml(breakdownText)}`;
+  }
+}
+
 function openPartyLumpSumCollectModal(rawCustomerName) {
   try {
     let customerName = rawCustomerName || "";
@@ -7348,40 +7421,13 @@ function openPartyLumpSumCollectModal(rawCustomerName) {
     if (p1Lbl) p1Lbl.textContent = `${p1} (Partner 1)`;
     if (p2Lbl) p2Lbl.textContent = `${p2} (Partner 2)`;
 
-    const unpaidSales = (state.sales || [])
-      .filter(s => (s.customerName || '').trim().toLowerCase() === customerName.trim().toLowerCase())
-      .map(s => {
-        const total = Number(s.totalAmount) || 0;
-        const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
-        const due = Math.max(0, total - paid);
-        return { sale: s, total, paid, due };
-      })
-      .filter(x => x.due > 0);
-
-    const totalDue = unpaidSales.reduce((acc, x) => acc + x.due, 0);
-
-    const nameInput = document.getElementById("lumpSumCustomerName");
-    const dispEl = document.getElementById("lumpSumPartyDisplayName");
-    const dueEl = document.getElementById("lumpSumTotalDueDisplay");
-    const amtInput = document.getElementById("lumpSumAmount");
     const dateInput = document.getElementById("lumpSumDate");
     const notesInput = document.getElementById("lumpSumNotes");
-
-    if (nameInput) nameInput.value = customerName;
-    if (dispEl) dispEl.textContent = customerName;
-    if (dueEl) dueEl.textContent = formatCurrency(totalDue);
-    if (amtInput) amtInput.value = totalDue > 0 ? totalDue : "";
     if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
     if (notesInput) notesInput.value = "";
 
-    const breakdownText = unpaidSales.length > 0
-      ? unpaidSales.map(x => `Bill #${x.sale.invoiceNo} (${formatDate(x.sale.date)}): Due ${formatCurrency(x.due)}`).join(' | ')
-      : "No pending unpaid bills found.";
-
-    const billsContainer = document.getElementById("lumpSumBillsSummaryText");
-    if (billsContainer) {
-      billsContainer.innerHTML = `<span class="font-semibold text-indigo-900">Unpaid Bills (${unpaidSales.length}):</span> ${escapeHtml(breakdownText)}`;
-    }
+    populatePartyLumpSumSelect(customerName);
+    updatePartyLumpSumModalDetails(customerName);
 
     openModal('partyLumpSumCollectModal');
   } catch (err) {
@@ -7394,7 +7440,12 @@ function handleSavePartyLumpSumCollect(e) {
   if (e && e.preventDefault) e.preventDefault();
 
   try {
-    let customerName = document.getElementById("lumpSumCustomerName")?.value.trim() || "";
+    let customerName = document.getElementById("lumpSumCustomerName")?.value.trim() || 
+                       document.getElementById("partyLumpSumCustomerSelect")?.value.trim() || "";
+    if (!customerName) {
+      showToast("કૃપા કરીને ગ્રાહક પસંદ કરો! (Please select a customer)", true);
+      return;
+    }
     const amount = parseFloat(document.getElementById("lumpSumAmount")?.value) || 0;
     const date = document.getElementById("lumpSumDate")?.value || new Date().toISOString().split('T')[0];
     const receivedBy = document.querySelector('input[name="lumpSumReceivedBy"]:checked')?.value || "partner1";
@@ -7496,6 +7547,93 @@ function handleSavePartyLumpSumCollect(e) {
 }
 
 // 2. Lump-Sum Payment to Supplier / Vendor (FIFO across unpaid purchase bills)
+function populateSupplierLumpSumSelect(selectedVendor) {
+  const select = document.getElementById("supplierLumpSumVendorSelect");
+  if (!select) return;
+
+  const vendorsSet = new Set();
+  (state.purchases || []).forEach(p => { if (p.vendor && p.vendor.trim()) vendorsSet.add(p.vendor.trim()); });
+  (state.suppliers || []).forEach(s => { if (s.name && s.name.trim()) vendorsSet.add(s.name.trim()); });
+  (state.supplierAdvances || []).forEach(sa => { if (sa.supplierName && sa.supplierName.trim()) vendorsSet.add(sa.supplierName.trim()); });
+  (state.supplierPayments || []).forEach(sp => { if (sp.supplierName && sp.supplierName.trim()) vendorsSet.add(sp.supplierName.trim()); });
+
+  const sortedVendors = Array.from(vendorsSet).sort((a, b) => a.localeCompare(b));
+
+  let html = `<option value="">-- વેપારી / સપ્લાયર પસંદ કરો (Select Supplier) --</option>`;
+  sortedVendors.forEach(v => {
+    const isSel = (v.toLowerCase() === (selectedVendor || '').toLowerCase()) ? 'selected' : '';
+    html += `<option value="${escapeHtml(v)}" ${isSel}>${escapeHtml(v)}</option>`;
+  });
+  select.innerHTML = html;
+}
+
+function onSupplierLumpSumVendorChanged(vendorName) {
+  updateSupplierLumpSumModalDetails(vendorName);
+}
+
+function updateSupplierLumpSumModalDetails(vendorName) {
+  vendorName = (vendorName || '').trim();
+  const nameInput = document.getElementById("supplierLumpSumVendorName");
+  const select = document.getElementById("supplierLumpSumVendorSelect");
+  const dispEl = document.getElementById("supplierLumpSumDisplayName");
+  const dueEl = document.getElementById("supplierLumpSumTotalDueDisplay");
+  const amtInput = document.getElementById("supplierLumpSumAmount");
+  const billsContainer = document.getElementById("supplierLumpSumBillsSummaryText");
+
+  if (nameInput) nameInput.value = vendorName;
+  if (select && select.value !== vendorName) select.value = vendorName;
+  if (dispEl) dispEl.textContent = vendorName || "-";
+
+  if (!vendorName) {
+    if (dueEl) dueEl.textContent = "₹0";
+    if (amtInput) amtInput.value = "";
+    if (billsContainer) billsContainer.innerHTML = `<span class="text-slate-400">કૃપા કરીને ઉપરથી વેપારી (Supplier) પસંદ કરો.</span>`;
+    return;
+  }
+
+  const unpaidPurchases = (state.purchases || [])
+    .filter(p => (p.vendor || '').trim().toLowerCase() === vendorName.toLowerCase())
+    .map(p => {
+      const total = Number(p.totalAmount) || 0;
+      const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
+      const due = Math.max(0, total - paid);
+      return { purchase: p, total, paid, due };
+    })
+    .filter(x => x.due > 0);
+
+  const totalDue = unpaidPurchases.reduce((acc, x) => acc + x.due, 0);
+
+  let totalDebitNotes = 0;
+  (state.supplierReturns || []).forEach(sr => {
+    const name = (sr.vendor || sr.supplierName || '').trim();
+    if (name.toLowerCase() === vendorName.toLowerCase()) {
+      const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
+      if (isDebitNote) {
+        totalDebitNotes += Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || 0);
+      }
+    }
+  });
+
+  const netPayable = Math.max(0, totalDue - totalDebitNotes);
+
+  if (dueEl) dueEl.textContent = formatCurrency(netPayable);
+  if (amtInput) {
+    amtInput.value = netPayable > 0 ? netPayable : "";
+  }
+
+  let breakdownText = unpaidPurchases.length > 0
+    ? unpaidPurchases.map(x => `Bill #${x.purchase.billNo} (${formatDate(x.purchase.date)}): Due ${formatCurrency(x.due)}`).join(' | ')
+    : "No pending unpaid purchase bills found (કોઈ બાકી બિલ નથી).";
+
+  if (totalDebitNotes > 0) {
+    breakdownText += ` | <span class="text-emerald-700 font-bold">Debit Notes: -${formatCurrency(totalDebitNotes)}</span>`;
+  }
+
+  if (billsContainer) {
+    billsContainer.innerHTML = `<span class="font-semibold text-rose-900">Pending Bills (${unpaidPurchases.length}):</span> ${breakdownText}`;
+  }
+}
+
 function openSupplierLumpSumPayModal(rawVendorName) {
   try {
     let vendorName = rawVendorName || "";
@@ -7512,57 +7650,13 @@ function openSupplierLumpSumPayModal(rawVendorName) {
     if (p1Lbl) p1Lbl.textContent = `${p1} (Partner 1)`;
     if (p2Lbl) p2Lbl.textContent = `${p2} (Partner 2)`;
 
-    const unpaidPurchases = (state.purchases || [])
-      .filter(p => (p.vendor || '').trim().toLowerCase() === vendorName.trim().toLowerCase())
-      .map(p => {
-        const total = Number(p.totalAmount) || 0;
-        const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
-        const due = Math.max(0, total - paid);
-        return { purchase: p, total, paid, due };
-      })
-      .filter(x => x.due > 0);
-
-    const totalDue = unpaidPurchases.reduce((acc, x) => acc + x.due, 0);
-
-    let totalDebitNotes = 0;
-    (state.supplierReturns || []).forEach(sr => {
-      const name = (sr.vendor || sr.supplierName || '').trim();
-      if (name.toLowerCase() === vendorName.toLowerCase()) {
-        const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
-        if (isDebitNote) {
-          totalDebitNotes += Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || 0);
-        }
-      }
-    });
-
-    const netPayable = Math.max(0, totalDue - totalDebitNotes);
-
-    const nameInput = document.getElementById("supplierLumpSumVendorName");
-    const dispEl = document.getElementById("supplierLumpSumDisplayName");
-    const dueEl = document.getElementById("supplierLumpSumTotalDueDisplay");
-    const amtInput = document.getElementById("supplierLumpSumAmount");
     const dateInput = document.getElementById("supplierLumpSumDate");
     const notesInput = document.getElementById("supplierLumpSumNotes");
-
-    if (nameInput) nameInput.value = vendorName;
-    if (dispEl) dispEl.textContent = vendorName;
-    if (dueEl) dueEl.textContent = formatCurrency(netPayable);
-    if (amtInput) amtInput.value = netPayable > 0 ? netPayable : 0;
     if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
     if (notesInput) notesInput.value = "";
 
-    let breakdownText = unpaidPurchases.length > 0
-      ? unpaidPurchases.map(x => `Bill #${x.purchase.billNo} (${formatDate(x.purchase.date)}): Due ${formatCurrency(x.due)}`).join(' | ')
-      : "No pending unpaid purchase bills found.";
-
-    if (totalDebitNotes > 0) {
-      breakdownText += ` | <span class="text-emerald-700 font-bold">Debit Notes: -${formatCurrency(totalDebitNotes)}</span>`;
-    }
-
-    const billsContainer = document.getElementById("supplierLumpSumBillsSummaryText");
-    if (billsContainer) {
-      billsContainer.innerHTML = `<span class="font-semibold text-rose-900">Pending Bills (${unpaidPurchases.length}):</span> ${breakdownText}`;
-    }
+    populateSupplierLumpSumSelect(vendorName);
+    updateSupplierLumpSumModalDetails(vendorName);
 
     openModal('supplierLumpSumPayModal');
   } catch (err) {
@@ -7575,7 +7669,12 @@ function handleSaveSupplierLumpSumPay(e) {
   if (e && e.preventDefault) e.preventDefault();
 
   try {
-    let vendorName = document.getElementById("supplierLumpSumVendorName")?.value.trim() || "";
+    let vendorName = document.getElementById("supplierLumpSumVendorName")?.value.trim() || 
+                     document.getElementById("supplierLumpSumVendorSelect")?.value.trim() || "";
+    if (!vendorName) {
+      showToast("કૃપા કરીને સપ્લાયર / વેપારી પસંદ કરો! (Please select a supplier)", true);
+      return;
+    }
     const amount = parseFloat(document.getElementById("supplierLumpSumAmount")?.value) || 0;
     const date = document.getElementById("supplierLumpSumDate")?.value || new Date().toISOString().split('T')[0];
     const paidBy = document.querySelector('input[name="supplierLumpSumPaidBy"]:checked')?.value || "partner1";
