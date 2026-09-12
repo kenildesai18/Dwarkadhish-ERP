@@ -275,6 +275,11 @@
             <i class="fa-solid fa-book-bookmark text-xs text-rose-600"></i>
             <span>Khata / Balances (બાકી હિસાબ)</span>
           </button>
+          <button onclick="switchTab('saree')" id="tab-saree" class="nav-tab-item">
+            <i class="fa-solid fa-shirt text-xs text-pink-600"></i>
+            <span>Saree & Kurti Hub (સાડી & કુર્તી)</span>
+            <span id="sareePendingBadge" class="hidden ml-1 px-1.5 py-0.2 text-[10px] bg-pink-600 text-white rounded-full font-bold">0</span>
+          </button>
           <button onclick="switchTab('expenses')" id="tab-expenses" class="nav-tab-item">
             <i class="fa-solid fa-receipt text-xs"></i>
             <span>Daily Expenses</span>
@@ -1084,6 +1089,309 @@
               <!-- Dynamically populated -->
             </tbody>
           </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== 5B. SAREE & KURTI HUB (ON-DEMAND PROCUREMENT & SHOP EXCHANGES) ==================== -->
+    <section id="view-saree" class="hidden space-y-4 sm:space-y-6">
+      
+      <!-- Top Saree Hub Header & Quick Action Buttons -->
+      <div class="pro-card p-3.5 sm:p-5 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 border-l-4 border-l-pink-500 bg-gradient-to-r from-pink-50/40 via-white to-indigo-50/20">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded bg-pink-100 text-pink-700 text-[11px] font-bold border border-pink-200">
+              <i class="fa-solid fa-shirt mr-1"></i> Surat Textile JIT Engine
+            </span>
+            <span class="text-xs text-slate-500 font-semibold">Daily Buying • Shop-Wise Inward • Customer Return Exchanges</span>
+          </div>
+          <h3 class="text-base sm:text-lg font-bold text-slate-900 mt-1">Saree & Kurti Hub (સાડી & કુર્તી મેનેજર)</h3>
+          <p class="text-xs text-slate-500">રોજના ગ્રાહક ઓર્ડર મુજબ દુકાનેથી ખરીદી, કસ્ટમર રીટર્ન સામે દુકાને માલ બદલી (Exchange) અને દુકાનવાર બાકી હિસાબ</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="openSareeOrderModal()" class="btn-solid-primary text-xs sm:text-sm py-2 px-3.5 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-cart-plus"></i> + Add Saree Order
+          </button>
+          <button onclick="openSareePurchaseModal()" class="btn-solid-primary text-xs sm:text-sm py-2 px-3.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-bag-shopping"></i> + Buy from Shop
+          </button>
+          <button onclick="openSareeExchangeModal()" class="btn-solid-amber text-xs sm:text-sm py-2 px-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-rotate"></i> + Shop Exchange
+          </button>
+          <button onclick="openSareeShopsManageModal()" class="btn-outline text-xs sm:text-sm py-2 px-3 flex items-center gap-1.5 shadow-sm" title="Saree Shops Directory">
+            <i class="fa-solid fa-store text-pink-600"></i> Shops
+          </button>
+        </div>
+      </div>
+
+      <!-- Top 4 Summary Metric Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <!-- 1. Today's Pending Orders to Buy -->
+        <div class="pro-card p-3.5 sm:p-4 border-l-4 border-l-pink-500 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">Orders to Procure</span>
+            <div class="w-7 h-7 rounded-lg bg-pink-50 text-pink-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-bag-shopping"></i>
+            </div>
+          </div>
+          <div class="mt-2">
+            <h3 class="text-xl sm:text-2xl font-extrabold text-pink-700 font-mono" id="sareeMetricPendingOrders">0 Pcs</h3>
+          </div>
+          <p class="text-[10px] sm:text-[11px] text-slate-500 mt-1 border-t border-slate-100 pt-1">
+            <span class="font-bold text-slate-800" id="sareeMetricPendingOrdersCount">0</span> orders to buy from market
+          </p>
+        </div>
+
+        <!-- 2. Monthly Saree Purchases -->
+        <div class="pro-card p-3.5 sm:p-4 border-l-4 border-l-indigo-500 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">Month Purchases</span>
+            <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-receipt"></i>
+            </div>
+          </div>
+          <div class="mt-2">
+            <h3 class="text-xl sm:text-2xl font-extrabold text-slate-900 font-mono" id="sareeMetricMonthPurchases">₹0</h3>
+          </div>
+          <p class="text-[10px] sm:text-[11px] text-slate-500 mt-1 border-t border-slate-100 pt-1">
+            <span class="font-bold text-slate-800 font-mono" id="sareeMetricTotalPcsBought">0</span> pcs bought from shops
+          </p>
+        </div>
+
+        <!-- 3. Returns Pending Shop Exchange -->
+        <div class="pro-card p-3.5 sm:p-4 border-l-4 border-l-amber-500 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">Pending Exchanges</span>
+            <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-rotate-left"></i>
+            </div>
+          </div>
+          <div class="mt-2">
+            <h3 class="text-xl sm:text-2xl font-extrabold text-amber-700 font-mono" id="sareeMetricPendingExchanges">0 Pcs</h3>
+          </div>
+          <p class="text-[10px] sm:text-[11px] text-slate-500 mt-1 border-t border-slate-100 pt-1">
+            Returned sarees to take to shop: <b class="text-amber-800 font-mono" id="sareeMetricPendingExchangesVal">₹0</b>
+          </p>
+        </div>
+
+        <!-- 4. Saree Shops Net Payable Due -->
+        <div class="pro-card p-3.5 sm:p-4 border-l-4 border-l-rose-500 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">Shops Net Due</span>
+            <div class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-store"></i>
+            </div>
+          </div>
+          <div class="mt-2">
+            <h3 class="text-xl sm:text-2xl font-extrabold text-rose-700 font-mono" id="sareeMetricShopsDue">₹0</h3>
+          </div>
+          <p class="text-[10px] sm:text-[11px] text-slate-500 mt-1 border-t border-slate-100 pt-1">
+            <span class="font-bold text-slate-800" id="sareeMetricShopsDueCount">0</span> shops with pending balance
+          </p>
+        </div>
+      </div>
+
+      <!-- Saree Hub Sub-Tabs Navigation Bar -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-100/90 p-1.5 rounded-xl border border-slate-200">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button onclick="switchSareeSubTab('orders')" id="saree-subtab-orders" class="py-1.5 px-3.5 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-sm bg-white text-slate-900 border border-slate-200">
+            <i class="fa-solid fa-list-check text-pink-600 mr-1.5"></i> Daily Buying List (રોજના ઓર્ડર)
+          </button>
+          <button onclick="switchSareeSubTab('purchases')" id="saree-subtab-purchases" class="py-1.5 px-3.5 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-bag-shopping text-indigo-600 mr-1.5"></i> Shop Purchases (દુકાનેથી ખરીદી)
+          </button>
+          <button onclick="switchSareeSubTab('exchanges')" id="saree-subtab-exchanges" class="py-1.5 px-3.5 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-rotate text-amber-600 mr-1.5"></i> Shop Exchanges (માલ બદલી)
+          </button>
+          <button onclick="switchSareeSubTab('khata')" id="saree-subtab-khata" class="py-1.5 px-3.5 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-book-bookmark text-rose-600 mr-1.5"></i> Saree Shops Khata (બાકી હિસાબ)
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div class="relative w-full sm:w-56">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="sareeSearchInput" oninput="renderSareeHub()" placeholder="Search design, shop, order..." class="input-pro pl-8 py-1.5 text-xs">
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== SUB-TAB 1: DAILY BUYING LIST (ORDERS) ==================== -->
+      <div id="sareeOrdersSection" class="space-y-4">
+        <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div>
+            <h4 class="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-clipboard-list text-pink-600"></i> Daily Orders Procurement Queue (ઓર્ડર મુજબ ખરીદીનું લિસ્ટ)
+            </h4>
+            <p class="text-[11px] text-slate-500">Add daily customer orders. As you buy them from market, click "Mark as Bought" to auto-create shop purchase.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="sareeOrdersFilterStatus" onchange="renderSareeOrdersTable()" class="input-pro text-xs py-1.5 w-auto">
+              <option value="all">All Status</option>
+              <option value="Pending" selected>Pending to Buy Only</option>
+              <option value="Purchased">Purchased Only</option>
+            </select>
+            <button onclick="openSareeOrderModal()" class="btn-solid-primary text-xs py-1.5 px-3 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+              <i class="fa-solid fa-plus"></i> + Add Order
+            </button>
+          </div>
+        </div>
+
+        <div class="pro-card overflow-hidden">
+          <div class="overflow-x-auto scrollbar-none">
+            <table class="pro-table">
+              <thead>
+                <tr>
+                  <th>Date & Platform</th>
+                  <th>Order / SKU Ref</th>
+                  <th>Saree / Kurti Item & Design #</th>
+                  <th>Color / Size</th>
+                  <th class="text-center">Qty (Pcs)</th>
+                  <th>Target Shop / Market</th>
+                  <th class="text-center">Status</th>
+                  <th class="text-center">Quick Action</th>
+                </tr>
+              </thead>
+              <tbody id="sareeOrdersTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== SUB-TAB 2: SHOP-WISE PURCHASES ==================== -->
+      <div id="sareePurchasesSection" class="space-y-4 hidden">
+        <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div>
+            <h4 class="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-bag-shopping text-indigo-600"></i> Saree & Kurti Shop Purchase Bills (દુકાનેથી ખરીદી રજીસ્ટર)
+            </h4>
+            <p class="text-[11px] text-slate-500">Track all wholesale shop purchase memos, partner out-of-pocket payments, and bills</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="sareePurchasesFilterPayment" onchange="renderSareePurchasesTable()" class="input-pro text-xs py-1.5 w-auto">
+              <option value="all">All Payment Status</option>
+              <option value="Paid">Fully Paid</option>
+              <option value="Partial">Partial Due</option>
+              <option value="Pending">Pending Due</option>
+            </select>
+            <button onclick="openSareePurchaseModal()" class="btn-solid-primary text-xs py-1.5 px-3 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+              <i class="fa-solid fa-plus"></i> + New Shop Bill
+            </button>
+          </div>
+        </div>
+
+        <div class="pro-card overflow-hidden">
+          <div class="overflow-x-auto scrollbar-none">
+            <table class="pro-table">
+              <thead>
+                <tr>
+                  <th>Purchase Date</th>
+                  <th>Shop / Vendor</th>
+                  <th>Memo / Bill #</th>
+                  <th>Items & Designs</th>
+                  <th class="text-right">Total Amount (₹)</th>
+                  <th class="text-right">Paid Amount (₹)</th>
+                  <th class="text-center">Paid By</th>
+                  <th class="text-center">Status</th>
+                  <th class="text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="sareePurchasesTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== SUB-TAB 3: SHOP EXCHANGES & RETURNS ==================== -->
+      <div id="sareeExchangesSection" class="space-y-4 hidden">
+        <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-amber-50/40 border border-amber-200">
+          <div>
+            <h4 class="text-xs sm:text-sm font-bold text-amber-950 flex items-center gap-2">
+              <i class="fa-solid fa-rotate text-amber-600"></i> Customer Returns ➔ Saree Shop Exchange Manager (દુકાને સાડી બદલી / રીટર્ન)
+            </h4>
+            <p class="text-[11px] text-amber-800">જ્યારે ગ્રાહક તરફથી સાડી રીટર્ન આવે ત્યારે તેને મૂળ દુકાને લઈ જઈ નવી સાડી સાથે બદલાવો અથવા ક્રેડિટ નોટ મેળવો</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="sareeExchangesFilterStatus" onchange="renderSareeExchangesTable()" class="input-pro text-xs py-1.5 w-auto">
+              <option value="all">All Exchanges</option>
+              <option value="pending_at_office">Pending with Us Only</option>
+              <option value="exchanged_at_shop">Exchanged at Shop Only</option>
+            </select>
+            <button onclick="openSareeExchangeModal()" class="btn-solid-amber text-xs py-1.5 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+              <i class="fa-solid fa-plus"></i> + Record Return / Exchange
+            </button>
+          </div>
+        </div>
+
+        <div class="pro-card overflow-hidden">
+          <div class="overflow-x-auto scrollbar-none">
+            <table class="pro-table">
+              <thead>
+                <tr>
+                  <th>Return Date</th>
+                  <th>Shop / Vendor</th>
+                  <th>Returned Saree & Design</th>
+                  <th class="text-right">Return Val (₹)</th>
+                  <th>Exchange Mode</th>
+                  <th>New Saree / Credit</th>
+                  <th class="text-center">Status</th>
+                  <th class="text-center">Quick Action</th>
+                </tr>
+              </thead>
+              <tbody id="sareeExchangesTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== SUB-TAB 4: SAREE SHOPS KHATA & BALANCES ==================== -->
+      <div id="sareeKhataSection" class="space-y-4 hidden">
+        <div class="pro-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div>
+            <h4 class="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-book-bookmark text-rose-600"></i> Saree Shops Ledger & Outstanding Balances (દુકાનવાર બાકી હિસાબ)
+            </h4>
+            <p class="text-[11px] text-slate-500">Track total sarees purchased from each shop, exchanges credited, and net payable dues</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="openSareeShopsManageModal()" class="btn-outline text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm">
+              <i class="fa-solid fa-store text-pink-600"></i> Manage Shops Directory
+            </button>
+            <button onclick="openSareeShopPayModal('')" class="btn-solid-primary text-xs py-1.5 px-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-sm">
+              <i class="fa-solid fa-money-bill-wave"></i> + Pay Saree Shop
+            </button>
+          </div>
+        </div>
+
+        <div class="pro-card overflow-hidden">
+          <div class="overflow-x-auto scrollbar-none">
+            <table class="pro-table">
+              <thead>
+                <tr>
+                  <th>Shop / Firm Name</th>
+                  <th>Market / Location</th>
+                  <th>Phone / WhatsApp</th>
+                  <th class="text-center">Memos</th>
+                  <th class="text-right">Total Purchased (₹)</th>
+                  <th class="text-right">Total Paid (₹)</th>
+                  <th class="text-right">Exchanges / Credit (₹)</th>
+                  <th class="text-right font-extrabold text-rose-700 bg-rose-50/50">Net Payable Due (₹)</th>
+                  <th class="text-center">Quick Action</th>
+                </tr>
+              </thead>
+              <tbody id="sareeShopsKhataTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -3139,6 +3447,97 @@
     </div>
   </div>
 
+  <!-- 20B. EDIT SUPPLIER PAYMENT MODAL -->
+  <div id="editSupplierPaymentModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-pen-to-square text-amber-600"></i> Edit Supplier Payment (સપ્લાયર પેમેન્ટ સુધારો)
+          </h3>
+          <p class="text-xs text-slate-500">Update payment amount, date, mode, or notes</p>
+        </div>
+        <button onclick="closeModal('editSupplierPaymentModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="editSupplierPaymentForm" onsubmit="handleSaveEditSupplierPayment(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="editSupplierPayKey" value="">
+        <input type="hidden" id="editSupplierPayVendor" value="">
+
+        <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-slate-600">Supplier:</span>
+            <b class="text-sm font-bold text-slate-900" id="editSupplierPayDisplayVendor">-</b>
+          </div>
+          <div class="text-[11px] text-amber-900" id="editSupplierPayBillsInfo">
+            <!-- Settled bills info -->
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Date *</label>
+            <input type="date" id="editSupplierPayDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Total Paid Amount (₹) *</label>
+            <input type="number" id="editSupplierPayAmount" min="0" step="any" required class="input-pro font-mono font-extrabold text-rose-700 text-base">
+          </div>
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+          <label class="block text-xs font-bold text-slate-800">
+            <i class="fa-solid fa-wallet text-indigo-600"></i> Paid By (Partner) *
+          </label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="editSupplierPayPaidBy" value="partner1" class="hidden">
+              <span id="editSupplierPayP1Label" class="truncate">Kenil</span>
+            </label>
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="editSupplierPayPaidBy" value="partner2" class="hidden">
+              <span id="editSupplierPayP2Label" class="truncate">Alpesh</span>
+            </label>
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="editSupplierPayPaidBy" value="business_account" class="hidden">
+              <span>Business A/c</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Mode</label>
+            <select id="editSupplierPayMethod" class="input-pro font-medium">
+              <option value="Cash">Cash</option>
+              <option value="Google Pay / UPI">Google Pay / PhonePe / UPI</option>
+              <option value="Bank Transfer (NEFT/IMPS)">Bank Transfer / NEFT</option>
+              <option value="Cheque">Cheque</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Reference / Note</label>
+            <input type="text" id="editSupplierPayNotes" class="input-pro">
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center pt-3 border-t border-slate-100">
+          <button type="button" onclick="deleteCurrentEditSupplierPayment()" class="btn-outline text-xs text-rose-600 hover:bg-rose-50 border-rose-200 py-2 px-3 flex items-center gap-1">
+            <i class="fa-solid fa-trash-can"></i> Delete
+          </button>
+          <div class="flex gap-2">
+            <button type="button" onclick="closeModal('editSupplierPaymentModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+            <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-5 font-bold shadow-md bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5">
+              <i class="fa-solid fa-check"></i> Update Payment
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- 21. PARTY / SUPPLIER LEDGER STATEMENT MODAL -->
   <div id="statementModal" class="modal-overlay hidden">
     <div class="modal-dialog max-w-3xl">
@@ -3160,6 +3559,528 @@
       </div>
 
       <div id="statementPrintContent" class="p-2 sm:p-4 bg-white text-slate-900 space-y-4">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SAREE & KURTI HUB MODALS ==================== -->
+  <datalist id="sareeShopsDatalist"></datalist>
+
+  <!-- 22. SAREE DAILY ORDER / PROCUREMENT MODAL -->
+  <div id="sareeOrderModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="sareeOrderModalTitle">
+            <i class="fa-solid fa-cart-plus text-pink-600"></i> Add Daily Saree/Kurti Order (ઓર્ડર એન્ટ્રી)
+          </h3>
+          <p class="text-xs text-slate-500">Add online customer order requirement to buy from wholesale market</p>
+        </div>
+        <button onclick="closeModal('sareeOrderModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="sareeOrderForm" onsubmit="handleSaveSareeOrder(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="sareeOrderEditId" value="">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Order Date *</label>
+            <input type="date" id="sareeOrderDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Platform *</label>
+            <select id="sareeOrderPlatform" required class="input-pro font-semibold text-pink-700">
+              <option value="Meesho">Meesho</option>
+              <option value="Amazon">Amazon</option>
+              <option value="Flipkart">Flipkart</option>
+              <option value="Direct / WhatsApp">Direct / WhatsApp</option>
+              <option value="Other">Other Platform</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Order No / SKU Ref</label>
+            <input type="text" id="sareeOrderRef" placeholder="e.g. MEESH-4821 or SKU-01" class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Target Shop / Market (દુકાનદાર) *</label>
+            <input type="text" id="sareeOrderShop" list="sareeShopsDatalist" required placeholder="e.g. Radhe Sarees, Shreeji" class="input-pro font-semibold">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Saree / Kurti Item Name & Description *</label>
+          <input type="text" id="sareeOrderItemTitle" required placeholder="e.g. Banarasi Silk Jacquard Saree or Bandhani Kurti" class="input-pro font-bold">
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Design / Catalog #</label>
+            <input type="text" id="sareeOrderDesignNo" placeholder="e.g. D-104" class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Color / Size</label>
+            <input type="text" id="sareeOrderColor" placeholder="Red / L" class="input-pro">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Qty (Pcs) *</label>
+            <input type="number" id="sareeOrderQty" min="1" value="1" required class="input-pro text-center font-bold font-mono text-pink-700">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Estimated Wholesale Cost (₹/pc)</label>
+            <input type="number" id="sareeOrderEstCost" min="0" step="any" placeholder="Approx Rate ₹" class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Notes / Instructions</label>
+            <input type="text" id="sareeOrderNotes" placeholder="e.g. Take matching blouse" class="input-pro">
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('sareeOrderModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-5 font-bold shadow-md bg-pink-600 hover:bg-pink-700 text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Save Order Requirement
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 23. SAREE SHOP PURCHASE & INWARD BILL MODAL -->
+  <div id="sareePurchaseModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-3xl sm:max-w-4xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="sareePurchaseModalTitle">
+            <i class="fa-solid fa-bag-shopping text-indigo-600"></i> New Saree Shop Purchase (દુકાનેથી ખરીદી બિલ/મેમો)
+          </h3>
+          <p class="text-xs text-slate-500">Record sarees/kurtis bought from wholesale market shops with partner payment</p>
+        </div>
+        <button onclick="closeModal('sareePurchaseModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="sareePurchaseForm" onsubmit="handleSaveSareePurchase(event)" class="space-y-4 mt-3.5">
+        <input type="hidden" id="sareePurchaseEditId" value="">
+        <input type="hidden" id="sareePurchaseLinkedOrderId" value="">
+
+        <!-- Top Details: Shop, Date, Memo # -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Purchase Date *</label>
+            <input type="date" id="sareePurchaseDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Shop / Vendor Name *</label>
+            <input type="text" id="sareePurchaseShop" list="sareeShopsDatalist" required placeholder="Shop Name" class="input-pro font-bold" autocomplete="off">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Memo / Bill # (Optional)</label>
+            <input type="text" id="sareePurchaseMemoNo" placeholder="e.g. MEMO-101" class="input-pro font-mono">
+          </div>
+        </div>
+
+        <!-- Saree Items Container -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between bg-indigo-50/70 px-3 py-2 rounded-lg border border-indigo-200">
+            <span class="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+              <i class="fa-solid fa-boxes-stacked text-indigo-600"></i> Saree / Kurti Items Bought
+            </span>
+            <button type="button" onclick="addSareePurchaseItemRow()" class="text-xs font-bold text-indigo-700 hover:text-indigo-900 flex items-center gap-1 bg-white px-2 py-0.5 rounded border border-indigo-200 shadow-2xs">
+              <i class="fa-solid fa-plus"></i> + Add Item Row
+            </button>
+          </div>
+
+          <div id="sareePurchaseItemsContainer" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+            <!-- Dynamically populated rows -->
+          </div>
+        </div>
+
+        <!-- Bill Summary Calculation -->
+        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div class="text-xs text-slate-600">
+            <span>Total Items: <b class="font-mono text-slate-900" id="sareePurchaseTotalPcs">0 pcs</b></span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-slate-500 font-semibold uppercase">Total Bill Amount:</span>
+            <h3 class="text-xl sm:text-2xl font-extrabold text-slate-900 font-mono" id="sareePurchaseTotalDisplay">₹0</h3>
+          </div>
+        </div>
+
+        <!-- Payment Settlement -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3 rounded-xl border border-slate-200">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Status *</label>
+            <select id="sareePurchasePaymentStatus" onchange="toggleSareePurchasePaymentUI()" class="input-pro font-bold">
+              <option value="Paid">Fully Paid (રોકડા/ઓનલાઈન ચૂકવાઈ ગયા)</option>
+              <option value="Partial">Partial Due (થોડા બાકી રાખ્યા)</option>
+              <option value="Pending">Pending Due (પૂરા બાકી રાખ્યા - ઉધાર)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Paid Amount (₹) *</label>
+            <input type="number" id="sareePurchasePaidAmount" min="0" step="any" required class="input-pro font-mono font-extrabold text-emerald-700">
+          </div>
+        </div>
+
+        <!-- Who Paid Saree Shop (Partner Ledger) -->
+        <div id="sareePurchasePaidBySection" class="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 space-y-2">
+          <label class="block text-xs font-bold text-indigo-950">
+            <i class="fa-solid fa-wallet text-indigo-600"></i> Paid Out of Pocket By (50/50 Partner Ledger) *
+          </label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-indigo-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="sareePurchasePaidBy" value="partner1" checked class="hidden">
+              <span id="sareeP1Label" class="truncate">Kenil (You)</span>
+            </label>
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-indigo-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="sareePurchasePaidBy" value="partner2" class="hidden">
+              <span id="sareeP2Label" class="truncate">Alpesh</span>
+            </label>
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-indigo-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="sareePurchasePaidBy" value="business_account" class="hidden">
+              <span>Business A/c</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Notes / Narration (Optional)</label>
+          <input type="text" id="sareePurchaseNotes" placeholder="Additional details..." class="input-pro">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('sareePurchaseModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-5 font-bold shadow-md bg-indigo-700 hover:bg-indigo-800 text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Save Shop Purchase
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 24. SAREE SHOP RETURN & EXCHANGE MODAL -->
+  <div id="sareeExchangeModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="sareeExchangeModalTitle">
+            <i class="fa-solid fa-rotate text-amber-600"></i> Record Saree Return & Shop Exchange (દુકાને સાડી બદલી)
+          </h3>
+          <p class="text-xs text-slate-500">Take returned customer saree to wholesale shop for exchange or credit</p>
+        </div>
+        <button onclick="closeModal('sareeExchangeModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="sareeExchangeForm" onsubmit="handleSaveSareeExchange(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="sareeExchangeEditId" value="">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Return / Exchange Date *</label>
+            <input type="date" id="sareeExchangeDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Shop / Vendor Name *</label>
+            <input type="text" id="sareeExchangeShop" list="sareeShopsDatalist" required placeholder="Shop Name" class="input-pro font-bold" autocomplete="off">
+          </div>
+        </div>
+
+        <!-- Returned Saree Box -->
+        <div class="p-3 bg-rose-50/60 border border-rose-200 rounded-xl space-y-2">
+          <span class="text-xs font-bold text-rose-950 block">
+            <i class="fa-solid fa-shirt text-rose-600"></i> Returned Saree Details (જે સાડી પાછી આવી છે)
+          </span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div class="sm:col-span-2">
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Returned Saree Title / Design *</label>
+              <input type="text" id="sareeExchangeReturnedDesign" required placeholder="e.g. Banarasi Saree Red D-101" class="input-pro py-1 text-xs font-semibold">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Return Value (₹) *</label>
+              <input type="number" id="sareeExchangeReturnVal" min="0" step="any" required placeholder="₹ Rate" oninput="calculateSareeExchangeDiff()" class="input-pro py-1 text-xs font-mono font-bold text-rose-700">
+            </div>
+          </div>
+        </div>
+
+        <!-- Exchange Mode & Action -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Exchange Mode *</label>
+            <select id="sareeExchangeMode" onchange="toggleSareeExchangeModeUI()" class="input-pro font-bold text-amber-800 bg-amber-50/50">
+              <option value="exchange">Exchange with New Saree (નવી સાડી સામે બદલી)</option>
+              <option value="credit_note">Shop Credit / Ledger Debit (દુકાનદાર પાસે જમા)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Status (સ્થિતિ) *</label>
+            <select id="sareeExchangeStatus" class="input-pro font-bold">
+              <option value="pending_at_office">Pending with Us (ઘરે પડી છે - દુકાને લઈ જવાની બાકી)</option>
+              <option value="exchanged_at_shop">Exchanged at Shop (દુકાને બદલાઈ ગઈ / જમા થઈ ગઈ)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- New Saree Fields (if mode === 'exchange') -->
+        <div id="sareeExchangeNewItemSection" class="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl space-y-2">
+          <span class="text-xs font-bold text-emerald-950 block">
+            <i class="fa-solid fa-plus-circle text-emerald-600"></i> New Saree Received in Exchange (સામે લીધેલી નવી સાડી)
+          </span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div class="sm:col-span-2">
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">New Saree Title / Design #</label>
+              <input type="text" id="sareeExchangeNewDesign" placeholder="e.g. Kanjivaram Green D-202" class="input-pro py-1 text-xs font-semibold">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">New Saree Cost (₹)</label>
+              <input type="number" id="sareeExchangeNewCost" min="0" step="any" placeholder="₹ Rate" oninput="calculateSareeExchangeDiff()" class="input-pro py-1 text-xs font-mono font-bold text-emerald-700">
+            </div>
+          </div>
+          <div class="flex justify-between items-center text-xs pt-1 border-t border-emerald-100 font-semibold">
+            <span id="sareeExchangeDiffLabel" class="text-slate-600">Rate Difference:</span>
+            <span id="sareeExchangeDiffDisplay" class="font-mono font-bold text-slate-900">₹0</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Remarks / Reason (Optional)</label>
+          <input type="text" id="sareeExchangeNotes" placeholder="e.g. Customer color exchange, defective border..." class="input-pro">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('sareeExchangeModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-5 font-bold shadow-md bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Save Exchange Record
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 25. SAREE SHOP FORM MODAL -->
+  <div id="sareeShopModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-md">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="sareeShopModalTitle">
+            <i class="fa-solid fa-store text-pink-600"></i> Add Saree Shop (દુકાનદાર)
+          </h3>
+          <p class="text-xs text-slate-500">Save Surat textile market shop details in directory</p>
+        </div>
+        <button onclick="closeModal('sareeShopModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="sareeShopForm" onsubmit="handleSaveSareeShop(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="sareeShopEditId" value="">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Shop / Firm Name *</label>
+          <input type="text" id="sareeShopName" required placeholder="e.g. Radhe Creation / Shreeji Sarees" class="input-pro font-bold">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Phone / WhatsApp</label>
+            <input type="tel" id="sareeShopPhone" placeholder="Mobile No." class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Shop / Gala No.</label>
+            <input type="text" id="sareeShopNo" placeholder="e.g. G-102" class="input-pro">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Market / Location (માર્કેટનું નામ)</label>
+          <input type="text" id="sareeShopMarket" placeholder="e.g. Millennium Market, Ring Road, Surat" class="input-pro font-semibold">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Notes / Contact Person</label>
+          <input type="text" id="sareeShopNotes" placeholder="e.g. Contact: Pareshbhai" class="input-pro">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('sareeShopModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-5 font-bold shadow-md bg-pink-600 hover:bg-pink-700 text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Save Shop
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 26. SAREE SHOPS DIRECTORY MANAGE MODAL -->
+  <div id="sareeShopsManageModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-3xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-store text-pink-600"></i> Saree Shops Directory (દુકાનદાર ડિરેક્ટરી)
+          </h3>
+          <p class="text-xs text-slate-500">Manage all wholesale saree market shops and contact details</p>
+        </div>
+        <button onclick="closeModal('sareeShopsManageModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3.5 mt-3.5">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <div class="relative flex-grow">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="sareeShopsSearchInput" oninput="renderSareeShopsManageTable()" placeholder="Search shop, market, phone..." class="input-pro pl-8 py-1.5 text-xs">
+          </div>
+          <button onclick="openSareeShopModal()" class="btn-solid-primary text-xs py-2 px-3 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-lg flex items-center gap-1.5 whitespace-nowrap shadow-sm">
+            <i class="fa-solid fa-plus"></i> + Add New Shop
+          </button>
+        </div>
+
+        <div class="border border-slate-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>Shop Name</th>
+                <th>Market / Location</th>
+                <th>Shop No.</th>
+                <th>Phone</th>
+                <th>Notes</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sareeShopsManageTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 27. SAREE SHOP LUMP-SUM PAYMENT MODAL -->
+  <div id="sareeShopPayModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-money-bill-wave text-rose-600"></i> Pay Saree Shop (દુકાનદારને ચૂકવણી)
+          </h3>
+          <p class="text-xs text-slate-500">Auto-distributes payment across oldest unpaid saree purchase memos (FIFO)</p>
+        </div>
+        <button onclick="closeModal('sareeShopPayModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="sareeShopPayForm" onsubmit="handleSaveSareeShopPay(event)" class="space-y-3.5 mt-3.5">
+        <input type="hidden" id="sareeShopPayName" value="">
+
+        <!-- Shop Summary Banner -->
+        <div class="p-3 bg-rose-50/70 border border-rose-100 rounded-xl space-y-1.5 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-slate-600">Saree Shop / Firm:</span>
+            <b class="text-sm font-bold text-slate-900" id="sareeShopPayDisplayName">-</b>
+          </div>
+          <div class="flex justify-between items-center border-t border-rose-100 pt-1">
+            <span class="text-slate-600">Total Net Outstanding Payable:</span>
+            <b class="text-sm font-mono font-extrabold text-rose-700" id="sareeShopPayTotalDueDisplay">₹0</b>
+          </div>
+          <div class="text-[11px] text-rose-800" id="sareeShopPayBillsSummaryText">
+            <!-- Dynamically populated bills -->
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Date *</label>
+            <input type="date" id="sareeShopPayDate" required class="input-pro font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Amount Paid (₹) *</label>
+            <input type="number" id="sareeShopPayAmount" min="0" step="any" required placeholder="0.00" class="input-pro font-mono font-extrabold text-rose-700 text-base">
+          </div>
+        </div>
+
+        <!-- Who Paid the Shopkeeper -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+          <label class="block text-xs font-bold text-slate-800">
+            <i class="fa-solid fa-wallet text-indigo-600"></i> Paid Out of Pocket By (Partner Ledger) *
+          </label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="sareeShopPayPaidBy" value="partner1" checked class="hidden">
+              <span id="sareeShopP1Label" class="truncate">Kenil (You)</span>
+            </label>
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="sareeShopPayPaidBy" value="partner2" class="hidden">
+              <span id="sareeShopP2Label" class="truncate">Alpesh</span>
+            </label>
+            <label class="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold cursor-pointer bg-white border border-slate-200 has-[:checked]:bg-slate-900 has-[:checked]:text-white text-slate-800 text-center shadow-2xs">
+              <input type="radio" name="sareeShopPayPaidBy" value="business_account" class="hidden">
+              <span>Business A/c</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Mode</label>
+            <select id="sareeShopPayMethod" class="input-pro font-medium">
+              <option value="Google Pay / UPI">Google Pay / PhonePe / UPI</option>
+              <option value="Cash">Cash Counter</option>
+              <option value="Bank Transfer (NEFT/IMPS)">Bank Transfer / NEFT</option>
+              <option value="Cheque">Cheque</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Reference / Note (Optional)</label>
+            <input type="text" id="sareeShopPayNotes" placeholder="e.g. Paid via UPI" class="input-pro">
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('sareeShopPayModal')" class="btn-outline text-xs sm:text-sm py-2 px-4">Cancel</button>
+          <button type="submit" class="btn-solid-primary text-xs sm:text-sm py-2 px-5 font-bold shadow-md bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Record Shop Payment
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 28. SAREE SHOP STATEMENT MODAL -->
+  <div id="sareeShopStatementModal" class="modal-overlay hidden">
+    <div class="modal-dialog max-w-3xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 no-print">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2" id="sareeShopStatementModalTitle">
+            <i class="fa-solid fa-store text-pink-600"></i> Saree Shop Ledger Statement
+          </h3>
+          <p class="text-xs text-slate-500" id="sareeShopStatementModalSubtitle">Purchases, Payments, and Returns/Exchanges</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="window.print()" class="btn-solid-primary text-xs py-1.5 px-3">
+            <i class="fa-solid fa-print"></i> Print / PDF
+          </button>
+          <button onclick="closeModal('sareeShopStatementModal')" class="text-slate-400 hover:text-slate-600 text-lg p-1">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="sareeShopStatementPrintContent" class="p-2 sm:p-4 bg-white text-slate-900 space-y-4">
         <!-- Rendered dynamically -->
       </div>
     </div>

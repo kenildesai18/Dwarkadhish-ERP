@@ -23,6 +23,14 @@ const INITIAL_STORE_DATABASE = {
   sales: [],
   purchases: [],
   supplierReturns: [],
+  supplierPayments: [],
+  supplierAdvances: [],
+  customerPayments: [],
+  customerAdvances: [],
+  sareeOrders: [],
+  sareePurchases: [],
+  sareeExchanges: [],
+  sareeShops: [],
   expenses: [],
   adjustments: [],
   partnerTransactions: [],
@@ -306,6 +314,14 @@ function loadState() {
       }
       if (!state.onlineDispatches) state.onlineDispatches = [];
       if (!state.supplierReturns) state.supplierReturns = [];
+      if (!state.supplierPayments) state.supplierPayments = [];
+      if (!state.supplierAdvances) state.supplierAdvances = [];
+      if (!state.customerPayments) state.customerPayments = [];
+      if (!state.customerAdvances) state.customerAdvances = [];
+      if (!state.sareeOrders) state.sareeOrders = [];
+      if (!state.sareePurchases) state.sareePurchases = [];
+      if (!state.sareeExchanges) state.sareeExchanges = [];
+      if (!state.sareeShops) state.sareeShops = [];
       rebuildProductBatchesFromHistory();
     } else {
       state = JSON.parse(JSON.stringify(INITIAL_STORE_DATABASE));
@@ -761,7 +777,7 @@ function calculatePartnerBalances() {
   const r1 = (state.settings.partner1Ratio || 50) / 100;
   const r2 = (state.settings.partner2Ratio || 50) / 100;
 
-  // 1. Purchases Paid
+  // 1. Purchases Paid & Supplier Advances
   let p1Purchases = 0;
   let p2Purchases = 0;
   state.purchases.forEach(p => {
@@ -771,12 +787,43 @@ function calculatePartnerBalances() {
     else if (p.paidBy === 'partner2') p2Purchases += paid;
   });
 
+  (state.supplierAdvances || []).forEach(sa => {
+    const amt = Number(sa.amount) || 0;
+    if (sa.paidBy === 'partner1') p1Purchases += amt;
+    else if (sa.paidBy === 'partner2') p2Purchases += amt;
+  });
+
   // 1b. Extra Money Paid to Supplier on Item Exchanges
   (state.supplierReturns || []).forEach(sr => {
     if (sr.settlementMode === 'extra_paid') {
       const extraAmt = Math.abs(Number(sr.netBalance) || 0);
       if (sr.refundRecipient === 'partner1') p1Purchases += extraAmt;
       else if (sr.refundRecipient === 'partner2') p2Purchases += extraAmt;
+    }
+  });
+
+  // 1c. Saree & Kurti Shop Purchases Paid Out of Pocket
+  (state.sareePurchases || []).forEach(sp => {
+    const total = Number(sp.totalAmount) || 0;
+    const paid = sp.paidAmount !== undefined ? Number(sp.paidAmount) : (sp.paymentStatus === 'Pending' ? 0 : total);
+    if (sp.paymentHistory && Array.isArray(sp.paymentHistory) && sp.paymentHistory.length > 0) {
+      sp.paymentHistory.forEach(ph => {
+        const amt = Number(ph.amount) || 0;
+        if (ph.paidBy === 'partner1') p1Purchases += amt;
+        else if (ph.paidBy === 'partner2') p2Purchases += amt;
+      });
+    } else {
+      if (sp.paidBy === 'partner1') p1Purchases += paid;
+      else if (sp.paidBy === 'partner2') p2Purchases += paid;
+    }
+  });
+
+  // 1d. Extra Money Paid on Saree Exchanges
+  (state.sareeExchanges || []).forEach(se => {
+    if (se.status === 'exchanged_at_shop' && Number(se.diffAmount) > 0) {
+      const extraAmt = Number(se.diffAmount);
+      if (se.paidBy === 'partner1') p1Purchases += extraAmt;
+      else if (se.paidBy === 'partner2') p2Purchases += extraAmt;
     }
   });
 
@@ -5083,8 +5130,43 @@ function handleSavePurchase(e) {
 }
 
 function reconcileSupplierReturnsAndBills() {
-  // Purchases retain their user-specified payment status (Paid, Pending, or Partial)
-  // Lump-sum payments and debit note adjustments are handled explicitly via handleSaveSupplierLumpSumPay
+  if (!state.supplierPayments) state.supplierPayments = [];
+  if (!state.supplierAdvances) state.supplierAdvances = [];
+  if (!state.customerPayments) state.customerPayments = [];
+  if (!state.customerAdvances) state.customerAdvances = [];
+
+  // Migration for Akshar legacy payment on 30/08/2026:
+  // User paid ₹5,000 cash to Akshar on 30/08/2026, which settled 5 bills (#19, #20, #23, #26, #PB-111) totaling ₹4,495.
+  // Ensure the 5 bills share batchId 'akshar_batch_2026-08-30' and the remaining ₹505 is recorded as advance.
+  const aksharPurchases = (state.purchases || []).filter(p => (p.vendor || '').trim().toLowerCase() === 'akshar');
+  const aksharLegacyBills = ['19', '20', '23', '26', 'PB-111'];
+  const matchedBills = aksharPurchases.filter(p => aksharLegacyBills.includes(String(p.billNo).trim()));
+
+  if (matchedBills.length > 0) {
+    matchedBills.forEach(p => {
+      if (Array.isArray(p.paymentHistory)) {
+        p.paymentHistory.forEach(ph => {
+          if ((ph.date === '2026-08-30' || ph.date === '30/08/2026') && (ph.method === 'Cash' || !ph.method)) {
+            ph.batchId = 'akshar_batch_2026-08-30';
+          }
+        });
+      }
+    });
+
+    if (!state.supplierAdvances.some(sa => sa.batchId === 'akshar_batch_2026-08-30' || ((sa.supplierName || '').toLowerCase() === 'akshar' && sa.amount === 505))) {
+      state.supplierAdvances.push({
+        id: 'sadv_akshar_505',
+        batchId: 'akshar_batch_2026-08-30',
+        date: '2026-08-30',
+        supplierName: 'Akshar',
+        amount: 505,
+        remainingAmount: 505,
+        paidBy: 'partner1',
+        method: 'Cash',
+        notes: 'Advance balance from ₹5,000 cash payment'
+      });
+    }
+  }
 }
 
 function renderPurchasesTable() {
@@ -6661,9 +6743,40 @@ function renderKhataTables() {
     }
   });
 
-  // Calculate final net payable for each supplier
+  // Factor in supplier advances that were paid
+  (state.supplierAdvances || []).forEach(sa => {
+    const name = (sa.supplierName || '').trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    if (!suppliersMap.has(key)) {
+      suppliersMap.set(key, {
+        name: name,
+        phone: '',
+        city: '',
+        gst: '',
+        purchases: [],
+        totalPurchased: 0,
+        totalPaid: 0,
+        totalReturns: 0,
+        totalPayable: 0,
+        advanceBalance: 0
+      });
+    }
+    const sup = suppliersMap.get(key);
+    const advAmt = Number(sa.amount) || 0;
+    sup.totalPaid += advAmt;
+  });
+
+  // Calculate final net payable and advance balance for each supplier
   suppliersMap.forEach(sup => {
-    sup.totalPayable = Math.max(0, Math.round((sup.totalPurchased - sup.totalPaid - sup.totalReturns) * 100) / 100);
+    const diff = Math.round((sup.totalPurchased - sup.totalPaid - sup.totalReturns) * 100) / 100;
+    if (diff >= 0) {
+      sup.totalPayable = diff;
+      sup.advanceBalance = 0;
+    } else {
+      sup.totalPayable = 0;
+      sup.advanceBalance = Math.abs(diff);
+    }
   });
 
   const suppliersList = Array.from(suppliersMap.values());
@@ -6783,8 +6896,8 @@ function renderKhataTables() {
             <td class="text-right font-mono font-bold text-slate-800 text-xs">${formatCurrency(s.totalPurchased)}</td>
             <td class="text-right font-mono font-bold text-emerald-700 text-xs">${formatCurrency(s.totalPaid)}</td>
             <td class="text-right font-mono font-bold text-indigo-700 text-xs">${s.totalReturns > 0 ? '-' + formatCurrency(s.totalReturns) : '₹0'}</td>
-            <td class="text-right font-mono font-extrabold text-sm ${s.totalPayable > 0 ? 'text-rose-700 bg-rose-50/50' : 'text-slate-400'}">
-              ${s.totalPayable > 0 ? formatCurrency(s.totalPayable) : '₹0 (Clear)'}
+            <td class="text-right font-mono font-extrabold text-sm ${s.totalPayable > 0 ? 'text-rose-700 bg-rose-50/50' : (s.advanceBalance > 0 ? 'text-emerald-700 bg-emerald-50/50' : 'text-slate-400')}">
+              ${s.totalPayable > 0 ? formatCurrency(s.totalPayable) : (s.advanceBalance > 0 ? `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Adv: ${formatCurrency(s.advanceBalance)}</span>` : '₹0 (Clear)')}
             </td>
             <td class="text-center space-x-1.5 whitespace-nowrap">
               ${s.totalPayable > 0 ? `
@@ -6815,7 +6928,30 @@ function renderKhataTables() {
     const p1 = state.settings.partner1Name || "Kenil";
     const p2 = state.settings.partner2Name || "Alpesh";
 
-    const recvEvents = [];
+    const recvMap = new Map();
+
+    // 1. Check master customerPayments
+    (state.customerPayments || []).forEach(cp => {
+      const key = cp.id || (cp.customerName + '_' + cp.date + '_' + cp.method);
+      const billsArr = Array.isArray(cp.settledBills) && cp.settledBills.length > 0 
+        ? cp.settledBills.map(b => typeof b === 'string' ? b : `#${b.invoiceNo || b.billNo}`) 
+        : ['Collection / Advance'];
+      recvMap.set(key, {
+        id: cp.id,
+        key: key,
+        date: cp.date,
+        partyName: (cp.customerName || 'Wholesale Customer').trim(),
+        bills: billsArr,
+        amount: Number(cp.amount) || 0,
+        receivedBy: cp.receivedBy || 'partner1',
+        method: cp.method || 'Google Pay / UPI',
+        notes: cp.notes || '',
+        advanceAmount: Number(cp.advanceAmount) || 0,
+        isMasterRecord: true
+      });
+    });
+
+    // 2. Process sales and paymentHistory
     (state.sales || []).forEach(s => {
       const custName = (s.customerName || s.partyName || 'Wholesale Customer').trim();
       const invNo = s.invoiceNo || s.billNo || 'Invoice';
@@ -6823,43 +6959,100 @@ function renderKhataTables() {
       if (Array.isArray(s.paymentHistory) && s.paymentHistory.length > 0) {
         s.paymentHistory.forEach(ph => {
           const amt = Number(ph.amount) || 0;
-          if (amt > 0) {
-            recvEvents.push({
+          if (amt <= 0) return;
+          if (ph.batchId && recvMap.has(ph.batchId)) return;
+
+          const groupKey = ph.batchId || (custName.toLowerCase() + '___' + (ph.date || s.date) + '___' + (ph.receivedBy || s.receivedBy || 'partner1') + '___' + (ph.method || s.paymentMode || 'UPI / Cash'));
+          if (recvMap.has(groupKey)) {
+            const ev = recvMap.get(groupKey);
+            ev.amount += amt;
+            if (!ev.bills.includes(`#${invNo}`)) ev.bills.push(`#${invNo}`);
+            if (ph.notes && !ev.notes.includes(ph.notes)) {
+              ev.notes = ev.notes ? `${ev.notes} | ${ph.notes}` : ph.notes;
+            }
+          } else {
+            recvMap.set(groupKey, {
+              id: ph.batchId || groupKey,
+              key: groupKey,
               date: ph.date || s.date,
               partyName: custName,
-              billNo: invNo,
+              bills: [`#${invNo}`],
               amount: amt,
               receivedBy: ph.receivedBy || s.receivedBy || 'partner1',
               method: ph.method || s.paymentMode || 'UPI / Cash',
               notes: ph.notes || s.notes || '',
-              saleId: s.id
+              saleId: s.id,
+              isMasterRecord: false
             });
           }
         });
       } else {
         const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? Number(s.totalAmount) : 0);
         if (paid > 0) {
-          recvEvents.push({
-            date: s.date,
-            partyName: custName,
-            billNo: invNo,
-            amount: paid,
-            receivedBy: s.receivedBy || 'partner1',
-            method: s.paymentMode || 'UPI / Cash',
-            notes: s.notes || 'Full payment at billing',
-            saleId: s.id
-          });
+          const singleKey = 'sale_init_' + s.id;
+          if (!recvMap.has(singleKey)) {
+            recvMap.set(singleKey, {
+              id: singleKey,
+              key: singleKey,
+              date: s.date,
+              partyName: custName,
+              bills: [`#${invNo}`],
+              amount: paid,
+              receivedBy: s.receivedBy || 'partner1',
+              method: s.paymentMode || 'UPI / Cash',
+              notes: s.notes || 'Full payment at billing',
+              saleId: s.id,
+              isMasterRecord: false
+            });
+          }
         }
       }
     });
 
+    // 3. Customer advances
+    (state.customerAdvances || []).forEach(ca => {
+      const advAmt = Number(ca.amount) || 0;
+      if (advAmt <= 0) return;
+      if (ca.batchId && recvMap.has(ca.batchId)) {
+        const ev = recvMap.get(ca.batchId);
+        if (!ev.isMasterRecord) {
+          ev.amount += advAmt;
+          ev.advanceAmount = (ev.advanceAmount || 0) + advAmt;
+        }
+        return;
+      }
+      const groupKey = (ca.customerName || '').trim().toLowerCase() + '___' + ca.date + '___' + (ca.receivedBy || 'partner1') + '___' + (ca.method || 'Google Pay / UPI');
+      if (recvMap.has(groupKey)) {
+        const ev = recvMap.get(groupKey);
+        if (!ev.isMasterRecord) {
+          ev.amount += advAmt;
+          ev.advanceAmount = (ev.advanceAmount || 0) + advAmt;
+        }
+      } else {
+        recvMap.set('cadv_' + ca.id, {
+          id: ca.id,
+          key: 'cadv_' + ca.id,
+          date: ca.date,
+          partyName: (ca.customerName || 'Wholesale Customer').trim(),
+          bills: ['Advance Collection'],
+          amount: advAmt,
+          receivedBy: ca.receivedBy || 'partner1',
+          method: ca.method || 'Google Pay / UPI',
+          notes: ca.notes || 'Advance received from customer',
+          advanceAmount: advAmt,
+          isMasterRecord: false
+        });
+      }
+    });
+
+    const recvEvents = Array.from(recvMap.values());
     recvEvents.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
     let filteredRecv = recvEvents;
     if (search) {
       filteredRecv = recvEvents.filter(ev =>
         (ev.partyName || '').toLowerCase().includes(search) ||
-        (ev.billNo || '').toLowerCase().includes(search) ||
+        (ev.bills.join(' ') || '').toLowerCase().includes(search) ||
         (ev.method || '').toLowerCase().includes(search) ||
         (ev.notes || '').toLowerCase().includes(search) ||
         (ev.date || '').includes(search)
@@ -6869,7 +7062,7 @@ function renderKhataTables() {
     const totalRecvAmt = filteredRecv.reduce((sum, x) => sum + x.amount, 0);
     const badgeRecv = document.getElementById("khataRecvLogSummaryBadge");
     if (badgeRecv) {
-      badgeRecv.innerHTML = `<span class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-900 rounded-lg text-xs font-bold font-mono">Total Collected: ${formatCurrency(totalRecvAmt)} (${filteredRecv.length} Entries)</span>`;
+      badgeRecv.innerHTML = `<span class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-900 rounded-lg text-xs font-bold font-mono">Total Collected: ${formatCurrency(totalRecvAmt)} (${filteredRecv.length} Collections)</span>`;
     }
 
     if (filteredRecv.length === 0) {
@@ -6877,18 +7070,33 @@ function renderKhataTables() {
     } else {
       recvTableBody.innerHTML = filteredRecv.map(ev => {
         const receiverLabel = ev.receivedBy === 'partner1' ? p1 : (ev.receivedBy === 'partner2' ? p2 : 'Business Account');
+        const encodedCust = encodeURIComponent(ev.partyName);
+        let billDisplayHtml = '';
+        if (ev.bills.length === 1 && ev.bills[0] !== 'Advance Collection') {
+          billDisplayHtml = `<span class="font-mono text-indigo-700 font-bold text-xs">${escapeHtml(ev.bills[0].replace(/^#/, ''))}</span>`;
+        } else if (ev.bills.length > 1) {
+          const tooltip = escapeHtml(ev.bills.join(', ') + (ev.advanceAmount > 0 ? ` + ₹${ev.advanceAmount} Advance` : ''));
+          billDisplayHtml = `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-indigo-50 text-indigo-800 border border-indigo-200 cursor-help" title="${tooltip}">
+              <i class="fa-solid fa-layer-group text-[10px]"></i> ${ev.bills.length} Bills Settled ${ev.advanceAmount > 0 ? `<span class="text-emerald-700 ml-0.5 font-bold">+ Adv</span>` : ''}
+            </span>
+          `;
+        } else {
+          billDisplayHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-emerald-50 text-emerald-800 border border-emerald-200">Advance Received</span>`;
+        }
+
         return `
-          <tr class="hover:bg-slate-50">
+          <tr class="hover:bg-slate-50 transition-colors">
             <td><span class="font-mono font-bold text-slate-900">${formatDate(ev.date)}</span></td>
             <td class="font-bold text-slate-900">${escapeHtml(ev.partyName)}</td>
-            <td><span class="font-mono text-indigo-700 font-bold text-xs">${escapeHtml(ev.billNo)}</span></td>
+            <td>${billDisplayHtml}</td>
             <td><span class="badge-status badge-neutral font-medium text-[11px]">${escapeHtml(ev.method)}</span></td>
             <td><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200"><i class="fa-solid fa-wallet text-[10px]"></i> ${escapeHtml(receiverLabel)}</span></td>
             <td class="text-right font-mono font-extrabold text-emerald-700 text-sm">${formatCurrency(ev.amount)}</td>
             <td class="text-slate-600 text-xs max-w-xs truncate" title="${escapeHtml(ev.notes || '-')}">${escapeHtml(ev.notes || '-')}</td>
             <td class="text-center">
-              <button type="button" onclick="viewInvoiceReceipt('${ev.saleId}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Invoice">
-                <i class="fa-solid fa-file-invoice mr-0.5"></i> Bill
+              <button type="button" onclick="viewCustomerStatement('${encodedCust}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Ledger Statement">
+                <i class="fa-solid fa-file-invoice mr-0.5"></i> Statement
               </button>
             </td>
           </tr>
@@ -6903,7 +7111,33 @@ function renderKhataTables() {
     const p1 = state.settings.partner1Name || "Kenil";
     const p2 = state.settings.partner2Name || "Alpesh";
 
-    const payEvents = [];
+    // Build unified supplier payment events grouped by transaction/batch
+    const payMap = new Map();
+
+    // 1. Process master supplierPayments records if any
+    (state.supplierPayments || []).forEach(sp => {
+      const key = sp.id || (sp.supplierName + '_' + sp.date + '_' + sp.method);
+      const billsArr = Array.isArray(sp.settledBills) && sp.settledBills.length > 0 
+        ? sp.settledBills.map(b => typeof b === 'string' ? b : `#${b.billNo}`) 
+        : ['Payment / Advance'];
+      payMap.set(key, {
+        id: sp.id,
+        key: key,
+        date: sp.date,
+        supplierName: (sp.supplierName || 'Supplier').trim(),
+        bills: billsArr,
+        amount: Number(sp.totalAmount || sp.cashAmount || sp.amount) || 0,
+        debitAdjusted: Number(sp.debitAdjusted) || 0,
+        totalSettled: Number(sp.totalSettled || sp.totalAmount || sp.amount) || 0,
+        paidBy: sp.paidBy || 'partner1',
+        method: sp.method || 'Cash',
+        notes: sp.notes || '',
+        advanceAmount: Number(sp.advanceAmount) || 0,
+        isMasterRecord: true
+      });
+    });
+
+    // 2. Process purchases and their paymentHistory
     (state.purchases || []).forEach(p => {
       const suppName = (p.vendor || 'Supplier').trim();
       const billNo = p.billNo || 'Bill';
@@ -6913,47 +7147,124 @@ function renderKhataTables() {
           const cashAmt = Number(ph.amount) || 0;
           const debAmt = Number(ph.debitAdjusted) || 0;
           const totSettled = cashAmt + debAmt;
-          if (totSettled > 0) {
-            payEvents.push({
+          if (totSettled <= 0) return;
+
+          // If this ph belongs to a master record already in payMap
+          if (ph.batchId && payMap.has(ph.batchId)) {
+            return;
+          }
+
+          // Group by batchId OR (suppName + date + paidBy + method)
+          const groupKey = ph.batchId || (suppName.toLowerCase() + '___' + (ph.date || p.date) + '___' + (ph.paidBy || p.paidBy || 'partner1') + '___' + (ph.method || 'Cash / Bank'));
+
+          if (payMap.has(groupKey)) {
+            const ev = payMap.get(groupKey);
+            ev.amount += cashAmt;
+            ev.debitAdjusted += debAmt;
+            ev.totalSettled += totSettled;
+            if (!ev.bills.includes(`#${billNo}`)) {
+              ev.bills.push(`#${billNo}`);
+            }
+            if (ph.notes && !ev.notes.includes(ph.notes)) {
+              ev.notes = ev.notes ? `${ev.notes} | ${ph.notes}` : ph.notes;
+            }
+          } else {
+            payMap.set(groupKey, {
+              id: ph.batchId || groupKey,
+              key: groupKey,
               date: ph.date || p.date,
               supplierName: suppName,
-              billNo: billNo,
+              bills: [`#${billNo}`],
               amount: cashAmt,
               debitAdjusted: debAmt,
               totalSettled: totSettled,
               paidBy: ph.paidBy || p.paidBy || 'partner1',
-              method: ph.method || 'UPI / Cash',
+              method: ph.method || 'Cash',
               notes: ph.notes || p.notes || '',
-              purchId: p.id
+              purchId: p.id,
+              isMasterRecord: false
             });
           }
         });
       } else {
         const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? Number(p.totalAmount) : 0);
         if (paid > 0) {
-          payEvents.push({
-            date: p.date,
-            supplierName: suppName,
-            billNo: billNo,
-            amount: paid,
-            debitAdjusted: 0,
-            totalSettled: paid,
-            paidBy: p.paidBy || 'partner1',
-            method: 'Cash / Bank',
-            notes: p.notes || 'Paid on purchase date',
-            purchId: p.id
-          });
+          const singleKey = 'bill_init_' + p.id;
+          if (!payMap.has(singleKey)) {
+            payMap.set(singleKey, {
+              id: singleKey,
+              key: singleKey,
+              date: p.date,
+              supplierName: suppName,
+              bills: [`#${billNo}`],
+              amount: paid,
+              debitAdjusted: 0,
+              totalSettled: paid,
+              paidBy: p.paidBy || 'partner1',
+              method: p.paymentMethod || 'Cash / Bank',
+              notes: p.notes || 'Paid on purchase date',
+              purchId: p.id,
+              isMasterRecord: false
+            });
+          }
         }
       }
     });
 
+    // 3. Fold in any supplierAdvances
+    (state.supplierAdvances || []).forEach(sa => {
+      const advAmt = Number(sa.amount) || 0;
+      if (advAmt <= 0) return;
+
+      if (sa.batchId && payMap.has(sa.batchId)) {
+        const ev = payMap.get(sa.batchId);
+        if (!ev.isMasterRecord) {
+          ev.amount += advAmt;
+          ev.totalSettled += advAmt;
+          ev.advanceAmount = (ev.advanceAmount || 0) + advAmt;
+        }
+        return;
+      }
+
+      // Check if there is an existing group for this supplier on this date
+      const groupKey = (sa.supplierName || '').trim().toLowerCase() + '___' + sa.date + '___' + (sa.paidBy || 'partner1') + '___' + (sa.method || 'Cash');
+      if (payMap.has(groupKey)) {
+        const ev = payMap.get(groupKey);
+        if (!ev.isMasterRecord) {
+          ev.amount += advAmt;
+          ev.totalSettled += advAmt;
+          ev.advanceAmount = (ev.advanceAmount || 0) + advAmt;
+        }
+      } else {
+        payMap.set('adv_' + sa.id, {
+          id: sa.id,
+          key: 'adv_' + sa.id,
+          date: sa.date,
+          supplierName: (sa.supplierName || 'Supplier').trim(),
+          bills: ['Advance Payment'],
+          amount: advAmt,
+          debitAdjusted: 0,
+          totalSettled: advAmt,
+          paidBy: sa.paidBy || 'partner1',
+          method: sa.method || 'Cash',
+          notes: sa.notes || 'Advance payment to supplier',
+          advanceAmount: advAmt,
+          isMasterRecord: false
+        });
+      }
+    });
+
+    // Store globally for edit & delete access
+    window._lastSupplierPayEventsMap = payMap;
+
+    const payEvents = Array.from(payMap.values());
     payEvents.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
     let filteredPay = payEvents;
     if (search) {
       filteredPay = payEvents.filter(ev =>
         (ev.supplierName || '').toLowerCase().includes(search) ||
-        (ev.billNo || '').toLowerCase().includes(search) ||
+        (ev.bills.join(' ') || '').toLowerCase().includes(search) ||
         (ev.method || '').toLowerCase().includes(search) ||
         (ev.notes || '').toLowerCase().includes(search) ||
         (ev.date || '').includes(search)
@@ -6966,7 +7277,7 @@ function renderKhataTables() {
 
     const badgePay = document.getElementById("khataPayLogSummaryBadge");
     if (badgePay) {
-      badgePay.innerHTML = `<span class="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-900 rounded-lg text-xs font-bold font-mono">Paid Cash/Bank: ${formatCurrency(totalCashPaid)} | Returns: ${formatCurrency(totalDebitAdj)} | Total Settled: ${formatCurrency(totalOverallSettled)} (${filteredPay.length} Entries)</span>`;
+      badgePay.innerHTML = `<span class="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-900 rounded-lg text-xs font-bold font-mono">Paid Cash/Bank: ${formatCurrency(totalCashPaid)} | Returns: ${formatCurrency(totalDebitAdj)} | Total Settled: ${formatCurrency(totalOverallSettled)} (${filteredPay.length} Payments)</span>`;
     }
 
     if (filteredPay.length === 0) {
@@ -6975,20 +7286,42 @@ function renderKhataTables() {
       payTableBody.innerHTML = filteredPay.map(ev => {
         const payerLabel = ev.paidBy === 'partner1' ? p1 : (ev.paidBy === 'partner2' ? p2 : 'Business Account');
         const encodedSup = encodeURIComponent(ev.supplierName);
+        const encodedKey = encodeURIComponent(ev.key);
+
+        let billDisplayHtml = '';
+        if (ev.bills.length === 1 && ev.bills[0] !== 'Advance Payment') {
+          billDisplayHtml = `<span class="font-mono text-rose-700 font-bold text-xs">${escapeHtml(ev.bills[0].replace(/^#/, ''))}</span>`;
+        } else if (ev.bills.length > 1) {
+          const tooltip = escapeHtml(ev.bills.join(', ') + (ev.advanceAmount > 0 ? ` + ₹${ev.advanceAmount} Advance` : ''));
+          billDisplayHtml = `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-rose-50 text-rose-800 border border-rose-200 cursor-help" title="${tooltip}">
+              <i class="fa-solid fa-layer-group text-[10px]"></i> ${ev.bills.length} Bills Settled ${ev.advanceAmount > 0 ? `<span class="text-emerald-700 ml-0.5 font-bold">+ Adv</span>` : ''}
+            </span>
+          `;
+        } else {
+          billDisplayHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-emerald-50 text-emerald-800 border border-emerald-200">Advance Paid</span>`;
+        }
+
         return `
-          <tr class="hover:bg-slate-50">
+          <tr class="hover:bg-slate-50 transition-colors">
             <td><span class="font-mono font-bold text-slate-900">${formatDate(ev.date)}</span></td>
             <td class="font-bold text-slate-900">${escapeHtml(ev.supplierName)}</td>
-            <td><span class="font-mono text-rose-700 font-bold text-xs">${escapeHtml(ev.billNo)}</span></td>
+            <td>${billDisplayHtml}</td>
             <td><span class="badge-status badge-neutral font-medium text-[11px]">${escapeHtml(ev.method)}</span></td>
             <td><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200"><i class="fa-solid fa-wallet text-[10px]"></i> ${escapeHtml(payerLabel)}</span></td>
             <td class="text-right font-mono font-bold text-rose-700 text-xs">${formatCurrency(ev.amount)}</td>
             <td class="text-right font-mono font-bold text-emerald-700 text-xs">${ev.debitAdjusted > 0 ? '-' + formatCurrency(ev.debitAdjusted) : '₹0'}</td>
             <td class="text-right font-mono font-extrabold text-slate-900 text-sm">${formatCurrency(ev.totalSettled)}</td>
             <td class="text-slate-600 text-xs max-w-xs truncate" title="${escapeHtml(ev.notes || '-')}">${escapeHtml(ev.notes || '-')}</td>
-            <td class="text-center">
+            <td class="text-center space-x-1 whitespace-nowrap">
               <button type="button" onclick="viewSupplierStatement('${encodedSup}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Supplier Statement">
                 <i class="fa-solid fa-file-invoice mr-0.5"></i> Statement
+              </button>
+              <button type="button" onclick="openEditSupplierPaymentModal('${encodedKey}')" class="btn-outline text-[11px] py-1 px-1.5 text-amber-700 hover:bg-amber-50 border-amber-200 shadow-xs cursor-pointer" title="Edit Payment">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button type="button" onclick="deleteSupplierPayment('${encodedKey}')" class="btn-outline text-[11px] py-1 px-1.5 text-rose-700 hover:bg-rose-50 border-rose-200 shadow-xs cursor-pointer" title="Delete Payment">
+                <i class="fa-solid fa-trash-can"></i>
               </button>
             </td>
           </tr>
@@ -7082,6 +7415,7 @@ function handleSavePartyLumpSumCollect(e) {
       .filter(s => (s.customerName || '').trim().toLowerCase() === customerName.toLowerCase())
       .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
+    const batchId = 'rpay_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     let remaining = amount;
     const settledBills = [];
 
@@ -7108,6 +7442,7 @@ function handleSavePartyLumpSumCollect(e) {
 
         if (!s.paymentHistory) s.paymentHistory = [];
         s.paymentHistory.push({
+          batchId,
           date,
           amount: applyAmt,
           receivedBy,
@@ -7120,10 +7455,40 @@ function handleSavePartyLumpSumCollect(e) {
       }
     });
 
+    // If remaining > 0 (excess collection or advance collection)
+    if (remaining > 0) {
+      if (!state.customerAdvances) state.customerAdvances = [];
+      state.customerAdvances.push({
+        id: 'cadv_' + Date.now(),
+        batchId,
+        date,
+        customerName,
+        amount: remaining,
+        remainingAmount: remaining,
+        receivedBy,
+        method,
+        notes: notes ? `Advance collection: ${notes}` : `Advance received from customer`
+      });
+    }
+
+    if (!state.customerPayments) state.customerPayments = [];
+    state.customerPayments.push({
+      id: batchId,
+      date,
+      customerName,
+      amount,
+      receivedBy,
+      method,
+      notes,
+      settledBills,
+      advanceAmount: remaining
+    });
+
     saveState();
     closeModal('partyLumpSumCollectModal');
     refreshAllUI();
-    showToast(`Recorded ₹${amount} received from ${customerName} in ${receiverLabel}! Settled: ${settledBills.join(', ')}`);
+    const advNotice = remaining > 0 ? ` (+ ₹${remaining} recorded as Customer Advance)` : '';
+    showToast(`Recorded ₹${amount} received from ${customerName} in ${receiverLabel}! Settled: ${settledBills.join(', ') || 'Advance Only'}${advNotice}`);
   } catch (err) {
     console.error("Error saving party lump sum collection:", err);
     showToast("Error saving: " + err.message, true);
@@ -7243,6 +7608,7 @@ function handleSaveSupplierLumpSumPay(e) {
       return;
     }
 
+    const batchId = 'spay_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     let remainingCash = amount;
     let remainingDebit = totalDebitNotes;
     const settledPurchases = [];
@@ -7279,6 +7645,7 @@ function handleSaveSupplierLumpSumPay(e) {
         if (notes) logParts.push(`(${notes})`);
 
         p.paymentHistory.push({
+          batchId,
           date,
           amount: applyCash,
           debitAdjusted: applyDebit,
@@ -7293,14 +7660,225 @@ function handleSaveSupplierLumpSumPay(e) {
       }
     });
 
+    // If remaining cash > 0 (excess payment or advance payment), record as Supplier Advance!
+    if (remainingCash > 0) {
+      if (!state.supplierAdvances) state.supplierAdvances = [];
+      state.supplierAdvances.push({
+        id: 'sadv_' + Date.now(),
+        batchId,
+        date,
+        supplierName: vendorName,
+        amount: remainingCash,
+        remainingAmount: remainingCash,
+        paidBy,
+        method,
+        notes: notes ? `Advance payment: ${notes}` : `Advance payment to supplier`
+      });
+    }
+
+    // Save unified master payment record
+    if (!state.supplierPayments) state.supplierPayments = [];
+    state.supplierPayments.push({
+      id: batchId,
+      date,
+      supplierName: vendorName,
+      totalAmount: amount, // The full amount paid e.g. ₹5,000!
+      cashAmount: amount,
+      debitAdjusted: totalDebitNotes - remainingDebit,
+      totalSettled: amount + (totalDebitNotes - remainingDebit),
+      paidBy,
+      method,
+      notes,
+      settledBills: settledPurchases,
+      advanceAmount: remainingCash
+    });
+
     saveState();
     closeModal('supplierLumpSumPayModal');
     refreshAllUI();
-    showToast(`Payment & Return adjustments recorded for ${vendorName}! Settled: ${settledPurchases.join(', ') || 'None'}`);
+    const advNotice = remainingCash > 0 ? ` (+ ₹${remainingCash} added to Advance balance)` : '';
+    showToast(`Payment of ₹${amount} recorded for ${vendorName}! Settled: ${settledPurchases.join(', ') || 'Advance Only'}${advNotice}`);
   } catch (err) {
     console.error("Error saving supplier lump sum payment:", err);
     showToast("Error saving: " + err.message, true);
   }
+}
+
+// 2B. Edit & Delete Supplier Payment Handlers
+function openEditSupplierPaymentModal(rawKey) {
+  try {
+    const key = decodeURIComponent(rawKey || '');
+    const payTableData = window._lastSupplierPayEventsMap || new Map();
+    const payEv = payTableData.get(key);
+    if (!payEv) {
+      showToast("Payment record not found for editing!", true);
+      return;
+    }
+
+    document.getElementById("editSupplierPayKey").value = key;
+    document.getElementById("editSupplierPayVendor").value = payEv.supplierName;
+    document.getElementById("editSupplierPayDisplayVendor").textContent = payEv.supplierName;
+    document.getElementById("editSupplierPayBillsInfo").textContent = `Settled: ${payEv.bills.join(', ')}${payEv.advanceAmount > 0 ? ` (+ ₹${payEv.advanceAmount} Advance)` : ''}`;
+    document.getElementById("editSupplierPayDate").value = payEv.date;
+    document.getElementById("editSupplierPayAmount").value = payEv.amount;
+    document.getElementById("editSupplierPayMethod").value = payEv.method || "Cash";
+    document.getElementById("editSupplierPayNotes").value = payEv.notes || "";
+
+    const p1 = state.settings.partner1Name || "Kenil";
+    const p2 = state.settings.partner2Name || "Alpesh";
+    const p1El = document.getElementById("editSupplierPayP1Label");
+    const p2El = document.getElementById("editSupplierPayP2Label");
+    if (p1El) p1El.textContent = p1;
+    if (p2El) p2El.textContent = p2;
+
+    const radio = document.querySelector(`input[name="editSupplierPayPaidBy"][value="${payEv.paidBy || 'partner1'}"]`);
+    if (radio) radio.checked = true;
+
+    openModal('editSupplierPaymentModal');
+  } catch (err) {
+    console.error("Error opening edit supplier payment modal:", err);
+    showToast("Error: " + err.message, true);
+  }
+}
+
+function handleSaveEditSupplierPayment(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  try {
+    const key = document.getElementById("editSupplierPayKey")?.value;
+    const payTableData = window._lastSupplierPayEventsMap || new Map();
+    const payEv = payTableData.get(key);
+    if (!payEv) {
+      showToast("Payment record not found!", true);
+      return;
+    }
+
+    const newDate = document.getElementById("editSupplierPayDate")?.value || payEv.date;
+    const newAmount = parseFloat(document.getElementById("editSupplierPayAmount")?.value) || 0;
+    const newMethod = document.getElementById("editSupplierPayMethod")?.value || payEv.method;
+    const newPaidBy = document.querySelector('input[name="editSupplierPayPaidBy"]:checked')?.value || payEv.paidBy || "partner1";
+    const newNotes = document.getElementById("editSupplierPayNotes")?.value.trim() || "";
+
+    if (newAmount <= 0) {
+      showToast("Amount must be greater than 0!", true);
+      return;
+    }
+
+    // 1. If it's a master supplierPayments record
+    if (payEv.isMasterRecord) {
+      const sp = (state.supplierPayments || []).find(x => x.id === payEv.id);
+      if (sp) {
+        sp.date = newDate;
+        sp.totalAmount = newAmount;
+        sp.cashAmount = newAmount;
+        sp.method = newMethod;
+        sp.paidBy = newPaidBy;
+        sp.notes = newNotes;
+      }
+    }
+
+    // 2. If it's an advance record
+    const matchingAdv = (state.supplierAdvances || []).find(sa => sa.id === payEv.id || sa.batchId === payEv.id || (payEv.key && (sa.id === payEv.key || sa.batchId === payEv.key)));
+    if (matchingAdv) {
+      matchingAdv.date = newDate;
+      matchingAdv.amount = Math.max(0, newAmount - (payEv.amount - (payEv.advanceAmount || 0)));
+      matchingAdv.remainingAmount = matchingAdv.amount;
+      matchingAdv.method = newMethod;
+      matchingAdv.paidBy = newPaidBy;
+      matchingAdv.notes = newNotes;
+    } else if (newAmount > payEv.amount) {
+      // Extra paid amount added as advance
+      const extraAdv = newAmount - payEv.amount;
+      if (!state.supplierAdvances) state.supplierAdvances = [];
+      state.supplierAdvances.push({
+        id: 'sadv_' + Date.now(),
+        batchId: payEv.id,
+        date: newDate,
+        supplierName: payEv.supplierName,
+        amount: extraAdv,
+        remainingAmount: extraAdv,
+        paidBy: newPaidBy,
+        method: newMethod,
+        notes: `Adjusted advance payment: ${newNotes}`
+      });
+    }
+
+    // 3. Update paymentHistory items
+    (state.purchases || []).forEach(p => {
+      if ((p.vendor || '').trim().toLowerCase() === payEv.supplierName.toLowerCase() && Array.isArray(p.paymentHistory)) {
+        p.paymentHistory.forEach(ph => {
+          if (ph.batchId === payEv.id || (payEv.bills.includes(`#${p.billNo}`) && (ph.date === payEv.date || ph.date === newDate))) {
+            ph.date = newDate;
+            ph.method = newMethod;
+            ph.paidBy = newPaidBy;
+            if (newNotes) ph.notes = newNotes;
+          }
+        });
+      }
+    });
+
+    saveState();
+    closeModal('editSupplierPaymentModal');
+    refreshAllUI();
+    showToast(`Payment for ${payEv.supplierName} updated successfully!`);
+  } catch (err) {
+    console.error("Error saving edited supplier payment:", err);
+    showToast("Error updating payment: " + err.message, true);
+  }
+}
+
+function deleteSupplierPayment(rawKey) {
+  try {
+    const key = decodeURIComponent(rawKey || '');
+    const payTableData = window._lastSupplierPayEventsMap || new Map();
+    const payEv = payTableData.get(key);
+    if (!payEv) {
+      showToast("Payment record not found to delete!", true);
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete payment of ${formatCurrency(payEv.amount)} to ${payEv.supplierName}? Settled bills will be reopened!`)) {
+      return;
+    }
+
+    // Remove from state.supplierPayments
+    if (state.supplierPayments) {
+      state.supplierPayments = state.supplierPayments.filter(sp => sp.id !== payEv.id && sp.id !== key);
+    }
+
+    // Remove from state.supplierAdvances
+    if (state.supplierAdvances) {
+      state.supplierAdvances = state.supplierAdvances.filter(sa => sa.id !== payEv.id && sa.batchId !== payEv.id && sa.id !== key && sa.batchId !== key);
+    }
+
+    // Rollback purchases paymentHistory and paidAmount
+    (state.purchases || []).forEach(p => {
+      if ((p.vendor || '').trim().toLowerCase() === payEv.supplierName.toLowerCase()) {
+        if (Array.isArray(p.paymentHistory)) {
+          const matchingHistory = p.paymentHistory.filter(ph => ph.batchId === payEv.id || (payEv.bills.includes(`#${p.billNo}`) && ph.date === payEv.date));
+          const removedAmt = matchingHistory.reduce((sum, ph) => sum + (Number(ph.amount) || 0) + (Number(ph.debitAdjusted) || 0), 0);
+          p.paymentHistory = p.paymentHistory.filter(ph => !(ph.batchId === payEv.id || (payEv.bills.includes(`#${p.billNo}`) && ph.date === payEv.date)));
+          if (removedAmt > 0) {
+            p.paidAmount = Math.max(0, (Number(p.paidAmount) || 0) - removedAmt);
+            const total = Number(p.totalAmount) || 0;
+            p.paymentStatus = p.paidAmount <= 0 ? 'Pending' : (p.paidAmount >= total ? 'Paid' : 'Partial');
+          }
+        }
+      }
+    });
+
+    saveState();
+    closeModal('editSupplierPaymentModal');
+    refreshAllUI();
+    showToast(`Payment of ${formatCurrency(payEv.amount)} to ${payEv.supplierName} deleted and bills reopened!`);
+  } catch (err) {
+    console.error("Error deleting supplier payment:", err);
+    showToast("Error deleting: " + err.message, true);
+  }
+}
+
+function deleteCurrentEditSupplierPayment() {
+  const key = document.getElementById("editSupplierPayKey")?.value;
+  if (key) deleteSupplierPayment(encodeURIComponent(key));
 }
 
 // 3. Complete Ledger Statement for Customer
@@ -7325,58 +7903,145 @@ function viewCustomerStatement(rawCustomerName) {
       .filter(s => (s.customerName || '').trim().toLowerCase() === customerName.trim().toLowerCase())
       .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
-    let totalBilled = 0;
-    let totalPaid = 0;
-    let runningBal = 0;
-
-    const rows = [];
-
+    // 1. Debit Row for Invoices
+    const allCustEvents = [];
     partySales.forEach(s => {
       const total = Number(s.totalAmount) || 0;
-      const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? total : 0);
-      
-      totalBilled += total;
-      runningBal += total;
-
-      // 1. Debit Row for Invoice
-      rows.push({
+      allCustEvents.push({
         date: s.date,
         type: 'Invoice',
         ref: s.invoiceNo,
         desc: s.items ? s.items.map(it => `${it.productName} (${it.qty} pcs)`).join(', ') : 'Wholesale Goods',
         debit: total,
-        credit: 0,
-        balance: runningBal
+        credit: 0
       });
+    });
 
-      // 2. Credit Row(s) for Payments
-      if (Array.isArray(s.paymentHistory) && s.paymentHistory.length > 0) {
-        s.paymentHistory.forEach(ph => {
-          totalPaid += Number(ph.amount) || 0;
-          runningBal -= Number(ph.amount) || 0;
-          rows.push({
-            date: ph.date || s.date,
-            type: 'Payment Receipt',
-            ref: `Recv-${s.invoiceNo}`,
-            desc: ph.notes || `Payment received (${ph.method || 'Cash/Online'})`,
-            debit: 0,
-            credit: Number(ph.amount) || 0,
-            balance: runningBal
-          });
-        });
-      } else if (paid > 0) {
-        totalPaid += paid;
-        runningBal -= paid;
-        rows.push({
-          date: s.date,
+    // 2. Grouped Collections
+    const custPayMap = new Map();
+
+    (state.customerPayments || []).forEach(cp => {
+      if ((cp.customerName || '').trim().toLowerCase() === customerName.toLowerCase()) {
+        const key = cp.id || (cp.date + '_' + cp.method);
+        const billsArr = Array.isArray(cp.settledBills) && cp.settledBills.length > 0 
+          ? cp.settledBills.map(b => typeof b === 'string' ? b : `#${b.invoiceNo || b.billNo}`) 
+          : ['Advance'];
+        custPayMap.set(key, {
+          date: cp.date,
           type: 'Payment Receipt',
-          ref: `Recv-${s.invoiceNo}`,
-          desc: `Payment received at billing`,
+          ref: billsArr.length > 1 ? `Recv (${billsArr.length} Bills)` : (billsArr[0] ? `Recv-${billsArr[0]}` : 'Receipt'),
+          desc: `Payment via ${cp.method || 'UPI/Cash'}${cp.notes ? ` (${cp.notes})` : ''} [Settled: ${billsArr.join(', ')}]`,
           debit: 0,
-          credit: paid,
-          balance: runningBal
+          credit: Number(cp.amount) || 0
         });
       }
+    });
+
+    partySales.forEach(s => {
+      const invNo = s.invoiceNo || s.billNo || 'Invoice';
+      if (Array.isArray(s.paymentHistory) && s.paymentHistory.length > 0) {
+        s.paymentHistory.forEach(ph => {
+          const amt = Number(ph.amount) || 0;
+          if (amt <= 0) return;
+          if (ph.batchId && custPayMap.has(ph.batchId)) return;
+
+          const groupKey = ph.batchId || (customerName.toLowerCase() + '___' + (ph.date || s.date) + '___' + (ph.receivedBy || 'partner1') + '___' + (ph.method || s.paymentMode || 'UPI / Cash'));
+          if (custPayMap.has(groupKey)) {
+            const ev = custPayMap.get(groupKey);
+            ev.credit += amt;
+            if (!ev.bills.includes(`#${invNo}`)) ev.bills.push(`#${invNo}`);
+          } else {
+            custPayMap.set(groupKey, {
+              date: ph.date || s.date,
+              type: 'Payment Receipt',
+              bills: [`#${invNo}`],
+              method: ph.method || s.paymentMode || 'UPI / Cash',
+              notes: ph.notes || '',
+              debit: 0,
+              credit: amt
+            });
+          }
+        });
+      } else {
+        const paid = s.paidAmount !== undefined ? Number(s.paidAmount) : (s.paymentStatus === 'Paid' ? Number(s.totalAmount) : 0);
+        if (paid > 0) {
+          const singleKey = 'sale_init_' + s.id;
+          if (!custPayMap.has(singleKey)) {
+            custPayMap.set(singleKey, {
+              date: s.date,
+              type: 'Payment Receipt',
+              bills: [`#${invNo}`],
+              method: s.paymentMode || 'UPI / Cash',
+              notes: s.notes || 'Payment received at billing',
+              debit: 0,
+              credit: paid
+            });
+          }
+        }
+      }
+    });
+
+    (state.customerAdvances || []).forEach(ca => {
+      if ((ca.customerName || '').trim().toLowerCase() === customerName.toLowerCase()) {
+        const advAmt = Number(ca.amount) || 0;
+        if (advAmt <= 0) return;
+        if (ca.batchId && custPayMap.has(ca.batchId)) {
+          const ev = custPayMap.get(ca.batchId);
+          if (!ev.ref) {
+            ev.credit += advAmt;
+            ev.hasAdv = true;
+          }
+          return;
+        }
+        const groupKey = customerName.toLowerCase() + '___' + ca.date + '___' + (ca.receivedBy || 'partner1') + '___' + (ca.method || 'Google Pay / UPI');
+        if (custPayMap.has(groupKey)) {
+          const ev = custPayMap.get(groupKey);
+          ev.credit += advAmt;
+          ev.hasAdv = true;
+        } else {
+          custPayMap.set('cadv_' + ca.id, {
+            date: ca.date,
+            type: 'Customer Advance',
+            bills: ['Advance'],
+            method: ca.method || 'Google Pay / UPI',
+            notes: ca.notes || 'Advance received from customer',
+            debit: 0,
+            credit: advAmt
+          });
+        }
+      }
+    });
+
+    custPayMap.forEach(item => {
+      if (!item.ref) {
+        const bList = (item.bills || []).join(', ');
+        item.ref = item.bills && item.bills.length > 1 ? `Recv (${item.bills.length} Bills)` : (item.bills && item.bills[0] ? `Recv-${item.bills[0]}` : 'Receipt');
+        item.desc = `Payment received via ${item.method || 'UPI/Cash'} [Settled: ${bList || 'Advance'}]${item.hasAdv ? ' + Advance' : ''}${item.notes ? ` (${item.notes})` : ''}`;
+      }
+      allCustEvents.push(item);
+    });
+
+    allCustEvents.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    let totalBilled = 0;
+    let totalPaid = 0;
+    let runningBal = 0;
+    const rows = [];
+
+    allCustEvents.forEach(ev => {
+      totalBilled += ev.debit;
+      totalPaid += ev.credit;
+      runningBal += ev.debit - ev.credit;
+
+      rows.push({
+        date: ev.date,
+        type: ev.type,
+        ref: ev.ref,
+        desc: ev.desc,
+        debit: ev.debit,
+        credit: ev.credit,
+        balance: Math.max(0, runningBal)
+      });
     });
 
     const netPending = Math.max(0, runningBal);
@@ -7470,9 +8135,9 @@ function viewSupplierStatement(rawVendorName) {
 
   const allEvents = [];
 
+  // 1. Add Purchase Bills
   purchases.forEach(p => {
     const total = Number(p.totalAmount) || 0;
-    const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
     allEvents.push({
       date: p.date,
       type: 'Purchase Bill',
@@ -7481,28 +8146,113 @@ function viewSupplierStatement(rawVendorName) {
       purchaseAmt: total,
       paidAmt: 0
     });
+  });
 
-    if (Array.isArray(p.paymentHistory) && p.paymentHistory.length > 0) {
-      p.paymentHistory.forEach(ph => {
-        allEvents.push({
-          date: ph.date || p.date,
-          type: 'Supplier Payment',
-          ref: `Pay-${p.billNo}`,
-          desc: ph.notes || `Paid to supplier (${ph.method || 'Online/Cash'})`,
-          purchaseAmt: 0,
-          paidAmt: Number(ph.amount) || 0
-        });
-      });
-    } else if (paid > 0) {
-      allEvents.push({
-        date: p.date,
+  // 2. Add Grouped Supplier Payments
+  const supPayMap = new Map();
+
+  // Check master records
+  (state.supplierPayments || []).forEach(sp => {
+    if ((sp.supplierName || '').trim().toLowerCase() === vendorName.toLowerCase()) {
+      const key = sp.id || (sp.date + '_' + sp.method);
+      const billsArr = Array.isArray(sp.settledBills) && sp.settledBills.length > 0 
+        ? sp.settledBills.map(b => typeof b === 'string' ? b : `#${b.billNo}`) 
+        : ['Advance'];
+      supPayMap.set(key, {
+        date: sp.date,
         type: 'Supplier Payment',
-        ref: `Pay-${p.billNo}`,
-        desc: `Paid on purchase date`,
+        ref: billsArr.length > 1 ? `Pay (${billsArr.length} Bills)` : (billsArr[0] ? `Pay-${billsArr[0]}` : 'Payment'),
+        desc: `Paid via ${sp.method || 'Cash'}${sp.notes ? ` (${sp.notes})` : ''} [Settled: ${billsArr.join(', ')}]`,
         purchaseAmt: 0,
-        paidAmt: paid
+        paidAmt: Number(sp.totalAmount || sp.cashAmount || sp.amount) || 0
       });
     }
+  });
+
+  // Check purchases paymentHistory
+  purchases.forEach(p => {
+    const billNo = p.billNo || 'Bill';
+    if (Array.isArray(p.paymentHistory) && p.paymentHistory.length > 0) {
+      p.paymentHistory.forEach(ph => {
+        const amt = Number(ph.amount) || 0;
+        if (amt <= 0) return;
+        if (ph.batchId && supPayMap.has(ph.batchId)) return;
+
+        const groupKey = ph.batchId || (vendorName.toLowerCase() + '___' + (ph.date || p.date) + '___' + (ph.paidBy || 'partner1') + '___' + (ph.method || 'Cash / Bank'));
+        if (supPayMap.has(groupKey)) {
+          const ev = supPayMap.get(groupKey);
+          ev.paidAmt += amt;
+          if (!ev.bills.includes(`#${billNo}`)) ev.bills.push(`#${billNo}`);
+        } else {
+          supPayMap.set(groupKey, {
+            date: ph.date || p.date,
+            type: 'Supplier Payment',
+            bills: [`#${billNo}`],
+            method: ph.method || 'Cash',
+            notes: ph.notes || '',
+            paidAmt: amt,
+            purchaseAmt: 0
+          });
+        }
+      });
+    } else {
+      const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? Number(p.totalAmount) : 0);
+      if (paid > 0) {
+        const singleKey = 'bill_init_' + p.id;
+        if (!supPayMap.has(singleKey)) {
+          supPayMap.set(singleKey, {
+            date: p.date,
+            type: 'Supplier Payment',
+            bills: [`#${billNo}`],
+            method: p.paymentMethod || 'Cash / Bank',
+            notes: p.notes || 'Paid on purchase date',
+            paidAmt: paid,
+            purchaseAmt: 0
+          });
+        }
+      }
+    }
+  });
+
+  // Fold in advances for this vendor
+  (state.supplierAdvances || []).forEach(sa => {
+    if ((sa.supplierName || '').trim().toLowerCase() === vendorName.toLowerCase()) {
+      const advAmt = Number(sa.amount) || 0;
+      if (advAmt <= 0) return;
+      if (sa.batchId && supPayMap.has(sa.batchId)) {
+        const ev = supPayMap.get(sa.batchId);
+        if (!ev.ref) {
+          ev.paidAmt += advAmt;
+          ev.hasAdv = true;
+        }
+        return;
+      }
+      const groupKey = vendorName.toLowerCase() + '___' + sa.date + '___' + (sa.paidBy || 'partner1') + '___' + (sa.method || 'Cash');
+      if (supPayMap.has(groupKey)) {
+        const ev = supPayMap.get(groupKey);
+        ev.paidAmt += advAmt;
+        ev.hasAdv = true;
+      } else {
+        supPayMap.set('adv_' + sa.id, {
+          date: sa.date,
+          type: 'Supplier Advance',
+          bills: ['Advance'],
+          method: sa.method || 'Cash',
+          notes: sa.notes || 'Advance payment to supplier',
+          paidAmt: advAmt,
+          purchaseAmt: 0
+        });
+      }
+    }
+  });
+
+  supPayMap.forEach(item => {
+    if (!item.ref) {
+      const bList = (item.bills || []).join(', ');
+      item.ref = item.bills && item.bills.length > 1 ? `Pay (${item.bills.length} Bills)` : (item.bills && item.bills[0] ? `Pay-${item.bills[0]}` : 'Payment');
+      item.desc = `Paid via ${item.method || 'Cash'} [Settled: ${bList || 'Advance'}]${item.hasAdv ? ' + Advance' : ''}${item.notes ? ` (${item.notes})` : ''}`;
+    }
+    allEvents.push(item);
   });
 
   (state.supplierReturns || []).forEach(sr => {
@@ -7624,10 +8374,1527 @@ function refreshAllUI() {
   renderSalesTable();
   renderPurchasesTable();
   renderSupplierReturnsTable();
+  renderSareeHub();
   renderExpensesTable();
   renderKhataTables();
   updatePartiesDatalist();
   updateSuppliersDatalist();
+  updateSareeShopsDatalist();
+}
+
+// ==================== 5B. SAREE & KURTI HUB BUSINESS LOGIC ====================
+let activeSareeSubTab = 'orders';
+
+function switchSareeSubTab(tab) {
+  activeSareeSubTab = tab;
+
+  const tabs = ['orders', 'purchases', 'exchanges', 'khata'];
+  tabs.forEach(t => {
+    const sec = document.getElementById(`saree${t.charAt(0).toUpperCase() + t.slice(1)}Section`);
+    const btn = document.getElementById(`saree-subtab-${t}`);
+    if (sec) {
+      if (t === tab) sec.classList.remove("hidden");
+      else sec.classList.add("hidden");
+    }
+    if (btn) {
+      if (t === tab) {
+        btn.className = "py-1.5 px-3.5 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-sm bg-white text-slate-900 border border-slate-200";
+      } else {
+        btn.className = "py-1.5 px-3.5 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900";
+      }
+    }
+  });
+
+  renderSareeHub();
+}
+
+function renderSareeHub() {
+  const curMonth = new Date().toISOString().slice(0, 7);
+
+  // 1. Pending Daily Orders Metrics
+  const pendingOrders = (state.sareeOrders || []).filter(o => o.status === 'Pending');
+  const pendingPcs = pendingOrders.reduce((sum, o) => sum + (Number(o.qty) || 0), 0);
+  const mPending = document.getElementById("sareeMetricPendingOrders");
+  const mPendingCount = document.getElementById("sareeMetricPendingOrdersCount");
+  const navBadge = document.getElementById("sareePendingBadge");
+
+  if (mPending) mPending.textContent = `${pendingPcs} Pcs`;
+  if (mPendingCount) mPendingCount.textContent = `${pendingOrders.length}`;
+  if (navBadge) {
+    if (pendingPcs > 0) {
+      navBadge.classList.remove("hidden");
+      navBadge.textContent = pendingPcs;
+    } else {
+      navBadge.classList.add("hidden");
+    }
+  }
+
+  // 2. Monthly Saree Purchases Metrics
+  const monthPurchases = (state.sareePurchases || []).filter(p => (p.date || '').startsWith(curMonth));
+  const monthPurchasesTotal = monthPurchases.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
+  let monthPcs = 0;
+  monthPurchases.forEach(p => {
+    (p.items || []).forEach(it => { monthPcs += (Number(it.qty) || 0); });
+  });
+
+  const mPurch = document.getElementById("sareeMetricMonthPurchases");
+  const mPurchPcs = document.getElementById("sareeMetricTotalPcsBought");
+  if (mPurch) mPurch.textContent = formatCurrency(monthPurchasesTotal);
+  if (mPurchPcs) mPurchPcs.textContent = `${monthPcs}`;
+
+  // 3. Pending Shop Exchanges Metrics
+  const pendingExchanges = (state.sareeExchanges || []).filter(e => e.status === 'pending_at_office');
+  const pendingExVal = pendingExchanges.reduce((sum, e) => sum + (Number(e.returnVal) || 0), 0);
+  const mExc = document.getElementById("sareeMetricPendingExchanges");
+  const mExcVal = document.getElementById("sareeMetricPendingExchangesVal");
+  if (mExc) mExc.textContent = `${pendingExchanges.length} Pcs`;
+  if (mExcVal) mExcVal.textContent = formatCurrency(pendingExVal);
+
+  // 4. Saree Shops Net Due Calculation
+  const shopsMap = new Map();
+  (state.sareeShops || []).forEach(s => {
+    const k = (s.name || '').trim().toLowerCase();
+    if (k) {
+      shopsMap.set(k, { name: s.name.trim(), totalPurchased: 0, totalPaid: 0, totalExchanges: 0, totalDue: 0 });
+    }
+  });
+
+  (state.sareePurchases || []).forEach(p => {
+    const name = (p.shopName || '').trim();
+    if (!name) return;
+    const k = name.toLowerCase();
+    if (!shopsMap.has(k)) {
+      shopsMap.set(k, { name, totalPurchased: 0, totalPaid: 0, totalExchanges: 0, totalDue: 0 });
+    }
+    const sup = shopsMap.get(k);
+    const total = Number(p.totalAmount) || 0;
+    const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
+    const due = Math.max(0, total - paid);
+    sup.totalPurchased += total;
+    sup.totalPaid += paid;
+    sup.totalDue += due;
+  });
+
+  (state.sareeExchanges || []).forEach(se => {
+    const name = (se.shopName || '').trim();
+    if (!name) return;
+    const k = name.toLowerCase();
+    if (shopsMap.has(k) && se.exchangeMode === 'credit_note') {
+      const sup = shopsMap.get(k);
+      const retVal = Number(se.returnVal) || 0;
+      sup.totalExchanges += retVal;
+      sup.totalDue = Math.max(0, sup.totalDue - retVal);
+    }
+  });
+
+  let totalShopsDue = 0;
+  let shopsDueCount = 0;
+  shopsMap.forEach(s => {
+    totalShopsDue += s.totalDue;
+    if (s.totalDue > 0) shopsDueCount++;
+  });
+
+  const mShopsDue = document.getElementById("sareeMetricShopsDue");
+  const mShopsDueCount = document.getElementById("sareeMetricShopsDueCount");
+  if (mShopsDue) mShopsDue.textContent = formatCurrency(totalShopsDue);
+  if (mShopsDueCount) mShopsDueCount.textContent = `${shopsDueCount}`;
+
+  // Render Sub-Tables
+  renderSareeOrdersTable();
+  renderSareePurchasesTable();
+  renderSareeExchangesTable();
+  renderSareeShopsKhataTable();
+  updateSareeShopsDatalist();
+}
+
+// -------------------- DAILY BUYING LIST (ORDERS) --------------------
+function renderSareeOrdersTable() {
+  const tbody = document.getElementById("sareeOrdersTableBody");
+  if (!tbody) return;
+
+  const search = (document.getElementById("sareeSearchInput")?.value || "").toLowerCase().trim();
+  const filterStatus = document.getElementById("sareeOrdersFilterStatus")?.value || "all";
+
+  let orders = (state.sareeOrders || []).filter(o => {
+    const matchSearch = !search ||
+      (o.itemTitle || '').toLowerCase().includes(search) ||
+      (o.designNo || '').toLowerCase().includes(search) ||
+      (o.shopName || '').toLowerCase().includes(search) ||
+      (o.orderNo || '').toLowerCase().includes(search) ||
+      (o.platform || '').toLowerCase().includes(search);
+    const matchStatus = filterStatus === 'all' || o.status === filterStatus;
+    return matchSearch && matchStatus;
+  });
+
+  orders.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  if (orders.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400">No saree/kurti orders found matching filter.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = orders.map(o => {
+    const isPending = o.status === 'Pending';
+    const statusBadge = isPending
+      ? `<span class="badge-status badge-pending"><i class="fa-solid fa-clock text-[10px]"></i> Pending to Buy</span>`
+      : `<span class="badge-status badge-paid"><i class="fa-solid fa-check text-[10px]"></i> Purchased</span>`;
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td>
+          <span class="font-bold text-slate-900 block">${formatDate(o.date)}</span>
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${o.platform === 'Meesho' ? 'bg-pink-50 text-pink-700 border border-pink-200' : 'bg-slate-100 text-slate-700'}">${escapeHtml(o.platform || 'Online')}</span>
+        </td>
+        <td>
+          <span class="font-mono text-xs font-semibold text-slate-800">${escapeHtml(o.orderNo || '-')}</span>
+        </td>
+        <td>
+          <div class="font-bold text-slate-900 text-xs sm:text-sm">${escapeHtml(o.itemTitle)}</div>
+          ${o.designNo ? `<span class="text-[11px] font-mono text-pink-700 font-bold">Design #${escapeHtml(o.designNo)}</span>` : ''}
+          ${o.notes ? `<span class="text-[10px] text-slate-400 block">${escapeHtml(o.notes)}</span>` : ''}
+        </td>
+        <td class="text-slate-600 text-xs">
+          ${escapeHtml(o.color || '-')}${o.size ? ` / <b class="text-slate-800">${escapeHtml(o.size)}</b>` : ''}
+        </td>
+        <td class="text-center font-mono font-bold text-pink-700 text-sm">
+          ${o.qty || 1}
+        </td>
+        <td>
+          <span class="font-bold text-slate-900 flex items-center gap-1">
+            <i class="fa-solid fa-store text-pink-600 text-xs"></i> ${escapeHtml(o.shopName || '-')}
+          </span>
+          ${o.estimatedCost ? `<span class="text-[10px] text-slate-400 font-mono">Est: ${formatCurrency(o.estimatedCost)}/pc</span>` : ''}
+        </td>
+        <td class="text-center">${statusBadge}</td>
+        <td class="text-center space-x-1 whitespace-nowrap">
+          ${isPending ? `
+            <button onclick="quickConvertOrderToPurchase('${o.id}')" class="btn-solid-primary text-[11px] py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs cursor-pointer" title="Buy from shop & add purchase memo">
+              <i class="fa-solid fa-cart-shopping mr-1"></i> Mark Bought
+            </button>
+          ` : `
+            <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              <i class="fa-solid fa-check mr-1"></i> Bought
+            </span>
+          `}
+          <button onclick="openSareeOrderModal('${o.id}')" class="p-1 text-slate-400 hover:text-indigo-600 rounded" title="Edit">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button onclick="deleteSareeOrder('${o.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded" title="Delete">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openSareeOrderModal(orderId = null) {
+  const form = document.getElementById("sareeOrderForm");
+  if (form) form.reset();
+
+  const title = document.getElementById("sareeOrderModalTitle");
+  const editIdInput = document.getElementById("sareeOrderEditId");
+  const dateInput = document.getElementById("sareeOrderDate");
+  const qtyInput = document.getElementById("sareeOrderQty");
+
+  if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+  if (qtyInput) qtyInput.value = 1;
+
+  if (orderId) {
+    const ord = (state.sareeOrders || []).find(o => o.id === orderId);
+    if (ord) {
+      if (title) title.innerHTML = `<i class="fa-solid fa-pen-to-square text-pink-600"></i> Edit Saree/Kurti Order`;
+      if (editIdInput) editIdInput.value = ord.id;
+      if (dateInput) dateInput.value = ord.date || "";
+      document.getElementById("sareeOrderPlatform").value = ord.platform || "Meesho";
+      document.getElementById("sareeOrderRef").value = ord.orderNo || "";
+      document.getElementById("sareeOrderShop").value = ord.shopName || "";
+      document.getElementById("sareeOrderItemTitle").value = ord.itemTitle || "";
+      document.getElementById("sareeOrderDesignNo").value = ord.designNo || "";
+      document.getElementById("sareeOrderColor").value = ord.color || "";
+      document.getElementById("sareeOrderQty").value = ord.qty || 1;
+      document.getElementById("sareeOrderEstCost").value = ord.estimatedCost || "";
+      document.getElementById("sareeOrderNotes").value = ord.notes || "";
+    }
+  } else {
+    if (title) title.innerHTML = `<i class="fa-solid fa-cart-plus text-pink-600"></i> Add Daily Saree/Kurti Order (ઓર્ડર એન્ટ્રી)`;
+    if (editIdInput) editIdInput.value = "";
+  }
+
+  updateSareeShopsDatalist();
+  openModal('sareeOrderModal');
+}
+
+function handleSaveSareeOrder(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  try {
+    const editId = document.getElementById("sareeOrderEditId")?.value.trim() || "";
+    const date = document.getElementById("sareeOrderDate")?.value || new Date().toISOString().split('T')[0];
+    const platform = document.getElementById("sareeOrderPlatform")?.value || "Meesho";
+    const orderNo = document.getElementById("sareeOrderRef")?.value.trim() || "";
+    const shopName = document.getElementById("sareeOrderShop")?.value.trim() || "";
+    const itemTitle = document.getElementById("sareeOrderItemTitle")?.value.trim() || "";
+    const designNo = document.getElementById("sareeOrderDesignNo")?.value.trim() || "";
+    const color = document.getElementById("sareeOrderColor")?.value.trim() || "";
+    const qty = parseInt(document.getElementById("sareeOrderQty")?.value) || 1;
+    const estimatedCost = parseFloat(document.getElementById("sareeOrderEstCost")?.value) || 0;
+    const notes = document.getElementById("sareeOrderNotes")?.value.trim() || "";
+
+    if (!itemTitle) {
+      showToast("Please enter Saree/Kurti item name!", true);
+      return;
+    }
+    if (!shopName) {
+      showToast("Please select target shop!", true);
+      return;
+    }
+
+    // Auto-save shop in directory if not present
+    ensureSareeShopExists(shopName);
+
+    if (!state.sareeOrders) state.sareeOrders = [];
+
+    if (editId) {
+      const ord = state.sareeOrders.find(o => o.id === editId);
+      if (ord) {
+        ord.date = date;
+        ord.platform = platform;
+        ord.orderNo = orderNo;
+        ord.shopName = shopName;
+        ord.itemTitle = itemTitle;
+        ord.designNo = designNo;
+        ord.color = color;
+        ord.qty = qty;
+        ord.estimatedCost = estimatedCost;
+        ord.notes = notes;
+        showToast("Saree order requirement updated!");
+      }
+    } else {
+      state.sareeOrders.push({
+        id: "sord_" + Date.now(),
+        date,
+        platform,
+        orderNo,
+        shopName,
+        itemTitle,
+        designNo,
+        color,
+        qty,
+        estimatedCost,
+        status: 'Pending',
+        purchaseId: null,
+        notes
+      });
+      showToast(`Added order: ${itemTitle} (${qty} pcs) to buying list!`);
+    }
+
+    saveState();
+    closeModal('sareeOrderModal');
+    refreshAllUI();
+  } catch (err) {
+    console.error("Error saving saree order:", err);
+    showToast("Error saving order: " + err.message, true);
+  }
+}
+
+function deleteSareeOrder(orderId) {
+  if (confirm("Are you sure you want to delete this saree order requirement?")) {
+    state.sareeOrders = (state.sareeOrders || []).filter(o => o.id !== orderId);
+    saveState();
+    refreshAllUI();
+    showToast("Order removed from buying list.");
+  }
+}
+
+function quickConvertOrderToPurchase(orderId) {
+  const ord = (state.sareeOrders || []).find(o => o.id === orderId);
+  if (!ord) return;
+
+  openSareePurchaseModal(null, {
+    linkedOrderId: ord.id,
+    shopName: ord.shopName,
+    items: [{
+      designNo: ord.designNo || "",
+      itemTitle: ord.itemTitle || "",
+      qty: ord.qty || 1,
+      costPrice: ord.estimatedCost || 0
+    }]
+  });
+}
+
+// -------------------- SHOP PURCHASES & BILLS --------------------
+function renderSareePurchasesTable() {
+  const tbody = document.getElementById("sareePurchasesTableBody");
+  if (!tbody) return;
+
+  const search = (document.getElementById("sareeSearchInput")?.value || "").toLowerCase().trim();
+  const filterPayment = document.getElementById("sareePurchasesFilterPayment")?.value || "all";
+
+  let purchases = (state.sareePurchases || []).filter(p => {
+    const matchSearch = !search ||
+      (p.shopName || '').toLowerCase().includes(search) ||
+      (p.memoNo || '').toLowerCase().includes(search) ||
+      (p.items || []).some(it => (it.itemTitle || '').toLowerCase().includes(search) || (it.designNo || '').toLowerCase().includes(search));
+    const matchPayment = filterPayment === 'all' || p.paymentStatus === filterPayment;
+    return matchSearch && matchPayment;
+  });
+
+  purchases.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  if (purchases.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">No saree shop purchases found matching filter.</td></tr>`;
+    return;
+  }
+
+  const p1 = state.settings.partner1Name || "Kenil";
+  const p2 = state.settings.partner2Name || "Alpesh";
+
+  tbody.innerHTML = purchases.map(p => {
+    const total = Number(p.totalAmount) || 0;
+    const paid = Number(p.paidAmount) || 0;
+    const due = Math.max(0, total - paid);
+
+    let statusBadge = `<span class="badge-status badge-paid">Fully Paid</span>`;
+    if (p.paymentStatus === 'Pending' || due === total) {
+      statusBadge = `<span class="badge-status badge-pending">Due: ${formatCurrency(due)}</span>`;
+    } else if (p.paymentStatus === 'Partial' || due > 0) {
+      statusBadge = `<span class="badge-status badge-partial">Due: ${formatCurrency(due)}</span>`;
+    }
+
+    const payerLabel = p.paidBy === 'partner1' ? p1 : (p.paidBy === 'partner2' ? p2 : 'Business A/c');
+    const itemsText = (p.items || []).map(it => `${escapeHtml(it.itemTitle || 'Saree')} ${it.designNo ? `(${escapeHtml(it.designNo)})` : ''} - ${it.qty} pcs @ ₹${it.costPrice}`).join('<br>');
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td>
+          <span class="font-bold text-slate-900 block font-mono">${formatDate(p.date)}</span>
+        </td>
+        <td>
+          <div class="font-bold text-slate-900 flex items-center gap-1">
+            <i class="fa-solid fa-store text-pink-600 text-xs"></i> ${escapeHtml(p.shopName)}
+          </div>
+          ${p.marketName ? `<span class="text-[10px] text-slate-400 block">${escapeHtml(p.marketName)}</span>` : ''}
+        </td>
+        <td>
+          <span class="font-mono text-xs font-bold text-slate-800">${escapeHtml(p.memoNo || '-')}</span>
+        </td>
+        <td class="text-xs text-slate-700 leading-relaxed">
+          ${itemsText || '-'}
+        </td>
+        <td class="text-right font-mono font-bold text-slate-900">${formatCurrency(total)}</td>
+        <td class="text-right font-mono font-bold text-emerald-700">${formatCurrency(paid)}</td>
+        <td class="text-center">
+          <span class="badge-status badge-neutral text-xs font-medium">${escapeHtml(payerLabel)}</span>
+        </td>
+        <td class="text-center">${statusBadge}</td>
+        <td class="text-center space-x-1 whitespace-nowrap">
+          <button onclick="openSareePurchaseModal('${p.id}')" class="p-1 text-slate-400 hover:text-indigo-600 rounded" title="Edit">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button onclick="deleteSareePurchase('${p.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded" title="Delete">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openSareePurchaseModal(purchaseId = null, prefilled = null) {
+  const form = document.getElementById("sareePurchaseForm");
+  if (form) form.reset();
+
+  const title = document.getElementById("sareePurchaseModalTitle");
+  const editIdInput = document.getElementById("sareePurchaseEditId");
+  const linkedOrderInput = document.getElementById("sareePurchaseLinkedOrderId");
+  const dateInput = document.getElementById("sareePurchaseDate");
+  const container = document.getElementById("sareePurchaseItemsContainer");
+
+  if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+  if (container) container.innerHTML = "";
+
+  const p1 = state.settings.partner1Name || "Kenil (You)";
+  const p2 = state.settings.partner2Name || "Alpesh";
+  const p1Lbl = document.getElementById("sareeP1Label");
+  const p2Lbl = document.getElementById("sareeP2Label");
+  if (p1Lbl) p1Lbl.textContent = p1;
+  if (p2Lbl) p2Lbl.textContent = p2;
+
+  if (purchaseId) {
+    const purch = (state.sareePurchases || []).find(p => p.id === purchaseId);
+    if (purch) {
+      if (title) title.innerHTML = `<i class="fa-solid fa-pen-to-square text-indigo-600"></i> Edit Saree Shop Purchase`;
+      if (editIdInput) editIdInput.value = purch.id;
+      if (linkedOrderInput) linkedOrderInput.value = "";
+      if (dateInput) dateInput.value = purch.date || "";
+      document.getElementById("sareePurchaseShop").value = purch.shopName || "";
+      document.getElementById("sareePurchaseMemoNo").value = purch.memoNo || "";
+      document.getElementById("sareePurchasePaymentStatus").value = purch.paymentStatus || "Paid";
+      document.getElementById("sareePurchasePaidAmount").value = purch.paidAmount !== undefined ? purch.paidAmount : purch.totalAmount;
+      document.getElementById("sareePurchaseNotes").value = purch.notes || "";
+
+      const radio = form.querySelector(`input[name="sareePurchasePaidBy"][value="${purch.paidBy || 'partner1'}"]`);
+      if (radio) radio.checked = true;
+
+      if (purch.items && Array.isArray(purch.items) && purch.items.length > 0) {
+        purch.items.forEach(it => addSareePurchaseItemRow(it));
+      } else {
+        addSareePurchaseItemRow();
+      }
+    }
+  } else if (prefilled) {
+    if (title) title.innerHTML = `<i class="fa-solid fa-bag-shopping text-indigo-600"></i> New Saree Shop Purchase`;
+    if (editIdInput) editIdInput.value = "";
+    if (linkedOrderInput) linkedOrderInput.value = prefilled.linkedOrderId || "";
+    document.getElementById("sareePurchaseShop").value = prefilled.shopName || "";
+    document.getElementById("sareePurchasePaymentStatus").value = "Paid";
+    document.getElementById("sareePurchaseNotes").value = "";
+
+    if (prefilled.items && Array.isArray(prefilled.items)) {
+      prefilled.items.forEach(it => addSareePurchaseItemRow(it));
+    } else {
+      addSareePurchaseItemRow();
+    }
+  } else {
+    if (title) title.innerHTML = `<i class="fa-solid fa-bag-shopping text-indigo-600"></i> New Saree Shop Purchase (દુકાનેથી ખરીદી)`;
+    if (editIdInput) editIdInput.value = "";
+    if (linkedOrderInput) linkedOrderInput.value = "";
+    document.getElementById("sareePurchasePaymentStatus").value = "Paid";
+    addSareePurchaseItemRow();
+  }
+
+  updateSareeShopsDatalist();
+  recalcSareePurchaseBill();
+  toggleSareePurchasePaymentUI();
+  openModal('sareePurchaseModal');
+}
+
+function addSareePurchaseItemRow(item = null) {
+  const container = document.getElementById("sareePurchaseItemsContainer");
+  if (!container) return;
+
+  const rowId = "sp_item_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+  const row = document.createElement("div");
+  row.className = "p-2.5 bg-white rounded-lg border border-slate-200 shadow-2xs grid grid-cols-1 sm:grid-cols-12 gap-2 items-center saree-purchase-item-row";
+  row.id = rowId;
+
+  const designNo = item ? (item.designNo || "") : "";
+  const itemTitle = item ? (item.itemTitle || "") : "";
+  const qty = item ? (item.qty || 1) : 1;
+  const costPrice = item ? (item.costPrice || "") : "";
+  const total = item ? (item.total || (qty * (Number(costPrice) || 0))) : 0;
+
+  row.innerHTML = `
+    <div class="sm:col-span-3">
+      <input type="text" placeholder="Design / Catalog #" value="${escapeHtml(designNo)}" class="input-pro py-1 text-xs font-mono font-bold sp-item-design" placeholder="D-101">
+    </div>
+    <div class="sm:col-span-4">
+      <input type="text" placeholder="Saree/Kurti Item Title *" value="${escapeHtml(itemTitle)}" required class="input-pro py-1 text-xs font-semibold sp-item-title">
+    </div>
+    <div class="sm:col-span-2">
+      <input type="number" min="1" value="${qty}" oninput="recalcSareePurchaseBill()" placeholder="Qty" required class="input-pro py-1 text-xs text-center font-bold font-mono sp-item-qty">
+    </div>
+    <div class="sm:col-span-2">
+      <input type="number" min="0" step="any" value="${costPrice}" oninput="recalcSareePurchaseBill()" placeholder="₹ Rate" required class="input-pro py-1 text-xs text-right font-mono font-bold sp-item-cost">
+    </div>
+    <div class="sm:col-span-1 text-right flex items-center justify-end gap-1">
+      <span class="text-xs font-bold font-mono text-slate-800 hidden sm:inline sp-item-total">₹${total}</span>
+      <button type="button" onclick="removeSareePurchaseItemRow('${rowId}')" class="text-slate-400 hover:text-rose-600 p-1" title="Remove">
+        <i class="fa-solid fa-trash-can text-xs"></i>
+      </button>
+    </div>
+  `;
+
+  container.appendChild(row);
+  recalcSareePurchaseBill();
+}
+
+function removeSareePurchaseItemRow(rowId) {
+  const row = document.getElementById(rowId);
+  if (row) {
+    row.remove();
+    recalcSareePurchaseBill();
+  }
+}
+
+function recalcSareePurchaseBill() {
+  const rows = document.querySelectorAll(".saree-purchase-item-row");
+  let totalPcs = 0;
+  let totalAmount = 0;
+
+  rows.forEach(r => {
+    const qty = parseInt(r.querySelector(".sp-item-qty")?.value) || 0;
+    const cost = parseFloat(r.querySelector(".sp-item-cost")?.value) || 0;
+    const itemTotal = qty * cost;
+    totalPcs += qty;
+    totalAmount += itemTotal;
+
+    const totalEl = r.querySelector(".sp-item-total");
+    if (totalEl) totalEl.textContent = formatCurrency(itemTotal);
+  });
+
+  const totalDisplay = document.getElementById("sareePurchaseTotalDisplay");
+  const pcsDisplay = document.getElementById("sareePurchaseTotalPcs");
+  const paidInput = document.getElementById("sareePurchasePaidAmount");
+  const statusSelect = document.getElementById("sareePurchasePaymentStatus");
+
+  if (totalDisplay) totalDisplay.textContent = formatCurrency(totalAmount);
+  if (pcsDisplay) pcsDisplay.textContent = `${totalPcs} pcs`;
+
+  if (statusSelect && statusSelect.value === 'Paid' && paidInput) {
+    paidInput.value = totalAmount;
+  }
+}
+
+function toggleSareePurchasePaymentUI() {
+  const status = document.getElementById("sareePurchasePaymentStatus")?.value || "Paid";
+  const paidInput = document.getElementById("sareePurchasePaidAmount");
+  const paidBySection = document.getElementById("sareePurchasePaidBySection");
+
+  if (status === 'Paid') {
+    recalcSareePurchaseBill();
+    if (paidBySection) paidBySection.classList.remove("hidden");
+  } else if (status === 'Pending') {
+    if (paidInput) paidInput.value = 0;
+    if (paidBySection) paidBySection.classList.add("hidden");
+  } else {
+    if (paidBySection) paidBySection.classList.remove("hidden");
+  }
+}
+
+function handleSaveSareePurchase(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  try {
+    const editId = document.getElementById("sareePurchaseEditId")?.value.trim() || "";
+    const linkedOrderId = document.getElementById("sareePurchaseLinkedOrderId")?.value.trim() || "";
+    const date = document.getElementById("sareePurchaseDate")?.value || new Date().toISOString().split('T')[0];
+    const shopName = document.getElementById("sareePurchaseShop")?.value.trim() || "";
+    const memoNo = document.getElementById("sareePurchaseMemoNo")?.value.trim() || "";
+    let paymentStatus = document.getElementById("sareePurchasePaymentStatus")?.value || "Paid";
+    let paidAmount = parseFloat(document.getElementById("sareePurchasePaidAmount")?.value) || 0;
+    const paidBy = document.querySelector('input[name="sareePurchasePaidBy"]:checked')?.value || "partner1";
+    const notes = document.getElementById("sareePurchaseNotes")?.value.trim() || "";
+
+    if (!shopName) {
+      showToast("Please enter shop name!", true);
+      return;
+    }
+
+    const itemRows = document.querySelectorAll(".saree-purchase-item-row");
+    const items = [];
+    let totalGross = 0;
+
+    itemRows.forEach(r => {
+      const designNo = r.querySelector(".sp-item-design")?.value.trim() || "";
+      const itemTitle = r.querySelector(".sp-item-title")?.value.trim() || "";
+      const qty = parseInt(r.querySelector(".sp-item-qty")?.value) || 0;
+      const costPrice = parseFloat(r.querySelector(".sp-item-cost")?.value) || 0;
+      if (!itemTitle || qty <= 0) return;
+
+      const total = qty * costPrice;
+      totalGross += total;
+      items.push({ designNo, itemTitle, qty, costPrice, total });
+    });
+
+    if (items.length === 0) {
+      showToast("Please add at least one saree/kurti item!", true);
+      return;
+    }
+
+    if (paidAmount >= totalGross) {
+      paymentStatus = 'Paid';
+      paidAmount = totalGross;
+    } else if (paidAmount <= 0) {
+      paymentStatus = 'Pending';
+      paidAmount = 0;
+    } else {
+      paymentStatus = 'Partial';
+    }
+
+    ensureSareeShopExists(shopName);
+
+    if (!state.sareePurchases) state.sareePurchases = [];
+
+    if (editId) {
+      const purch = state.sareePurchases.find(p => p.id === editId);
+      if (purch) {
+        purch.date = date;
+        purch.shopName = shopName;
+        purch.memoNo = memoNo;
+        purch.items = items;
+        purch.totalAmount = totalGross;
+        purch.paidAmount = paidAmount;
+        purch.paymentStatus = paymentStatus;
+        purch.paidBy = paidBy;
+        purch.notes = notes;
+        if (!purch.paymentHistory || purch.paymentHistory.length === 0) {
+          if (paidAmount > 0) purch.paymentHistory = [{ date, amount: paidAmount, paidBy, notes }];
+        }
+        showToast(`Purchase memo updated!`);
+      }
+    } else {
+      const newPurchaseId = "spurch_" + Date.now();
+      state.sareePurchases.push({
+        id: newPurchaseId,
+        date,
+        shopName,
+        memoNo: memoNo || `MEMO-${Date.now().toString().slice(-4)}`,
+        items,
+        totalAmount: totalGross,
+        paidAmount,
+        paymentStatus,
+        paidBy,
+        paymentHistory: paidAmount > 0 ? [{ date, amount: paidAmount, paidBy, notes }] : [],
+        notes
+      });
+
+      // If this purchase was linked from a daily order requirement, mark order as purchased
+      if (linkedOrderId) {
+        const ord = (state.sareeOrders || []).find(o => o.id === linkedOrderId);
+        if (ord) {
+          ord.status = 'Purchased';
+          ord.purchaseId = newPurchaseId;
+        }
+      }
+
+      showToast(`Saved shop purchase of ₹${totalGross} from ${shopName}!`);
+    }
+
+    saveState();
+    closeModal('sareePurchaseModal');
+    refreshAllUI();
+  } catch (err) {
+    console.error("Error saving saree purchase:", err);
+    showToast("Error saving purchase: " + err.message, true);
+  }
+}
+
+function deleteSareePurchase(purchaseId) {
+  if (confirm("Are you sure you want to delete this saree purchase memo?")) {
+    state.sareePurchases = (state.sareePurchases || []).filter(p => p.id !== purchaseId);
+    saveState();
+    refreshAllUI();
+    showToast("Saree purchase deleted.");
+  }
+}
+
+// -------------------- SHOP EXCHANGES & RETURNS --------------------
+function renderSareeExchangesTable() {
+  const tbody = document.getElementById("sareeExchangesTableBody");
+  if (!tbody) return;
+
+  const search = (document.getElementById("sareeSearchInput")?.value || "").toLowerCase().trim();
+  const filterStatus = document.getElementById("sareeExchangesFilterStatus")?.value || "all";
+
+  let exchanges = (state.sareeExchanges || []).filter(e => {
+    const matchSearch = !search ||
+      (e.shopName || '').toLowerCase().includes(search) ||
+      (e.returnedDesignNo || '').toLowerCase().includes(search) ||
+      (e.newDesignNo || '').toLowerCase().includes(search) ||
+      (e.itemTitle || '').toLowerCase().includes(search);
+    const matchStatus = filterStatus === 'all' || e.status === filterStatus;
+    return matchSearch && matchStatus;
+  });
+
+  exchanges.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  if (exchanges.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400">No saree returns/exchanges found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = exchanges.map(e => {
+    const isPending = e.status === 'pending_at_office';
+    const statusBadge = isPending
+      ? `<span class="badge-status badge-pending"><i class="fa-solid fa-box text-[10px]"></i> Pending with Us</span>`
+      : `<span class="badge-status badge-paid"><i class="fa-solid fa-check text-[10px]"></i> Exchanged at Shop</span>`;
+
+    const modeBadge = e.exchangeMode === 'exchange'
+      ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-rotate mr-1"></i> New Item Exchange</span>`
+      : `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200"><i class="fa-solid fa-receipt mr-1"></i> Shop Credit Note</span>`;
+
+    let exchangeDetail = '-';
+    if (e.exchangeMode === 'exchange') {
+      exchangeDetail = `<b class="text-slate-900">${escapeHtml(e.newDesignNo || 'New Saree')}</b> (₹${e.newCost || 0})`;
+      if (e.diffAmount > 0) exchangeDetail += ` <span class="text-rose-600 font-bold block text-[10px]">+₹${e.diffAmount} Paid</span>`;
+      else if (e.diffAmount < 0) exchangeDetail += ` <span class="text-emerald-600 font-bold block text-[10px]">-₹${Math.abs(e.diffAmount)} Credit</span>`;
+    } else {
+      exchangeDetail = `<span class="text-indigo-700 font-bold">Credited ₹${e.returnVal} in ledger</span>`;
+    }
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td>
+          <span class="font-bold text-slate-900 block font-mono">${formatDate(e.date)}</span>
+        </td>
+        <td>
+          <div class="font-bold text-slate-900 flex items-center gap-1">
+            <i class="fa-solid fa-store text-pink-600 text-xs"></i> ${escapeHtml(e.shopName)}
+          </div>
+        </td>
+        <td>
+          <div class="font-bold text-slate-900 text-xs">${escapeHtml(e.returnedDesignNo || e.itemTitle || 'Returned Saree')}</div>
+          ${e.notes ? `<span class="text-[10px] text-slate-400 block">${escapeHtml(e.notes)}</span>` : ''}
+        </td>
+        <td class="text-right font-mono font-bold text-rose-700">${formatCurrency(e.returnVal || 0)}</td>
+        <td>${modeBadge}</td>
+        <td class="text-xs">${exchangeDetail}</td>
+        <td class="text-center">${statusBadge}</td>
+        <td class="text-center space-x-1 whitespace-nowrap">
+          ${isPending ? `
+            <button onclick="markExchangeCompletedAtShop('${e.id}')" class="btn-solid-amber text-[11px] py-1 px-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-xs cursor-pointer" title="Mark as exchanged with shopkeeper">
+              <i class="fa-solid fa-check mr-1"></i> Done at Shop
+            </button>
+          ` : ''}
+          <button onclick="openSareeExchangeModal('${e.id}')" class="p-1 text-slate-400 hover:text-indigo-600 rounded" title="Edit">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button onclick="deleteSareeExchange('${e.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded" title="Delete">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openSareeExchangeModal(exchangeId = null) {
+  const form = document.getElementById("sareeExchangeForm");
+  if (form) form.reset();
+
+  const title = document.getElementById("sareeExchangeModalTitle");
+  const editIdInput = document.getElementById("sareeExchangeEditId");
+  const dateInput = document.getElementById("sareeExchangeDate");
+
+  if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+
+  if (exchangeId) {
+    const exc = (state.sareeExchanges || []).find(e => e.id === exchangeId);
+    if (exc) {
+      if (title) title.innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-600"></i> Edit Saree Exchange / Return`;
+      if (editIdInput) editIdInput.value = exc.id;
+      if (dateInput) dateInput.value = exc.date || "";
+      document.getElementById("sareeExchangeShop").value = exc.shopName || "";
+      document.getElementById("sareeExchangeReturnedDesign").value = exc.returnedDesignNo || "";
+      document.getElementById("sareeExchangeReturnVal").value = exc.returnVal || "";
+      document.getElementById("sareeExchangeMode").value = exc.exchangeMode || "exchange";
+      document.getElementById("sareeExchangeStatus").value = exc.status || "pending_at_office";
+      document.getElementById("sareeExchangeNewDesign").value = exc.newDesignNo || "";
+      document.getElementById("sareeExchangeNewCost").value = exc.newCost || "";
+      document.getElementById("sareeExchangeNotes").value = exc.notes || "";
+    }
+  } else {
+    if (title) title.innerHTML = `<i class="fa-solid fa-rotate text-amber-600"></i> Record Saree Return & Shop Exchange (દુકાને સાડી બદલી)`;
+    if (editIdInput) editIdInput.value = "";
+    document.getElementById("sareeExchangeMode").value = "exchange";
+    document.getElementById("sareeExchangeStatus").value = "pending_at_office";
+  }
+
+  updateSareeShopsDatalist();
+  toggleSareeExchangeModeUI();
+  calculateSareeExchangeDiff();
+  openModal('sareeExchangeModal');
+}
+
+function toggleSareeExchangeModeUI() {
+  const mode = document.getElementById("sareeExchangeMode")?.value || "exchange";
+  const newSection = document.getElementById("sareeExchangeNewItemSection");
+  if (newSection) {
+    if (mode === "exchange") newSection.classList.remove("hidden");
+    else newSection.classList.add("hidden");
+  }
+  calculateSareeExchangeDiff();
+}
+
+function calculateSareeExchangeDiff() {
+  const mode = document.getElementById("sareeExchangeMode")?.value || "exchange";
+  const returnVal = parseFloat(document.getElementById("sareeExchangeReturnVal")?.value) || 0;
+  const newCost = parseFloat(document.getElementById("sareeExchangeNewCost")?.value) || 0;
+  const diffEl = document.getElementById("sareeExchangeDiffDisplay");
+  const diffLbl = document.getElementById("sareeExchangeDiffLabel");
+
+  if (!diffEl) return;
+
+  if (mode === 'exchange') {
+    const diff = newCost - returnVal;
+    if (diff > 0) {
+      if (diffLbl) diffLbl.textContent = "Extra Money to Pay Shopkeeper:";
+      diffEl.textContent = `+${formatCurrency(diff)}`;
+      diffEl.className = "font-mono font-bold text-rose-700";
+    } else if (diff < 0) {
+      if (diffLbl) diffLbl.textContent = "Credit from Shopkeeper:";
+      diffEl.textContent = `-${formatCurrency(Math.abs(diff))}`;
+      diffEl.className = "font-mono font-bold text-emerald-700";
+    } else {
+      if (diffLbl) diffLbl.textContent = "Even Exchange:";
+      diffEl.textContent = "₹0 (No rate difference)";
+      diffEl.className = "font-mono font-bold text-slate-900";
+    }
+  } else {
+    if (diffLbl) diffLbl.textContent = "Shop Credit (Debit Note):";
+    diffEl.textContent = `-${formatCurrency(returnVal)}`;
+    diffEl.className = "font-mono font-bold text-indigo-700";
+  }
+}
+
+function handleSaveSareeExchange(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  try {
+    const editId = document.getElementById("sareeExchangeEditId")?.value.trim() || "";
+    const date = document.getElementById("sareeExchangeDate")?.value || new Date().toISOString().split('T')[0];
+    const shopName = document.getElementById("sareeExchangeShop")?.value.trim() || "";
+    const returnedDesignNo = document.getElementById("sareeExchangeReturnedDesign")?.value.trim() || "";
+    const returnVal = parseFloat(document.getElementById("sareeExchangeReturnVal")?.value) || 0;
+    const exchangeMode = document.getElementById("sareeExchangeMode")?.value || "exchange";
+    const status = document.getElementById("sareeExchangeStatus")?.value || "pending_at_office";
+    const newDesignNo = document.getElementById("sareeExchangeNewDesign")?.value.trim() || "";
+    const newCost = parseFloat(document.getElementById("sareeExchangeNewCost")?.value) || 0;
+    const notes = document.getElementById("sareeExchangeNotes")?.value.trim() || "";
+
+    if (!shopName) {
+      showToast("Please enter shop name!", true);
+      return;
+    }
+    if (!returnedDesignNo) {
+      showToast("Please enter returned saree title / design!", true);
+      return;
+    }
+    if (returnVal <= 0) {
+      showToast("Please enter return value!", true);
+      return;
+    }
+
+    const diffAmount = exchangeMode === 'exchange' ? (newCost - returnVal) : (-returnVal);
+
+    ensureSareeShopExists(shopName);
+
+    if (!state.sareeExchanges) state.sareeExchanges = [];
+
+    if (editId) {
+      const exc = state.sareeExchanges.find(x => x.id === editId);
+      if (exc) {
+        exc.date = date;
+        exc.shopName = shopName;
+        exc.returnedDesignNo = returnedDesignNo;
+        exc.returnVal = returnVal;
+        exc.exchangeMode = exchangeMode;
+        exc.status = status;
+        exc.newDesignNo = newDesignNo;
+        exc.newCost = newCost;
+        exc.diffAmount = diffAmount;
+        exc.notes = notes;
+        showToast("Saree exchange record updated!");
+      }
+    } else {
+      state.sareeExchanges.push({
+        id: "sexc_" + Date.now(),
+        date,
+        shopName,
+        returnedDesignNo,
+        returnVal,
+        exchangeMode,
+        status,
+        newDesignNo,
+        newCost,
+        diffAmount,
+        paidBy: 'partner1',
+        notes
+      });
+      showToast("Recorded saree return/exchange successfully!");
+    }
+
+    saveState();
+    closeModal('sareeExchangeModal');
+    refreshAllUI();
+  } catch (err) {
+    console.error("Error saving saree exchange:", err);
+    showToast("Error saving exchange: " + err.message, true);
+  }
+}
+
+function markExchangeCompletedAtShop(exchangeId) {
+  const exc = (state.sareeExchanges || []).find(e => e.id === exchangeId);
+  if (!exc) return;
+
+  exc.status = 'exchanged_at_shop';
+  saveState();
+  refreshAllUI();
+  showToast(`Marked ${exc.returnedDesignNo} as exchanged with shop!`);
+}
+
+function deleteSareeExchange(exchangeId) {
+  if (confirm("Are you sure you want to delete this exchange record?")) {
+    state.sareeExchanges = (state.sareeExchanges || []).filter(e => e.id !== exchangeId);
+    saveState();
+    refreshAllUI();
+    showToast("Exchange record deleted.");
+  }
+}
+
+// -------------------- SAREE SHOPS DIRECTORY & KHATA --------------------
+function ensureSareeShopExists(shopName) {
+  if (!shopName) return;
+  if (!state.sareeShops) state.sareeShops = [];
+  const k = shopName.trim().toLowerCase();
+  const exists = state.sareeShops.some(s => (s.name || '').trim().toLowerCase() === k);
+  if (!exists) {
+    state.sareeShops.push({
+      id: "sshop_" + Date.now(),
+      name: shopName.trim(),
+      phone: "",
+      marketName: "Surat Textile Market",
+      shopNo: "",
+      city: "Surat",
+      notes: ""
+    });
+  }
+}
+
+function updateSareeShopsDatalist() {
+  const dl = document.getElementById("sareeShopsDatalist");
+  if (!dl) return;
+
+  const names = new Set();
+  (state.sareeShops || []).forEach(s => { if (s.name) names.add(s.name.trim()); });
+  (state.sareePurchases || []).forEach(p => { if (p.shopName) names.add(p.shopName.trim()); });
+  (state.sareeOrders || []).forEach(o => { if (o.shopName) names.add(o.shopName.trim()); });
+
+  dl.innerHTML = Array.from(names).map(n => `<option value="${escapeHtml(n)}">`).join('');
+}
+
+function openSareeShopModal(shopId = null) {
+  const form = document.getElementById("sareeShopForm");
+  if (form) form.reset();
+
+  const title = document.getElementById("sareeShopModalTitle");
+  const editIdInput = document.getElementById("sareeShopEditId");
+
+  if (shopId) {
+    const shp = (state.sareeShops || []).find(s => s.id === shopId);
+    if (shp) {
+      if (title) title.innerHTML = `<i class="fa-solid fa-store text-pink-600"></i> Edit Saree Shop`;
+      if (editIdInput) editIdInput.value = shp.id;
+      document.getElementById("sareeShopName").value = shp.name || "";
+      document.getElementById("sareeShopPhone").value = shp.phone || "";
+      document.getElementById("sareeShopNo").value = shp.shopNo || "";
+      document.getElementById("sareeShopMarket").value = shp.marketName || "";
+      document.getElementById("sareeShopNotes").value = shp.notes || "";
+    }
+  } else {
+    if (title) title.innerHTML = `<i class="fa-solid fa-store text-pink-600"></i> Add Saree Shop (દુકાનદાર)`;
+    if (editIdInput) editIdInput.value = "";
+  }
+
+  openModal('sareeShopModal');
+}
+
+function handleSaveSareeShop(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  try {
+    const editId = document.getElementById("sareeShopEditId")?.value.trim() || "";
+    const name = document.getElementById("sareeShopName")?.value.trim() || "";
+    const phone = document.getElementById("sareeShopPhone")?.value.trim() || "";
+    const shopNo = document.getElementById("sareeShopNo")?.value.trim() || "";
+    const marketName = document.getElementById("sareeShopMarket")?.value.trim() || "";
+    const notes = document.getElementById("sareeShopNotes")?.value.trim() || "";
+
+    if (!name) {
+      showToast("Please enter shop name!", true);
+      return;
+    }
+
+    if (!state.sareeShops) state.sareeShops = [];
+
+    if (editId) {
+      const shp = state.sareeShops.find(s => s.id === editId);
+      if (shp) {
+        shp.name = name;
+        shp.phone = phone;
+        shp.shopNo = shopNo;
+        shp.marketName = marketName;
+        shp.notes = notes;
+        showToast(`Saree shop ${name} updated!`);
+      }
+    } else {
+      state.sareeShops.push({
+        id: "sshop_" + Date.now(),
+        name,
+        phone,
+        shopNo,
+        marketName,
+        city: "Surat",
+        notes
+      });
+      showToast(`Added saree shop: ${name}`);
+    }
+
+    saveState();
+    closeModal('sareeShopModal');
+    renderSareeShopsManageTable();
+    refreshAllUI();
+  } catch (err) {
+    console.error("Error saving saree shop:", err);
+    showToast("Error saving shop: " + err.message, true);
+  }
+}
+
+function deleteSareeShop(shopId) {
+  if (confirm("Are you sure you want to remove this shop from directory?")) {
+    state.sareeShops = (state.sareeShops || []).filter(s => s.id !== shopId);
+    saveState();
+    renderSareeShopsManageTable();
+    refreshAllUI();
+    showToast("Shop removed from directory.");
+  }
+}
+
+function openSareeShopsManageModal() {
+  renderSareeShopsManageTable();
+  openModal('sareeShopsManageModal');
+}
+
+function renderSareeShopsManageTable() {
+  const tbody = document.getElementById("sareeShopsManageTableBody");
+  if (!tbody) return;
+
+  const search = (document.getElementById("sareeShopsSearchInput")?.value || "").toLowerCase().trim();
+  let shops = (state.sareeShops || []).filter(s => {
+    return !search ||
+      (s.name || '').toLowerCase().includes(search) ||
+      (s.marketName || '').toLowerCase().includes(search) ||
+      (s.phone || '').includes(search);
+  });
+
+  if (shops.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400">No shops in directory. Click "+ Add New Shop".</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = shops.map(s => `
+    <tr>
+      <td class="font-bold text-slate-900">${escapeHtml(s.name)}</td>
+      <td class="text-slate-600 text-xs">${escapeHtml(s.marketName || '-')}</td>
+      <td class="font-mono text-xs">${escapeHtml(s.shopNo || '-')}</td>
+      <td class="font-mono text-xs">${escapeHtml(s.phone || '-')}</td>
+      <td class="text-slate-500 text-xs">${escapeHtml(s.notes || '-')}</td>
+      <td class="text-center space-x-1">
+        <button onclick="openSareeShopModal('${s.id}')" class="p-1 text-slate-400 hover:text-indigo-600 rounded" title="Edit">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </button>
+        <button onclick="deleteSareeShop('${s.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded" title="Delete">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderSareeShopsKhataTable() {
+  const tbody = document.getElementById("sareeShopsKhataTableBody");
+  if (!tbody) return;
+
+  const search = (document.getElementById("sareeSearchInput")?.value || "").toLowerCase().trim();
+
+  const shopsMap = new Map();
+
+  (state.sareeShops || []).forEach(s => {
+    const k = (s.name || '').trim().toLowerCase();
+    if (k) {
+      shopsMap.set(k, {
+        name: s.name.trim(),
+        market: s.marketName || '',
+        phone: s.phone || '',
+        memos: [],
+        totalPurchased: 0,
+        totalPaid: 0,
+        totalExchanges: 0,
+        totalDue: 0
+      });
+    }
+  });
+
+  (state.sareePurchases || []).forEach(p => {
+    const name = (p.shopName || '').trim();
+    if (!name) return;
+    const k = name.toLowerCase();
+    if (!shopsMap.has(k)) {
+      shopsMap.set(k, {
+        name,
+        market: p.marketName || '',
+        phone: '',
+        memos: [],
+        totalPurchased: 0,
+        totalPaid: 0,
+        totalExchanges: 0,
+        totalDue: 0
+      });
+    }
+    const sup = shopsMap.get(k);
+    const total = Number(p.totalAmount) || 0;
+    const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
+    const due = Math.max(0, total - paid);
+    sup.memos.push(p);
+    sup.totalPurchased += total;
+    sup.totalPaid += paid;
+    sup.totalDue += due;
+  });
+
+  (state.sareeExchanges || []).forEach(se => {
+    const name = (se.shopName || '').trim();
+    if (!name) return;
+    const k = name.toLowerCase();
+    if (shopsMap.has(k) && se.exchangeMode === 'credit_note') {
+      const sup = shopsMap.get(k);
+      const retVal = Number(se.returnVal) || 0;
+      sup.totalExchanges += retVal;
+      sup.totalDue = Math.max(0, sup.totalDue - retVal);
+    }
+  });
+
+  let shopsList = Array.from(shopsMap.values()).filter(s => {
+    return !search ||
+      s.name.toLowerCase().includes(search) ||
+      s.market.toLowerCase().includes(search) ||
+      s.phone.includes(search);
+  });
+
+  shopsList.sort((a, b) => b.totalDue - a.totalDue);
+
+  if (shopsList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">No saree shops found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = shopsList.map(s => {
+    const safeName = escapeHtml(s.name);
+    const encodedName = encodeURIComponent(s.name);
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td>
+          <div class="font-bold text-slate-900">${safeName}</div>
+        </td>
+        <td class="text-slate-600 text-xs">${escapeHtml(s.market || '-')}</td>
+        <td class="font-mono text-xs">${escapeHtml(s.phone || '-')}</td>
+        <td class="text-center font-mono font-bold text-slate-700 text-xs">${s.memos.length}</td>
+        <td class="text-right font-mono font-bold text-slate-900 text-xs">${formatCurrency(s.totalPurchased)}</td>
+        <td class="text-right font-mono font-bold text-emerald-700 text-xs">${formatCurrency(s.totalPaid)}</td>
+        <td class="text-right font-mono font-bold text-indigo-700 text-xs">${s.totalExchanges > 0 ? '-' + formatCurrency(s.totalExchanges) : '₹0'}</td>
+        <td class="text-right font-mono font-extrabold text-sm ${s.totalDue > 0 ? 'text-rose-700 bg-rose-50/50' : 'text-slate-400'}">
+          ${s.totalDue > 0 ? formatCurrency(s.totalDue) : '₹0 (Clear)'}
+        </td>
+        <td class="text-center space-x-1.5 whitespace-nowrap">
+          ${s.totalDue > 0 ? `
+            <button type="button" onclick="openSareeShopPayModal('${encodedName}')" class="btn-solid-primary text-[11px] py-1 px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs cursor-pointer">
+              <i class="fa-solid fa-money-bill-wave mr-1"></i> Pay
+            </button>
+          ` : `
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <i class="fa-solid fa-check mr-1"></i> Clear
+            </span>
+          `}
+          <button type="button" onclick="viewSareeShopStatement('${encodedName}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Statement">
+            <i class="fa-solid fa-file-invoice mr-0.5"></i> Statement
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openSareeShopPayModal(rawShopName) {
+  try {
+    let shopName = rawShopName ? decodeURIComponent(rawShopName) : "";
+
+    const unpaidMemos = (state.sareePurchases || [])
+      .filter(p => (p.shopName || '').trim().toLowerCase() === shopName.trim().toLowerCase())
+      .map(p => {
+        const total = Number(p.totalAmount) || 0;
+        const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
+        const due = Math.max(0, total - paid);
+        return { purchase: p, total, paid, due };
+      })
+      .filter(x => x.due > 0);
+
+    const totalDue = unpaidMemos.reduce((acc, x) => acc + x.due, 0);
+
+    // Factor in credit notes
+    let totalCreditNotes = 0;
+    (state.sareeExchanges || []).forEach(se => {
+      const name = (se.shopName || '').trim();
+      if (name.toLowerCase() === shopName.toLowerCase() && se.exchangeMode === 'credit_note') {
+        totalCreditNotes += Number(se.returnVal) || 0;
+      }
+    });
+
+    const netPayable = Math.max(0, totalDue - totalCreditNotes);
+
+    const p1 = state.settings.partner1Name || "Kenil (You)";
+    const p2 = state.settings.partner2Name || "Alpesh";
+    const p1Lbl = document.getElementById("sareeShopP1Label");
+    const p2Lbl = document.getElementById("sareeShopP2Label");
+    if (p1Lbl) p1Lbl.textContent = p1;
+    if (p2Lbl) p2Lbl.textContent = p2;
+
+    const nameInput = document.getElementById("sareeShopPayName");
+    const dispEl = document.getElementById("sareeShopPayDisplayName");
+    const dueEl = document.getElementById("sareeShopPayTotalDueDisplay");
+    const amtInput = document.getElementById("sareeShopPayAmount");
+    const dateInput = document.getElementById("sareeShopPayDate");
+    const notesInput = document.getElementById("sareeShopPayNotes");
+
+    if (nameInput) nameInput.value = shopName;
+    if (dispEl) dispEl.textContent = shopName;
+    if (dueEl) dueEl.textContent = formatCurrency(netPayable);
+    if (amtInput) amtInput.value = netPayable > 0 ? netPayable : "";
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+    if (notesInput) notesInput.value = "";
+
+    let breakdownText = unpaidMemos.length > 0
+      ? unpaidMemos.map(x => `Memo #${x.purchase.memoNo} (${formatDate(x.purchase.date)}): Due ${formatCurrency(x.due)}`).join(' | ')
+      : "No pending unpaid purchase memos found.";
+
+    if (totalCreditNotes > 0) {
+      breakdownText += ` | <span class="text-emerald-700 font-bold">Credit Notes: -${formatCurrency(totalCreditNotes)}</span>`;
+    }
+
+    const billsContainer = document.getElementById("sareeShopPayBillsSummaryText");
+    if (billsContainer) {
+      billsContainer.innerHTML = `<span class="font-semibold text-rose-900">Pending Memos (${unpaidMemos.length}):</span> ${breakdownText}`;
+    }
+
+    openModal('sareeShopPayModal');
+  } catch (err) {
+    console.error("Error opening saree shop pay modal:", err);
+    showToast("Error opening modal: " + err.message, true);
+  }
+}
+
+function handleSaveSareeShopPay(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  try {
+    const shopName = document.getElementById("sareeShopPayName")?.value.trim() || "";
+    const amount = parseFloat(document.getElementById("sareeShopPayAmount")?.value) || 0;
+    const date = document.getElementById("sareeShopPayDate")?.value || new Date().toISOString().split('T')[0];
+    const paidBy = document.querySelector('input[name="sareeShopPayPaidBy"]:checked')?.value || "partner1";
+    const method = document.getElementById("sareeShopPayMethod")?.value || "Google Pay / UPI";
+    const notes = document.getElementById("sareeShopPayNotes")?.value.trim() || "";
+
+    if (amount <= 0) {
+      showToast("Please enter a valid payment amount!", true);
+      return;
+    }
+
+    const p1 = state.settings.partner1Name || "Kenil";
+    const p2 = state.settings.partner2Name || "Alpesh";
+    const payerLabel = paidBy === 'partner1' ? p1 : (paidBy === 'partner2' ? p2 : 'Business Account');
+
+    const shopPurchases = (state.sareePurchases || [])
+      .filter(p => (p.shopName || '').trim().toLowerCase() === shopName.toLowerCase())
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    let remaining = amount;
+    shopPurchases.forEach(p => {
+      const total = Number(p.totalAmount) || 0;
+      const currentPaid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Paid' ? total : 0);
+      const due = Math.max(0, total - currentPaid);
+
+      if (due > 0 && remaining > 0) {
+        const applyAmt = Math.min(remaining, due);
+        const newPaid = currentPaid + applyAmt;
+        p.paidAmount = newPaid;
+        p.paidBy = paidBy;
+        if (newPaid >= total) p.paymentStatus = 'Paid';
+        else p.paymentStatus = 'Partial';
+
+        if (!p.paymentHistory) p.paymentHistory = [];
+        p.paymentHistory.push({
+          date,
+          amount: applyAmt,
+          paidBy,
+          method,
+          notes: notes || `Paid to shop by ${payerLabel}`
+        });
+
+        remaining -= applyAmt;
+      }
+    });
+
+    saveState();
+    closeModal('sareeShopPayModal');
+    refreshAllUI();
+    showToast(`Recorded payment of ₹${amount} to ${shopName} by ${payerLabel}!`);
+  } catch (err) {
+    console.error("Error saving saree shop payment:", err);
+    showToast("Error saving payment: " + err.message, true);
+  }
+}
+
+function viewSareeShopStatement(rawShopName) {
+  try {
+    const shopName = rawShopName ? decodeURIComponent(rawShopName) : "";
+    const content = document.getElementById("sareeShopStatementPrintContent");
+    const title = document.getElementById("sareeShopStatementModalTitle");
+    const bizName = state.settings.bizName || "Dwarkadhish Enterprise";
+
+    if (title) title.innerHTML = `<i class="fa-solid fa-store text-pink-600"></i> Saree Shop Statement: ${escapeHtml(shopName)}`;
+
+    const purchases = (state.sareePurchases || []).filter(p => (p.shopName || '').trim().toLowerCase() === shopName.toLowerCase());
+    const exchanges = (state.sareeExchanges || []).filter(e => (e.shopName || '').trim().toLowerCase() === shopName.toLowerCase());
+
+    const allEvents = [];
+
+    purchases.forEach(p => {
+      const total = Number(p.totalAmount) || 0;
+      const itemsDesc = (p.items || []).map(it => `${it.itemTitle || 'Saree'} (${it.qty} pcs)`).join(', ');
+      allEvents.push({
+        date: p.date,
+        type: 'Purchase Memo',
+        ref: p.memoNo || 'MEMO',
+        desc: itemsDesc || 'Saree Purchases',
+        purchaseAmt: total,
+        paidAmt: 0
+      });
+
+      if (p.paymentHistory && Array.isArray(p.paymentHistory) && p.paymentHistory.length > 0) {
+        p.paymentHistory.forEach(ph => {
+          allEvents.push({
+            date: ph.date || p.date,
+            type: 'Shop Payment',
+            ref: `Pay-${p.memoNo || ''}`,
+            desc: ph.notes || `Paid via ${ph.method || 'Online/Cash'}`,
+            purchaseAmt: 0,
+            paidAmt: Number(ph.amount) || 0
+          });
+        });
+      } else if (p.paidAmount > 0) {
+        allEvents.push({
+          date: p.date,
+          type: 'Shop Payment',
+          ref: `Pay-${p.memoNo || ''}`,
+          desc: `Paid on purchase date`,
+          purchaseAmt: 0,
+          paidAmt: Number(p.paidAmount) || 0
+        });
+      }
+    });
+
+    exchanges.forEach(se => {
+      if (se.exchangeMode === 'credit_note') {
+        allEvents.push({
+          date: se.date,
+          type: 'Return / Credit Note',
+          ref: 'Credit Note',
+          desc: `Returned: ${se.returnedDesignNo || 'Saree'}`,
+          purchaseAmt: 0,
+          paidAmt: Number(se.returnVal) || 0
+        });
+      } else if (se.exchangeMode === 'exchange') {
+        allEvents.push({
+          date: se.date,
+          type: 'Item Exchange',
+          ref: 'Exchange',
+          desc: `Exchanged ${se.returnedDesignNo || ''} with ${se.newDesignNo || ''} (Diff: ₹${se.diffAmount || 0})`,
+          purchaseAmt: se.diffAmount > 0 ? Number(se.diffAmount) : 0,
+          paidAmt: se.diffAmount < 0 ? Math.abs(Number(se.diffAmount)) : 0
+        });
+      }
+    });
+
+    allEvents.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    let totalPurchased = 0;
+    let totalPaid = 0;
+    let runningBal = 0;
+    const rows = [];
+
+    allEvents.forEach(ev => {
+      totalPurchased += ev.purchaseAmt;
+      totalPaid += ev.paidAmt;
+      runningBal += ev.purchaseAmt - ev.paidAmt;
+
+      rows.push({
+        date: ev.date,
+        type: ev.type,
+        ref: ev.ref,
+        desc: ev.desc,
+        purchaseAmt: ev.purchaseAmt,
+        paidAmt: ev.paidAmt,
+        balance: Math.max(0, runningBal)
+      });
+    });
+
+    const netPayable = Math.max(0, runningBal);
+
+    content.innerHTML = `
+      <div class="text-center pb-3 border-b border-slate-200 flex flex-col items-center">
+        <div class="w-14 h-14 rounded-full overflow-hidden border border-slate-200 mb-1 flex items-center justify-center bg-white">
+          <img src="logo.jpg" alt="Dwarkadhish Enterprise" class="w-full h-full object-cover">
+        </div>
+        <h2 class="text-base font-bold text-slate-900">${escapeHtml(bizName)}</h2>
+        <p class="text-xs text-slate-500">Saree & Kurti Shop Account Statement / સાડી દુકાનદાર ખાતાવહી</p>
+      </div>
+
+      <div class="grid grid-cols-2 text-xs py-2 gap-2 border-b border-slate-100">
+        <div>
+          <p><span class="text-slate-500">Shop / Firm:</span> <b class="text-slate-900 text-sm">${escapeHtml(shopName)}</b></p>
+          <p><span class="text-slate-500">Statement Date:</span> <b>${formatDate(new Date().toISOString().split('T')[0])}</b></p>
+        </div>
+        <div class="text-right">
+          <p><span class="text-slate-500">Total Purchases:</span> <b class="font-mono text-slate-900">${formatCurrency(totalPurchased)}</b></p>
+          <p><span class="text-slate-500">Total Paid/Credited:</span> <b class="font-mono text-emerald-700">${formatCurrency(totalPaid)}</b></p>
+          <p class="text-sm font-extrabold ${netPayable > 0 ? 'text-rose-700' : 'text-emerald-700'}">
+            Net Balance Due: ${formatCurrency(netPayable)}
+          </p>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 text-slate-600 border-b border-slate-200">
+              <th class="py-2 px-2">Date</th>
+              <th class="py-2 px-2">Type / Ref</th>
+              <th class="py-2 px-2">Particulars / Description</th>
+              <th class="py-2 px-2 text-right">Debit / Buy (₹)</th>
+              <th class="py-2 px-2 text-right">Credit / Paid (₹)</th>
+              <th class="py-2 px-2 text-right">Balance Due (₹)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-mono">
+            ${rows.map(r => `
+              <tr>
+                <td class="py-2 px-2 text-slate-600">${formatDate(r.date)}</td>
+                <td class="py-2 px-2 font-bold text-slate-800">${escapeHtml(r.ref)} <span class="text-[10px] block font-normal text-slate-400">${r.type}</span></td>
+                <td class="py-2 px-2 font-sans text-slate-600 text-[11px] max-w-xs">${escapeHtml(r.desc)}</td>
+                <td class="py-2 px-2 text-right font-bold text-slate-900">${r.purchaseAmt > 0 ? formatCurrency(r.purchaseAmt) : '-'}</td>
+                <td class="py-2 px-2 text-right font-bold text-emerald-700">${r.paidAmt > 0 ? formatCurrency(r.paidAmt) : '-'}</td>
+                <td class="py-2 px-2 text-right font-extrabold ${r.balance > 0 ? 'text-rose-700' : 'text-emerald-700'}">${formatCurrency(r.balance)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr class="bg-slate-50 font-bold border-t-2 border-slate-300 font-mono">
+              <td colspan="3" class="py-2 px-2 text-right font-sans">Total:</td>
+              <td class="py-2 px-2 text-right text-slate-900">${formatCurrency(totalPurchased)}</td>
+              <td class="py-2 px-2 text-right text-emerald-700">${formatCurrency(totalPaid)}</td>
+              <td class="py-2 px-2 text-right text-rose-700 font-extrabold">${formatCurrency(netPayable)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+
+    openModal('sareeShopStatementModal');
+  } catch (err) {
+    console.error("Error viewing saree shop statement:", err);
+    showToast("Error generating statement: " + err.message, true);
+  }
 }
 
 function escapeHtml(str) {
