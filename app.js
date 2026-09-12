@@ -7649,6 +7649,36 @@ function handleSavePartyLumpSumCollect(e) {
   }
 }
 
+function getAvailableDebitNotesForVendor(vendorName) {
+  if (!vendorName) return 0;
+  const vLower = vendorName.trim().toLowerCase();
+
+  let totalReturnsVal = 0;
+  (state.supplierReturns || []).forEach(sr => {
+    const name = (sr.vendor || sr.supplierName || '').trim().toLowerCase();
+    if (name === vLower) {
+      const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
+      if (isDebitNote) {
+        totalReturnsVal += Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || Number(sr.netReturnVal) || 0);
+      }
+    }
+  });
+
+  let totalAdjusted = 0;
+  (state.purchases || []).forEach(p => {
+    if ((p.vendor || '').trim().toLowerCase() === vLower) {
+      const pDeb = Number(p.debitNoteAdjusted) || 0;
+      let histDeb = 0;
+      if (Array.isArray(p.paymentHistory)) {
+        histDeb = p.paymentHistory.reduce((sum, ph) => sum + (Number(ph.debitAdjusted) || 0), 0);
+      }
+      totalAdjusted += Math.max(pDeb, histDeb);
+    }
+  });
+
+  return Math.max(0, Math.round((totalReturnsVal - totalAdjusted) * 100) / 100);
+}
+
 // 2. Lump-Sum Payment to Supplier / Vendor (FIFO across unpaid purchase bills)
 function populateSupplierLumpSumSelect(selectedVendor) {
   const select = document.getElementById("supplierLumpSumVendorSelect");
@@ -7703,36 +7733,6 @@ function updateSupplierLumpSumModalDetails(vendorName) {
       return { purchase: p, total, paid, due };
     })
     .filter(x => x.due > 0);
-
-function getAvailableDebitNotesForVendor(vendorName) {
-  if (!vendorName) return 0;
-  const vLower = vendorName.trim().toLowerCase();
-
-  let totalReturnsVal = 0;
-  (state.supplierReturns || []).forEach(sr => {
-    const name = (sr.vendor || sr.supplierName || '').trim().toLowerCase();
-    if (name === vLower) {
-      const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
-      if (isDebitNote) {
-        totalReturnsVal += Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || Number(sr.netReturnVal) || 0);
-      }
-    }
-  });
-
-  let totalAdjusted = 0;
-  (state.purchases || []).forEach(p => {
-    if ((p.vendor || '').trim().toLowerCase() === vLower) {
-      const pDeb = Number(p.debitNoteAdjusted) || 0;
-      let histDeb = 0;
-      if (Array.isArray(p.paymentHistory)) {
-        histDeb = p.paymentHistory.reduce((sum, ph) => sum + (Number(ph.debitAdjusted) || 0), 0);
-      }
-      totalAdjusted += Math.max(pDeb, histDeb);
-    }
-  });
-
-  return Math.max(0, Math.round((totalReturnsVal - totalAdjusted) * 100) / 100);
-}
 
   const totalDue = unpaidPurchases.reduce((acc, x) => acc + x.due, 0);
   const totalDebitNotes = getAvailableDebitNotesForVendor(vendorName);
