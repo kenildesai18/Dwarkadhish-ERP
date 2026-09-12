@@ -5167,6 +5167,53 @@ function reconcileSupplierReturnsAndBills() {
       });
     }
   }
+
+  // Automatic cleanup for accidental 12/09/2026 Akshar payment
+  if (!state._cleanedAccidentalAkshar20260912) {
+    let wasCleaned = false;
+    if (state.supplierPayments) {
+      const beforeLen = state.supplierPayments.length;
+      state.supplierPayments = state.supplierPayments.filter(sp => {
+        const isTarget = (sp.supplierName || '').trim().toLowerCase() === 'akshar' && 
+                         (sp.date === '2026-09-12' || sp.date === '12/09/2026');
+        return !isTarget;
+      });
+      if (state.supplierPayments.length < beforeLen) wasCleaned = true;
+    }
+
+    if (state.supplierAdvances) {
+      const beforeAdvLen = state.supplierAdvances.length;
+      state.supplierAdvances = state.supplierAdvances.filter(sa => {
+        const isTarget = (sa.supplierName || '').trim().toLowerCase() === 'akshar' && 
+                         (sa.date === '2026-09-12' || sa.date === '12/09/2026');
+        return !isTarget;
+      });
+      if (state.supplierAdvances.length < beforeAdvLen) wasCleaned = true;
+    }
+
+    (state.purchases || []).forEach(p => {
+      if ((p.vendor || '').trim().toLowerCase() === 'akshar') {
+        if (Array.isArray(p.paymentHistory)) {
+          const toRemove = p.paymentHistory.filter(ph => 
+            (ph.date === '2026-09-12' || ph.date === '12/09/2026')
+          );
+          if (toRemove.length > 0) {
+            const removedAmt = toRemove.reduce((sum, ph) => sum + (Number(ph.amount) || 0) + (Number(ph.debitAdjusted) || 0), 0);
+            p.paymentHistory = p.paymentHistory.filter(ph => !toRemove.includes(ph));
+            p.paidAmount = Math.max(0, (Number(p.paidAmount) || 0) - removedAmt);
+            const total = Number(p.totalAmount) || 0;
+            p.paymentStatus = p.paidAmount <= 0 ? 'Pending' : (p.paidAmount >= total ? 'Paid' : 'Partial');
+            wasCleaned = true;
+          }
+        }
+      }
+    });
+
+    state._cleanedAccidentalAkshar20260912 = true;
+    if (wasCleaned) {
+      saveState();
+    }
+  }
 }
 
 function renderPurchasesTable() {
@@ -7094,7 +7141,7 @@ function renderKhataTables() {
             <td><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200"><i class="fa-solid fa-wallet text-[10px]"></i> ${escapeHtml(receiverLabel)}</span></td>
             <td class="text-right font-mono font-extrabold text-emerald-700 text-sm">${formatCurrency(ev.amount)}</td>
             <td class="text-slate-600 text-xs max-w-xs truncate" title="${escapeHtml(ev.notes || '-')}">${escapeHtml(ev.notes || '-')}</td>
-            <td class="text-center">
+            <td class="text-center sticky right-0 bg-white z-10 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.12)] border-l border-slate-100 whitespace-nowrap">
               <button type="button" onclick="viewCustomerStatement('${encodedCust}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Ledger Statement">
                 <i class="fa-solid fa-file-invoice mr-0.5"></i> Statement
               </button>
@@ -7313,15 +7360,15 @@ function renderKhataTables() {
             <td class="text-right font-mono font-bold text-emerald-700 text-xs">${ev.debitAdjusted > 0 ? '-' + formatCurrency(ev.debitAdjusted) : '₹0'}</td>
             <td class="text-right font-mono font-extrabold text-slate-900 text-sm">${formatCurrency(ev.totalSettled)}</td>
             <td class="text-slate-600 text-xs max-w-xs truncate" title="${escapeHtml(ev.notes || '-')}">${escapeHtml(ev.notes || '-')}</td>
-            <td class="text-center space-x-1 whitespace-nowrap">
-              <button type="button" onclick="viewSupplierStatement('${encodedSup}')" class="btn-outline text-[11px] py-1 px-2 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Supplier Statement">
-                <i class="fa-solid fa-file-invoice mr-0.5"></i> Statement
+            <td class="text-center space-x-1.5 whitespace-nowrap sticky right-0 bg-white z-10 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.12)] border-l border-slate-100">
+              <button type="button" onclick="viewSupplierStatement('${encodedSup}')" class="btn-outline text-[11px] py-1 px-1.5 text-indigo-700 hover:bg-indigo-50 border-indigo-200 shadow-xs cursor-pointer" title="View Supplier Statement">
+                <i class="fa-solid fa-file-invoice"></i>
               </button>
               <button type="button" onclick="openEditSupplierPaymentModal('${encodedKey}')" class="btn-outline text-[11px] py-1 px-1.5 text-amber-700 hover:bg-amber-50 border-amber-200 shadow-xs cursor-pointer" title="Edit Payment">
                 <i class="fa-solid fa-pen-to-square"></i>
               </button>
-              <button type="button" onclick="deleteSupplierPayment('${encodedKey}')" class="btn-outline text-[11px] py-1 px-1.5 text-rose-700 hover:bg-rose-50 border-rose-200 shadow-xs cursor-pointer" title="Delete Payment">
-                <i class="fa-solid fa-trash-can"></i>
+              <button type="button" onclick="deleteSupplierPayment('${encodedKey}')" class="btn-solid-rose text-[11px] py-1 px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded shadow-xs cursor-pointer inline-flex items-center gap-1" title="Delete Payment (એન્ટ્રી ડિલીટ કરો)">
+                <i class="fa-solid fa-trash-can text-[10px]"></i> Delete
               </button>
             </td>
           </tr>
@@ -7941,21 +7988,34 @@ function deleteSupplierPayment(rawKey) {
 
     // Remove from state.supplierPayments
     if (state.supplierPayments) {
-      state.supplierPayments = state.supplierPayments.filter(sp => sp.id !== payEv.id && sp.id !== key);
+      state.supplierPayments = state.supplierPayments.filter(sp => 
+        sp.id !== payEv.id && 
+        sp.id !== key && 
+        !(sp.date === payEv.date && (sp.supplierName || '').trim().toLowerCase() === payEv.supplierName.toLowerCase() && Math.abs((Number(sp.totalAmount) || 0) - payEv.amount) < 1)
+      );
     }
 
     // Remove from state.supplierAdvances
     if (state.supplierAdvances) {
-      state.supplierAdvances = state.supplierAdvances.filter(sa => sa.id !== payEv.id && sa.batchId !== payEv.id && sa.id !== key && sa.batchId !== key);
+      state.supplierAdvances = state.supplierAdvances.filter(sa => 
+        sa.id !== payEv.id && 
+        sa.batchId !== payEv.id && 
+        sa.id !== key && 
+        sa.batchId !== key && 
+        !(sa.date === payEv.date && (sa.supplierName || '').trim().toLowerCase() === payEv.supplierName.toLowerCase())
+      );
     }
 
     // Rollback purchases paymentHistory and paidAmount
     (state.purchases || []).forEach(p => {
       if ((p.vendor || '').trim().toLowerCase() === payEv.supplierName.toLowerCase()) {
         if (Array.isArray(p.paymentHistory)) {
-          const matchingHistory = p.paymentHistory.filter(ph => ph.batchId === payEv.id || (payEv.bills.includes(`#${p.billNo}`) && ph.date === payEv.date));
+          const matchingHistory = p.paymentHistory.filter(ph => 
+            (ph.batchId && (ph.batchId === payEv.id || ph.batchId === key)) || 
+            (ph.date === payEv.date && (payEv.bills.some(b => b.includes(String(p.billNo))) || (ph.batchId && ph.batchId === payEv.id)))
+          );
           const removedAmt = matchingHistory.reduce((sum, ph) => sum + (Number(ph.amount) || 0) + (Number(ph.debitAdjusted) || 0), 0);
-          p.paymentHistory = p.paymentHistory.filter(ph => !(ph.batchId === payEv.id || (payEv.bills.includes(`#${p.billNo}`) && ph.date === payEv.date)));
+          p.paymentHistory = p.paymentHistory.filter(ph => !matchingHistory.includes(ph));
           if (removedAmt > 0) {
             p.paidAmount = Math.max(0, (Number(p.paidAmount) || 0) - removedAmt);
             const total = Number(p.totalAmount) || 0;
