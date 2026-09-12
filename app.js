@@ -5135,36 +5135,65 @@ function reconcileSupplierReturnsAndBills() {
   if (!state.customerPayments) state.customerPayments = [];
   if (!state.customerAdvances) state.customerAdvances = [];
 
-  // Migration for Akshar legacy payment on 30/08/2026:
-  // User paid ₹5,000 cash to Akshar on 30/08/2026, which settled 5 bills (#19, #20, #23, #26, #PB-111) totaling ₹4,495.
-  // Ensure the 5 bills share batchId 'akshar_batch_2026-08-30' and the remaining ₹505 is recorded as advance.
+  // Reconcile Akshar payment of ₹6,255 on 30/08/2026 (settled 6 bills: #19, #20, #23, #26, #PB-111, #PB-114):
   const aksharPurchases = (state.purchases || []).filter(p => (p.vendor || '').trim().toLowerCase() === 'akshar');
-  const aksharLegacyBills = ['19', '20', '23', '26', 'PB-111'];
-  const matchedBills = aksharPurchases.filter(p => aksharLegacyBills.includes(String(p.billNo).trim()));
+  const aksharBills6255 = ['19', '20', '23', '26', 'PB-111', 'PB-114'];
+  const matchedBills = aksharPurchases.filter(p => aksharBills6255.includes(String(p.billNo).trim()));
 
   if (matchedBills.length > 0) {
     matchedBills.forEach(p => {
-      if (Array.isArray(p.paymentHistory)) {
-        p.paymentHistory.forEach(ph => {
-          if ((ph.date === '2026-08-30' || ph.date === '30/08/2026') && (ph.method === 'Cash' || !ph.method)) {
-            ph.batchId = 'akshar_batch_2026-08-30';
-          }
+      p.paidAmount = Number(p.totalAmount) || 0;
+      p.paymentStatus = 'Paid';
+      if (!Array.isArray(p.paymentHistory)) p.paymentHistory = [];
+
+      const hist = p.paymentHistory.find(ph => ph.date === '2026-08-30' || ph.date === '30/08/2026' || ph.batchId === 'akshar_batch_2026-08-30');
+      if (hist) {
+        hist.batchId = 'akshar_batch_2026-08-30';
+        hist.date = '2026-08-30';
+        hist.method = 'Cash';
+        hist.paidBy = hist.paidBy || 'partner1';
+      } else {
+        const amt = String(p.billNo).trim() === '19' ? 97 : (Number(p.totalAmount) || 0);
+        p.paymentHistory.push({
+          batchId: 'akshar_batch_2026-08-30',
+          date: '2026-08-30',
+          amount: amt,
+          method: 'Cash',
+          paidBy: 'partner1',
+          notes: 'Lump-sum payment (Cash)'
         });
       }
     });
+  }
 
-    if (!state.supplierAdvances.some(sa => sa.batchId === 'akshar_batch_2026-08-30' || ((sa.supplierName || '').toLowerCase() === 'akshar' && sa.amount === 505))) {
-      state.supplierAdvances.push({
-        id: 'sadv_akshar_505',
-        batchId: 'akshar_batch_2026-08-30',
-        date: '2026-08-30',
-        supplierName: 'Akshar',
-        amount: 505,
-        remainingAmount: 505,
-        paidBy: 'partner1',
-        method: 'Cash',
-        notes: 'Advance balance from ₹5,000 cash payment'
-      });
+  // Ensure master payment record in state.supplierPayments reflects the actual ₹6,255 paid
+  if (!state.supplierPayments) state.supplierPayments = [];
+  state.supplierPayments = state.supplierPayments.filter(sp => sp.id !== 'akshar_batch_2026-08-30' && !(sp.date === '2026-08-30' && (sp.supplierName || '').trim().toLowerCase() === 'akshar'));
+  state.supplierPayments.push({
+    id: 'akshar_batch_2026-08-30',
+    date: '2026-08-30',
+    supplierName: 'Akshar',
+    totalAmount: 6255,
+    cashAmount: 6255,
+    debitAdjusted: 0,
+    totalSettled: 6255,
+    paidBy: 'partner1',
+    method: 'Cash',
+    notes: 'Paid ₹6,255 cash settling 6 purchase bills',
+    settledBills: ['#19 (₹97)', '#20 (₹748)', '#23 (₹3,275)', '#26 (₹325)', '#PB-111 (₹50)', '#PB-114 (₹1,760)'],
+    advanceAmount: 0
+  });
+
+  // Ensure NO artificial ₹505 or any advance exists for Akshar
+  if (state.supplierAdvances && state.supplierAdvances.length > 0) {
+    const beforeAdv = state.supplierAdvances.length;
+    state.supplierAdvances = state.supplierAdvances.filter(sa => 
+      sa.id !== 'sadv_akshar_505' && 
+      sa.batchId !== 'akshar_batch_2026-08-30' && 
+      !( (sa.supplierName || '').trim().toLowerCase() === 'akshar' && Number(sa.amount) === 505 )
+    );
+    if (state.supplierAdvances.length < beforeAdv) {
+      saveState();
     }
   }
 
@@ -5219,6 +5248,33 @@ function reconcileSupplierReturnsAndBills() {
 function renderPurchasesTable() {
   const tbody = document.getElementById("purchasesTableBody");
   if (!tbody) return;
+
+  let grossDue = 0;
+  (state.purchases || []).forEach(p => {
+    const total = Number(p.totalAmount) || 0;
+    const paid = p.paidAmount !== undefined ? Number(p.paidAmount) : (p.paymentStatus === 'Pending' ? 0 : total);
+    grossDue += Math.max(0, total - paid);
+  });
+
+  let totalAdvances = (state.supplierAdvances || []).reduce((acc, sa) => acc + (Number(sa.amount) || 0), 0);
+  let netPayable = Math.max(0, grossDue - totalAdvances);
+
+  const banner = document.getElementById("purchasesSummaryBanner");
+  if (banner) {
+    banner.innerHTML = `
+      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 font-bold border border-rose-200" title="Total gross balance across all individual unpaid bills">
+        Pending Bills: <b class="font-mono">${formatCurrency(grossDue)}</b>
+      </span>
+      ${totalAdvances > 0 ? `
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold border border-blue-200" title="Advance payments already given to suppliers">
+          Advance: <b class="font-mono">-${formatCurrency(totalAdvances)}</b>
+        </span>
+      ` : ''}
+      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-700 text-white font-bold shadow-xs" title="Actual net payable to suppliers (Bills − Advance)">
+        Net Payable: <b class="font-mono">${formatCurrency(netPayable)}</b>
+      </span>
+    `;
+  }
 
   if (state.purchases.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="py-5 text-center text-slate-400">No purchase bills recorded.</td></tr>`;
@@ -7661,7 +7717,15 @@ function updateSupplierLumpSumModalDetails(vendorName) {
     }
   });
 
-  const netPayable = Math.max(0, totalDue - totalDebitNotes);
+  let totalAdvance = 0;
+  (state.supplierAdvances || []).forEach(sa => {
+    const name = (sa.supplierName || '').trim();
+    if (name.toLowerCase() === vendorName.toLowerCase()) {
+      totalAdvance += Number(sa.amount) || 0;
+    }
+  });
+
+  const netPayable = Math.max(0, totalDue - totalDebitNotes - totalAdvance);
 
   if (dueEl) dueEl.textContent = formatCurrency(netPayable);
   if (amtInput) {
@@ -7674,6 +7738,9 @@ function updateSupplierLumpSumModalDetails(vendorName) {
 
   if (totalDebitNotes > 0) {
     breakdownText += ` | <span class="text-emerald-700 font-bold">Debit Notes: -${formatCurrency(totalDebitNotes)}</span>`;
+  }
+  if (totalAdvance > 0) {
+    breakdownText += ` | <span class="text-blue-700 font-bold">Advance Credit: -${formatCurrency(totalAdvance)}</span>`;
   }
 
   if (billsContainer) {

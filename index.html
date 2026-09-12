@@ -795,9 +795,14 @@
 
       <!-- Purchases Table -->
       <div class="pro-card overflow-hidden">
-        <div class="px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">Purchase Inward Bills</h3>
-          <span class="text-[11px] text-slate-400 font-medium">Inward Stock</span>
+        <div class="px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div>
+            <h3 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">Purchase Inward Bills</h3>
+            <span class="text-[11px] text-slate-500 font-medium">બધા ખરીદી બિલોની વિગતવાર યાદી</span>
+          </div>
+          <div id="purchasesSummaryBanner" class="flex flex-wrap items-center gap-2 text-xs">
+            <!-- Dynamically populated in renderPurchasesTable -->
+          </div>
         </div>
         <div class="overflow-x-auto scrollbar-none">
           <table class="pro-table">
