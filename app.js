@@ -7704,18 +7704,38 @@ function updateSupplierLumpSumModalDetails(vendorName) {
     })
     .filter(x => x.due > 0);
 
-  const totalDue = unpaidPurchases.reduce((acc, x) => acc + x.due, 0);
+function getAvailableDebitNotesForVendor(vendorName) {
+  if (!vendorName) return 0;
+  const vLower = vendorName.trim().toLowerCase();
 
-  let totalDebitNotes = 0;
+  let totalReturnsVal = 0;
   (state.supplierReturns || []).forEach(sr => {
-    const name = (sr.vendor || sr.supplierName || '').trim();
-    if (name.toLowerCase() === vendorName.toLowerCase()) {
+    const name = (sr.vendor || sr.supplierName || '').trim().toLowerCase();
+    if (name === vLower) {
       const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
       if (isDebitNote) {
-        totalDebitNotes += Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || 0);
+        totalReturnsVal += Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || Number(sr.netReturnVal) || 0);
       }
     }
   });
+
+  let totalAdjusted = 0;
+  (state.purchases || []).forEach(p => {
+    if ((p.vendor || '').trim().toLowerCase() === vLower) {
+      const pDeb = Number(p.debitNoteAdjusted) || 0;
+      let histDeb = 0;
+      if (Array.isArray(p.paymentHistory)) {
+        histDeb = p.paymentHistory.reduce((sum, ph) => sum + (Number(ph.debitAdjusted) || 0), 0);
+      }
+      totalAdjusted += Math.max(pDeb, histDeb);
+    }
+  });
+
+  return Math.max(0, Math.round((totalReturnsVal - totalAdjusted) * 100) / 100);
+}
+
+  const totalDue = unpaidPurchases.reduce((acc, x) => acc + x.due, 0);
+  const totalDebitNotes = getAvailableDebitNotesForVendor(vendorName);
 
   let totalAdvance = 0;
   (state.supplierAdvances || []).forEach(sa => {
@@ -7804,17 +7824,8 @@ function handleSaveSupplierLumpSumPay(e) {
       .filter(p => (p.vendor || '').trim().toLowerCase() === vendorName.toLowerCase())
       .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
-    // Calculate total debit notes for this vendor
-    let totalDebitNotes = 0;
-    (state.supplierReturns || []).forEach(sr => {
-      const name = (sr.vendor || sr.supplierName || '').trim();
-      if (name.toLowerCase() === vendorName.toLowerCase()) {
-        const isDebitNote = sr.settlementMode === 'ledger_credit' || sr.settlementType === 'Debit Note (Deduct from Future Bill)' || (!sr.settlementMode && !sr.settlementType);
-        if (isDebitNote) {
-          totalDebitNotes += Math.abs(Number(sr.netBalance) || Number(sr.totalReturnedVal) || 0);
-        }
-      }
-    });
+    // Calculate available unadjusted debit notes for this vendor
+    let totalDebitNotes = getAvailableDebitNotesForVendor(vendorName);
 
     if (amount <= 0 && totalDebitNotes <= 0) {
       showToast("Please enter a valid payment amount or ensure a return/debit note exists!", true);
